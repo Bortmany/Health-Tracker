@@ -2,6 +2,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import { pool } from './db/pool.js';
+import authRouter from './routes/auth.js';
 
 const app = express();
 
@@ -16,6 +17,13 @@ app.get('/api/health', async (_req, res) => {
   } catch (err) {
     res.status(503).json({ status: 'error', db: 'disconnected', message: err.message });
   }
+});
+
+app.use('/api/auth', authRouter);
+
+app.use((err, _req, res, _next) => {
+  console.error(err);
+  res.status(500).json({ error: { message: 'Internal server error', code: 'INTERNAL_ERROR' } });
 });
 
 const port = process.env.PORT || 3001;
