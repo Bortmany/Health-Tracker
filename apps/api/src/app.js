@@ -7,6 +7,7 @@ import authRouter from './routes/auth.js';
 import habitsRouter from './routes/habits.js';
 import injuriesRouter from './routes/injuries.js';
 import logsRouter from './routes/logs.js';
+import nutritionRouter from './routes/nutrition.js';
 import programsRouter from './routes/programs.js';
 import settingsRouter from './routes/settings.js';
 import trainingLogsRouter from './routes/trainingLogs.js';
@@ -32,6 +33,7 @@ app.use('/api/habits', habitsRouter);
 app.use('/api/activities', activitiesRouter);
 app.use('/api/injuries', injuriesRouter);
 app.use('/api/logs', logsRouter);
+app.use('/api/nutrition', nutritionRouter);
 app.use('/api/programs', programsRouter);
 app.use('/api/training-logs', trainingLogsRouter);
 
