@@ -1,0 +1,20 @@
+{
+  "name": "api",
+  "private": true,
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --env-file-if-exists=../../.env --watch src/server.js",
+    "start": "node --env-file-if-exists=../../.env src/server.js",
+    "migrate": "node --env-file-if-exists=../../.env src/db/migrate.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1"
+  }
+}
