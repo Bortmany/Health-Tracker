@@ -1,0 +1,11 @@
+.screen {
+  padding: 1.25rem 1rem 1rem;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.empty {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}

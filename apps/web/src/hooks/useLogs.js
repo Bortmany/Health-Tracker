@@ -1,0 +1,28 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as logsApi from '../api/logs.js';
+
+export function useLog(date) {
+  return useQuery({
+    queryKey: ['log', date],
+    queryFn: () => logsApi.getLog(date),
+    enabled: Boolean(date),
+  });
+}
+
+export function useLogsRange({ from, to } = {}) {
+  return useQuery({
+    queryKey: ['logs', from, to],
+    queryFn: async () => (await logsApi.getLogs({ from, to })).logs,
+  });
+}
+
+export function usePutLog(date) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload) => logsApi.putLog(date, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['log', date] });
+      queryClient.invalidateQueries({ queryKey: ['logs'] });
+    },
+  });
+}
