@@ -35,7 +35,10 @@ export function useUpdateProgram() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...program }) => programsApi.updateProgram(id, program),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEY }),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: KEY });
+      queryClient.invalidateQueries({ queryKey: ['program', id] });
+    },
   });
 }
 
@@ -43,6 +46,9 @@ export function useDeleteProgram() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: programsApi.deleteProgram,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEY }),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: KEY });
+      queryClient.invalidateQueries({ queryKey: ['program', id] });
+    },
   });
 }
