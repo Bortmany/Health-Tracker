@@ -1,6 +1,7 @@
 import { useQueries } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import * as logsApi from '../api/logs.js';
+import LineChart from '../components/LineChart.jsx';
 import { useMe } from '../hooks/useAuth.js';
 import { useLogsRange } from '../hooks/useLogs.js';
 import { useSettings } from '../hooks/useSettings.js';
@@ -127,7 +128,16 @@ export default function Dashboard() {
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Weight trend</h2>
-        <div className={styles.chartStub}>Chart coming in Phase 5 — {weighIns.length} weigh-ins in the last 30 days</div>
+        {logsLoading ? (
+          <div className="skeleton" style={{ height: 160 }} />
+        ) : weighIns.length > 0 ? (
+          <LineChart
+            labels={weighIns.map((l) => l.date.slice(5, 10))}
+            values={weighIns.map((l) => l.weight)}
+          />
+        ) : (
+          <div className={styles.chartStub}>No weigh-ins in the last 30 days yet</div>
+        )}
       </section>
     </div>
   );

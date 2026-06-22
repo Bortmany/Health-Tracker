@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useActivities } from '../hooks/useActivities.js';
 import { useActiveInjuries } from '../hooks/useInjuries.js';
 import { useLog, usePutLog } from '../hooks/useLogs.js';
+import { useNutrition, usePutNutrition } from '../hooks/useNutrition.js';
 import styles from './Log.module.css';
 
 const DURATIONS = [5, 10, 15, 20, 30, 45, 60, 75, 90, 120];
@@ -35,9 +36,19 @@ const METRIC_FIELDS = [
   { key: 'calories', label: 'Calories', step: '1' },
 ];
 
-function buildFormFromData(data) {
+function buildFormFromData(data, nutritionData) {
   return {
     weight: data.log?.weight ?? '',
+    foodCalories: nutritionData?.log?.calories ?? '',
+    protein: nutritionData?.log?.protein ?? '',
+    carbs: nutritionData?.log?.carbs ?? '',
+    fat: nutritionData?.log?.fat ?? '',
+    meals: (nutritionData?.meals ?? []).map((m, i) => ({
+      key: m.id ?? `new-${i}`,
+      name: m.name ?? '',
+      calories: m.calories ?? '',
+      protein: m.protein ?? '',
+    })),
     waist: data.log?.waist ?? '',
     sleep: data.log?.sleep ?? '',
     hrv: data.log?.hrv ?? '',
@@ -68,13 +79,15 @@ function buildFormFromData(data) {
 export default function Log() {
   const [date, setDate] = useState(todayISO());
   const { data, isLoading } = useLog(date);
+  const { data: nutritionData, isLoading: nutritionLoading } = useNutrition(date);
   const { data: activityOptions = [] } = useActivities();
   const putLog = usePutLog(date);
+  const putNutrition = usePutNutrition(date);
   const [form, setForm] = useState(null);
 
   useEffect(() => {
-    if (data) setForm(buildFormFromData(data));
-  }, [date, data]);
+    if (data && nutritionData) setForm(buildFormFromData(data, nutritionData));
+  }, [date, data, nutritionData]);
 
   function updateField(key, value) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -103,6 +116,24 @@ export default function Log() {
 
   function removeActivityRow(key) {
     setForm((f) => ({ ...f, activities: f.activities.filter((a) => a.key !== key) }));
+  }
+
+  function addMealRow() {
+    setForm((f) => ({
+      ...f,
+      meals: [...f.meals, { key: `new-${Date.now()}`, name: '', calories: '', protein: '' }],
+    }));
+  }
+
+  function updateMealRow(key, patch) {
+    setForm((f) => ({
+      ...f,
+      meals: f.meals.map((m) => (m.key === key ? { ...m, ...patch } : m)),
+    }));
+  }
+
+  function removeMealRow(key) {
+    setForm((f) => ({ ...f, meals: f.meals.filter((m) => m.key !== key) }));
   }
 
   function updateInjuryField(injuryId, key, value) {
@@ -143,6 +174,20 @@ export default function Log() {
         canTrainTomorrow: c.canTrainTomorrow,
       })),
     });
+
+    putNutrition.mutate({
+      calories: form.foodCalories === '' ? null : Number(form.foodCalories),
+      protein: form.protein === '' ? null : Number(form.protein),
+      carbs: form.carbs === '' ? null : Number(form.carbs),
+      fat: form.fat === '' ? null : Number(form.fat),
+      meals: form.meals
+        .filter((m) => m.name)
+        .map((m) => ({
+          name: m.name,
+          calories: m.calories === '' ? null : Number(m.calories),
+          protein: m.protein === '' ? null : Number(m.protein),
+        })),
+    });
   }
 
   return (
@@ -160,16 +205,17 @@ export default function Log() {
         <button
           className={styles.saveButton}
           onClick={handleSubmit}
-          disabled={!form || putLog.isPending}
+          disabled={!form || putLog.isPending || putNutrition.isPending}
           type="button"
         >
-          {putLog.isPending ? 'Saving...' : 'Save'}
+          {putLog.isPending || putNutrition.isPending ? 'Saving...' : 'Save'}
         </button>
       </div>
 
       {putLog.isError && <p className={styles.error}>{putLog.error.message}</p>}
+      {putNutrition.isError && <p className={styles.error}>{putNutrition.error.message}</p>}
 
-      {isLoading || !form ? (
+      {isLoading || nutritionLoading || !form ? (
         <>
           <div className="skeleton" style={{ height: 160, marginBottom: '1rem' }} />
           <div className="skeleton" style={{ height: 120, marginBottom: '1rem' }} />
@@ -245,6 +291,87 @@ export default function Log() {
             ))}
             <button type="button" className={styles.addButton} onClick={addActivityRow}>
               + Add activity
+            </button>
+          </section>
+
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Nutrition</h2>
+            <div className={styles.metricsGrid}>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Calories eaten</span>
+                <input
+                  className={styles.input}
+                  type="number"
+                  inputMode="decimal"
+                  step="1"
+                  value={form.foodCalories}
+                  onChange={(e) => updateField('foodCalories', e.target.value)}
+                />
+              </label>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Protein (g)</span>
+                <input
+                  className={styles.input}
+                  type="number"
+                  inputMode="decimal"
+                  step="1"
+                  value={form.protein}
+                  onChange={(e) => updateField('protein', e.target.value)}
+                />
+              </label>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Carbs (g)</span>
+                <input
+                  className={styles.input}
+                  type="number"
+                  inputMode="decimal"
+                  step="1"
+                  value={form.carbs}
+                  onChange={(e) => updateField('carbs', e.target.value)}
+                />
+              </label>
+              <label className={styles.field}>
+                <span className={styles.fieldLabel}>Fat (g)</span>
+                <input
+                  className={styles.input}
+                  type="number"
+                  inputMode="decimal"
+                  step="1"
+                  value={form.fat}
+                  onChange={(e) => updateField('fat', e.target.value)}
+                />
+              </label>
+            </div>
+
+            {form.meals.map((m) => (
+              <div className={styles.activityRow} key={m.key}>
+                <input
+                  className={styles.input}
+                  type="text"
+                  placeholder="Meal name"
+                  value={m.name}
+                  onChange={(e) => updateMealRow(m.key, { name: e.target.value })}
+                />
+                <input
+                  className={styles.input}
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="kcal"
+                  value={m.calories}
+                  onChange={(e) => updateMealRow(m.key, { calories: e.target.value })}
+                />
+                <button
+                  type="button"
+                  className={styles.removeButton}
+                  onClick={() => removeMealRow(m.key)}
+                  aria-label="Remove meal"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button type="button" className={styles.addButton} onClick={addMealRow}>
+              + Add meal
             </button>
           </section>
 

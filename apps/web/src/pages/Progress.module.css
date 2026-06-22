@@ -1,0 +1,32 @@
+.screen {
+  padding: 1.25rem 1rem 1rem;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.title {
+  font-size: 1.4rem;
+  margin-bottom: 1.25rem;
+}
+
+.section {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.sectionTitle {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin: 0 0 0.75rem;
+}
+
+.empty {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
