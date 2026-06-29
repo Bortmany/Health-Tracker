@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: cut-app
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run migrate -w apps/api && npm start -w apps/api
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cut-db
+          property: connectionString
+
+databases:
+  - name: cut-db
+    plan: free
