@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import PlanSection from '../components/PlanSection.jsx';
 import { useActivePrograms, useCreateProgram } from '../hooks/usePrograms.js';
 import {
   useCreateTrainingLog,
@@ -308,6 +309,8 @@ export default function Train() {
       </div>
 
       {mutationError && <p className={styles.error}>{mutationError.message}</p>}
+
+      <PlanSection />
 
       <section className={styles.section}>
         <div className={styles.sectionHeader}>

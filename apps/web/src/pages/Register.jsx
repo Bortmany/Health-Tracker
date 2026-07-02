@@ -12,7 +12,7 @@ export default function Register() {
 
   function handleSubmit(e) {
     e.preventDefault();
-    register.mutate({ displayName, email, password }, { onSuccess: () => navigate('/') });
+    register.mutate({ displayName, email, password }, { onSuccess: () => navigate('/onboarding') });
   }
 
   return (
