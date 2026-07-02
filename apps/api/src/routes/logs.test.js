@@ -93,6 +93,32 @@ test('PUT /logs/:date on an existing date replaces child rows rather than append
   assert.equal(body.activities[0].name, 'Freeform run');
 });
 
+test('GET /logs/habit-summary returns per-day habit completion counts', async () => {
+  const res = await fetch(`${baseUrl}/logs/habit-summary?from=2026-01-15&to=2026-01-16`, {
+    headers: { Cookie: cookie },
+  });
+  assert.equal(res.status, 200);
+  const { days } = await res.json();
+
+  assert.equal(days.length, 2);
+  const day1 = days.find((d) => d.date.startsWith('2026-01-15'));
+  assert.equal(day1.possible, 1);
+  assert.equal(day1.completed, 1);
+  const day2 = days.find((d) => d.date.startsWith('2026-01-16'));
+  assert.equal(day2.completed, 0);
+});
+
+test('registering with a short password is rejected', async () => {
+  const res = await fetch(`${baseUrl}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: `weak-${Date.now()}@example.com`, password: 'short', displayName: 'Weak' }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.error.code, 'WEAK_PASSWORD');
+});
+
 test('a second user cannot read another user\'s log for the same date', async () => {
   const email = `logs-test-other-${Date.now()}@example.com`;
   const registerRes = await fetch(`${baseUrl}/auth/register`, {

@@ -1,9 +1,7 @@
-import { useQueries } from '@tanstack/react-query';
-import { useMemo } from 'react';
-import * as logsApi from '../api/logs.js';
 import LineChart from '../components/LineChart.jsx';
 import { useMe } from '../hooks/useAuth.js';
-import { useLogsRange } from '../hooks/useLogs.js';
+import { useHabits } from '../hooks/useHabits.js';
+import { useHabitSummary, useLogsRange } from '../hooks/useLogs.js';
 import { useSettings } from '../hooks/useSettings.js';
 import styles from './Dashboard.module.css';
 
@@ -15,10 +13,6 @@ function dateNDaysAgo(n) {
   const d = new Date();
   d.setDate(d.getDate() - n);
   return d.toISOString().slice(0, 10);
-}
-
-function lastNDates(n) {
-  return Array.from({ length: n }, (_, i) => dateNDaysAgo(n - 1 - i));
 }
 
 function diffDays(a, b) {
@@ -33,13 +27,8 @@ export default function Dashboard() {
   const from = dateNDaysAgo(29);
   const { data: logs = [], isLoading: logsLoading } = useLogsRange({ from, to: today });
 
-  const last7 = useMemo(() => lastNDates(7), []);
-  const weekQueries = useQueries({
-    queries: last7.map((date) => ({
-      queryKey: ['log', date],
-      queryFn: () => logsApi.getLog(date),
-    })),
-  });
+  const { data: habitDays = [] } = useHabitSummary({ from: dateNDaysAgo(6), to: today });
+  const { data: activeHabits = [] } = useHabits();
 
   const weighIns = logs.filter((l) => l.weight != null);
   const currentWeight = weighIns.at(-1)?.weight ?? null;
@@ -48,17 +37,9 @@ export default function Dashboard() {
 
   const daysToTarget = settings?.targetDate ? diffDays(settings.targetDate, today) : null;
 
-  const weekLoaded = weekQueries.every((q) => q.isSuccess);
-  let completed = 0;
-  let possible = 0;
-  if (weekLoaded) {
-    for (const q of weekQueries) {
-      for (const h of q.data.habits) {
-        possible += 1;
-        if (h.completed) completed += 1;
-      }
-    }
-  }
+  // Every active habit counts for all 7 days, so days you didn't log count as misses.
+  const completed = habitDays.reduce((sum, d) => sum + d.completed, 0);
+  const possible = activeHabits.length * 7;
   const compliancePct = possible > 0 ? Math.round((completed / possible) * 100) : null;
 
   function trendClass() {

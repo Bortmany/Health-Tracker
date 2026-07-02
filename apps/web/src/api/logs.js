@@ -8,6 +8,14 @@ export function getLogs({ from, to } = {}) {
   return request(`/logs${qs ? `?${qs}` : ''}`);
 }
 
+export function getHabitSummary({ from, to } = {}) {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const qs = params.toString();
+  return request(`/logs/habit-summary${qs ? `?${qs}` : ''}`);
+}
+
 export function getLog(date) {
   return request(`/logs/${date}`);
 }

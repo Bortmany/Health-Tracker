@@ -33,6 +33,11 @@ router.post('/register', asyncHandler(async (req, res) => {
       error: { message: 'email, password, and displayName are required', code: 'INVALID_INPUT' },
     });
   }
+  if (password.length < 8) {
+    return res.status(400).json({
+      error: { message: 'Password must be at least 8 characters long', code: 'WEAK_PASSWORD' },
+    });
+  }
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
 

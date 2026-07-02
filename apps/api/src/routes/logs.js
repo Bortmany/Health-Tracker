@@ -37,6 +37,25 @@ router.get('/', asyncHandler(async (req, res) => {
   res.json({ logs: rows.map(toPublicLog) });
 }));
 
+// One query for the Dashboard's weekly habit ring instead of one request per day.
+router.get('/habit-summary', asyncHandler(async (req, res) => {
+  const from = DATE_RE.test(req.query.from) ? req.query.from : '1970-01-01';
+  const to = DATE_RE.test(req.query.to) ? req.query.to : '9999-12-31';
+
+  const { rows } = await pool.query(
+    `SELECT dl.date,
+            COUNT(dlh.habit_id)::int AS possible,
+            COUNT(dlh.habit_id) FILTER (WHERE dlh.completed)::int AS completed
+     FROM daily_logs dl
+     JOIN daily_log_habits dlh ON dlh.daily_log_id = dl.id
+     WHERE dl.user_id = $1 AND dl.date BETWEEN $2 AND $3
+     GROUP BY dl.date
+     ORDER BY dl.date`,
+    [req.userId, from, to]
+  );
+  res.json({ days: rows.map((r) => ({ date: r.date, possible: r.possible, completed: r.completed })) });
+}));
+
 router.get('/:date', asyncHandler(async (req, res) => {
   const { date } = req.params;
   if (!DATE_RE.test(date)) {

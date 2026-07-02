@@ -1,6 +1,9 @@
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { pool } from './db/pool.js';
@@ -16,9 +19,23 @@ import trainingLogsRouter from './routes/trainingLogs.js';
 
 export const app = express();
 
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(compression());
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }));
+
+// Slow down password-guessing: 20 login/register attempts per 15 minutes per IP.
+// Off outside production so local dev and the test suite aren't throttled.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV !== 'production',
+  message: { error: { message: 'Too many attempts. Please wait 15 minutes and try again.', code: 'RATE_LIMITED' } },
+});
+app.use('/api/auth', authLimiter);
 
 app.get('/api/health', async (_req, res) => {
   try {
