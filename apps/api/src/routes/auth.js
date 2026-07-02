@@ -28,12 +28,13 @@ function toPublicUser(row) {
     email: row.email,
     displayName: row.display_name,
     planTier: row.plan_tier ?? 'free',
+    role: row.role ?? 'consumer',
     createdAt: row.created_at,
   };
 }
 
 router.post('/register', asyncHandler(async (req, res) => {
-  const { email, password, displayName } = req.body ?? {};
+  const { email, password, displayName, role } = req.body ?? {};
   if (!email || !password || !displayName) {
     return res.status(400).json({
       error: { message: 'email, password, and displayName are required', code: 'INVALID_INPUT' },
@@ -44,6 +45,11 @@ router.post('/register', asyncHandler(async (req, res) => {
       error: { message: 'Password must be at least 8 characters long', code: 'WEAK_PASSWORD' },
     });
   }
+  if (role !== undefined && role !== 'consumer' && role !== 'coach') {
+    return res.status(400).json({
+      error: { message: "role must be 'consumer' or 'coach'", code: 'INVALID_INPUT' },
+    });
+  }
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
 
@@ -51,10 +57,10 @@ router.post('/register', asyncHandler(async (req, res) => {
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `INSERT INTO users (email, password_hash, display_name)
-       VALUES ($1, $2, $3)
-       RETURNING id, email, display_name, plan_tier, created_at`,
-      [email.toLowerCase(), passwordHash, displayName]
+      `INSERT INTO users (email, password_hash, display_name, role)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, email, display_name, plan_tier, role, created_at`,
+      [email.toLowerCase(), passwordHash, displayName, role ?? 'consumer']
     );
     const user = rows[0];
     await client.query('INSERT INTO user_settings (user_id) VALUES ($1)', [user.id]);
