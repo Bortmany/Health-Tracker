@@ -1,7 +1,7 @@
 import LineChart from '../components/LineChart.jsx';
 import { useMe } from '../hooks/useAuth.js';
 import { useHabits } from '../hooks/useHabits.js';
-import { useHabitSummary, useLogsRange } from '../hooks/useLogs.js';
+import { useHabitSummary, useLogsRange, useStreak } from '../hooks/useLogs.js';
 import { useSettings } from '../hooks/useSettings.js';
 import styles from './Dashboard.module.css';
 
@@ -29,6 +29,7 @@ export default function Dashboard() {
 
   const { data: habitDays = [] } = useHabitSummary({ from: dateNDaysAgo(6), to: today });
   const { data: activeHabits = [] } = useHabits();
+  const { data: streak, isLoading: streakLoading } = useStreak();
 
   const weighIns = logs.filter((l) => l.weight != null);
   const currentWeight = weighIns.at(-1)?.weight ?? null;
@@ -77,6 +78,19 @@ export default function Dashboard() {
           <p className={styles.cardSub} style={{ color: 'var(--text-dim)' }}>
             {settings?.targetWeight != null ? `target ${settings.targetWeight} kg` : 'set a target in More'}
           </p>
+        </div>
+        <div className={styles.card}>
+          <p className={styles.cardLabel}>Streak</p>
+          {streakLoading ? (
+            <div className="skeleton" style={{ height: 28, width: '60%' }} />
+          ) : (
+            <>
+              <p className={styles.cardValue}>{`${streak ?? 0} day${streak === 1 ? '' : 's'}`}</p>
+              <p className={styles.cardSub} style={{ color: 'var(--text-dim)' }}>
+                days in a row with a log
+              </p>
+            </>
+          )}
         </div>
       </div>
 

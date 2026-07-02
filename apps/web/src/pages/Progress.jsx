@@ -1,6 +1,7 @@
 import LineChart from '../components/LineChart.jsx';
 import { useLogsRange } from '../hooks/useLogs.js';
 import { useNutritionRange } from '../hooks/useNutrition.js';
+import { usePersonalRecords } from '../hooks/useTrainingLogs.js';
 import styles from './Progress.module.css';
 
 function todayISO() {
@@ -18,6 +19,7 @@ export default function Progress() {
   const from = dateNDaysAgo(59);
   const { data: logs = [], isLoading: logsLoading } = useLogsRange({ from, to: today });
   const { data: nutritionLogs = [], isLoading: nutritionLoading } = useNutritionRange({ from, to: today });
+  const { data: records = [], isLoading: recordsLoading } = usePersonalRecords();
 
   const weighIns = logs.filter((l) => l.weight != null);
   const calorieDays = nutritionLogs.filter((l) => l.calories != null);
@@ -49,6 +51,27 @@ export default function Progress() {
           />
         ) : (
           <p className={styles.empty}>No food logged yet.</p>
+        )}
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Personal records</h2>
+        {recordsLoading ? (
+          <div className="skeleton" style={{ height: 120 }} />
+        ) : records.length > 0 ? (
+          records.slice(0, 10).map((r, i) => (
+            <div className={styles.recordRow} key={`${r.name}-${i}`}>
+              <div>
+                <p className={styles.recordName}>{r.name}</p>
+                <p className={styles.recordDate}>{r.date.slice(0, 10)}</p>
+              </div>
+              <span className={styles.recordValue}>
+                {r.weight} kg × {r.reps}
+              </span>
+            </div>
+          ))
+        ) : (
+          <p className={styles.empty}>Log some weighted sets and your best lifts will show up here.</p>
         )}
       </section>
     </div>

@@ -30,3 +30,34 @@
   color: var(--text-dim);
   font-size: 0.9rem;
 }
+
+.recordRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding: 0.6rem 0;
+}
+
+.recordRow:last-child {
+  border-bottom: none;
+}
+
+.recordName {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.recordDate {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.recordValue {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--text);
+  white-space: nowrap;
+}
