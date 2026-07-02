@@ -7,12 +7,16 @@ export default function Register() {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState('consumer');
   const register = useRegister();
   const navigate = useNavigate();
 
   function handleSubmit(e) {
     e.preventDefault();
-    register.mutate({ displayName, email, password }, { onSuccess: () => navigate('/onboarding') });
+    register.mutate(
+      { displayName, email, password, role },
+      { onSuccess: () => navigate(role === 'coach' ? '/clients' : '/onboarding') }
+    );
   }
 
   return (
@@ -58,6 +62,23 @@ export default function Register() {
             minLength={8}
             required
           />
+          <span className={styles.label}>I'm training</span>
+          <div className={styles.roleToggle}>
+            <button
+              type="button"
+              className={`${styles.roleOption} ${role === 'consumer' ? styles.roleOptionActive : ''}`}
+              onClick={() => setRole('consumer')}
+            >
+              I'm training myself
+            </button>
+            <button
+              type="button"
+              className={`${styles.roleOption} ${role === 'coach' ? styles.roleOptionActive : ''}`}
+              onClick={() => setRole('coach')}
+            >
+              I'm a coach
+            </button>
+          </div>
           {register.isError && <p className={styles.error}>{register.error.message}</p>}
           <button className={styles.submit} type="submit" disabled={register.isPending}>
             {register.isPending ? 'Creating account...' : 'Create account'}

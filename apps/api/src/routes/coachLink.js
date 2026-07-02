@@ -13,48 +13,74 @@ router.post('/redeem', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: { message: 'code is required', code: 'INVALID_INPUT' } });
   }
 
-  const { rows: inviteRows } = await pool.query(
-    `SELECT * FROM coach_clients WHERE invite_code = $1 AND status = 'pending'`,
-    [code]
-  );
-  const invite = inviteRows[0];
-  if (!invite) {
-    return res.status(404).json({
-      error: { message: 'That invite code was not found or has already been used', code: 'NOT_FOUND' },
-    });
-  }
+  // Everything runs in one transaction with the invite row locked, so two
+  // people redeeming at once (or one person redeeming two codes at once)
+  // can't slip past the checks.
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  if (invite.coach_id === req.userId) {
-    return res.status(400).json({
-      error: { message: "You can't use your own invite code", code: 'INVALID_INPUT' },
-    });
-  }
-
-  const { rows: existingRows } = await pool.query(
-    `SELECT coach_id FROM coach_clients WHERE client_id = $1 AND status = 'active'`,
-    [req.userId]
-  );
-  const existing = existingRows[0];
-  if (existing) {
-    if (existing.coach_id === invite.coach_id) {
-      return res.status(400).json({
-        error: { message: "You're already connected to this coach", code: 'ALREADY_CONNECTED' },
+    const { rows: inviteRows } = await client.query(
+      `SELECT * FROM coach_clients WHERE invite_code = $1 AND status = 'pending' FOR UPDATE`,
+      [code]
+    );
+    const invite = inviteRows[0];
+    if (!invite) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        error: { message: 'That invite code was not found or has already been used', code: 'NOT_FOUND' },
       });
     }
-    return res.status(400).json({
-      error: { message: 'You already have a coach. Remove them first under More.', code: 'HAS_COACH' },
-    });
+
+    if (invite.coach_id === req.userId) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: { message: "You can't use your own invite code", code: 'INVALID_INPUT' },
+      });
+    }
+
+    const { rows: existingRows } = await client.query(
+      `SELECT coach_id FROM coach_clients WHERE client_id = $1 AND status = 'active' FOR UPDATE`,
+      [req.userId]
+    );
+    const existing = existingRows[0];
+    if (existing) {
+      await client.query('ROLLBACK');
+      if (existing.coach_id === invite.coach_id) {
+        return res.status(400).json({
+          error: { message: "You're already connected to this coach", code: 'ALREADY_CONNECTED' },
+        });
+      }
+      return res.status(400).json({
+        error: { message: 'You already have a coach. Remove them first under More.', code: 'HAS_COACH' },
+      });
+    }
+
+    const { rows, rowCount } = await client.query(
+      `UPDATE coach_clients SET client_id = $1, status = 'active'
+       WHERE id = $2 AND status = 'pending'
+       RETURNING coach_id`,
+      [req.userId, invite.id]
+    );
+    if (rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        error: { message: 'That invite code was not found or has already been used', code: 'NOT_FOUND' },
+      });
+    }
+
+    const { rows: coachRows } = await client.query('SELECT display_name FROM users WHERE id = $1', [
+      rows[0].coach_id,
+    ]);
+    await client.query('COMMIT');
+
+    res.json({ coach: { displayName: coachRows[0]?.display_name ?? null } });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
-
-  const { rows } = await pool.query(
-    `UPDATE coach_clients SET client_id = $1, status = 'active' WHERE id = $2 RETURNING coach_id`,
-    [req.userId, invite.id]
-  );
-  const { rows: coachRows } = await pool.query('SELECT display_name FROM users WHERE id = $1', [
-    rows[0].coach_id,
-  ]);
-
-  res.json({ coach: { displayName: coachRows[0]?.display_name ?? null } });
 }));
 
 router.get('/', asyncHandler(async (req, res) => {

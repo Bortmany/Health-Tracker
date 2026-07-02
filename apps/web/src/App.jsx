@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import AppLayout from './components/AppLayout.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import Clients from './pages/Clients.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Log from './pages/Log.jsx';
 import Login from './pages/Login.jsx';
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="/log" element={<Log />} />
             <Route path="/progress" element={<Progress />} />
             <Route path="/train" element={<Train />} />
+            <Route path="/clients" element={<Clients />} />
             <Route path="/more" element={<More />} />
           </Route>
         </Route>

@@ -40,6 +40,8 @@ const authLimiter = rateLimit({
   message: { error: { message: 'Too many attempts. Please wait 15 minutes and try again.', code: 'RATE_LIMITED' } },
 });
 app.use('/api/auth', authLimiter);
+// Invite codes get the same guessing protection as passwords.
+app.use('/api/coach-link/redeem', authLimiter);
 
 app.get('/api/health', async (_req, res) => {
   try {

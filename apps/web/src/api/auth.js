@@ -1,9 +1,9 @@
 import { request } from './client.js';
 
-export function register({ email, password, displayName }) {
+export function register({ email, password, displayName, role }) {
   return request('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password, displayName }),
+    body: JSON.stringify({ email, password, displayName, role }),
   });
 }
 
