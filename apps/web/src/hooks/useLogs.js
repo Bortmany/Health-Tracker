@@ -16,6 +16,13 @@ export function useLogsRange({ from, to } = {}) {
   });
 }
 
+export function useHabitSummary({ from, to } = {}) {
+  return useQuery({
+    queryKey: ['habitSummary', from, to],
+    queryFn: async () => (await logsApi.getHabitSummary({ from, to })).days,
+  });
+}
+
 export function usePutLog(date) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -23,6 +30,7 @@ export function usePutLog(date) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['log', date] });
       queryClient.invalidateQueries({ queryKey: ['logs'] });
+      queryClient.invalidateQueries({ queryKey: ['habitSummary'] });
     },
   });
 }
