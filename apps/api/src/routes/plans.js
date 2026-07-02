@@ -167,9 +167,11 @@ router.get('/my-plan', asyncHandler(async (req, res) => {
   const plan = rows[0];
   if (!plan) return res.json({ plan: null });
 
-  const daysSinceStart = Math.floor(
-    (Date.now() - new Date(plan.start_date).getTime()) / (1000 * 60 * 60 * 24)
-  );
+  // Compare calendar dates, not clock times, so week boundaries don't
+  // drift by a day depending on what time of day someone opens the app.
+  const startDate = plan.start_date.toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  const daysSinceStart = Math.round((Date.parse(today) - Date.parse(startDate)) / (1000 * 60 * 60 * 24));
   const rawWeek = Math.floor(Math.max(daysSinceStart, 0) / 7) + 1;
   const completed = rawWeek > plan.duration_weeks;
   const weekNumber = Math.min(rawWeek, plan.duration_weeks);
@@ -185,7 +187,7 @@ router.get('/my-plan', asyncHandler(async (req, res) => {
       name: plan.name,
       description: plan.description,
       programId: plan.program_id,
-      startDate: plan.start_date,
+      startDate,
       durationWeeks: plan.duration_weeks,
       completed,
       ...targets,

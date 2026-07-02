@@ -56,11 +56,21 @@ const STEPS = [
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { data: settings } = useSettings();
+  const { data: settings, isLoading } = useSettings();
   const updateSettings = useUpdateSettings();
   const [stepIndex, setStepIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const step = STEPS[stepIndex];
+
+  // Wait for existing settings to load so finishing the quiz can't
+  // accidentally overwrite saved goals with blanks.
+  if (isLoading) {
+    return (
+      <div className={styles.screen}>
+        <div className="skeleton" style={{ height: 200 }} />
+      </div>
+    );
+  }
 
   function saveAndFinish(finalAnswers) {
     updateSettings.mutate(

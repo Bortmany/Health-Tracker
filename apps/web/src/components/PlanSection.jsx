@@ -77,7 +77,7 @@ export default function PlanSection() {
               key={t.id}
               template={t}
               adopting={adopt.isPending && adopt.variables?.id === t.id}
-              onAdopt={() => adopt.mutate({ id: t.id })}
+              onAdopt={() => adopt.mutate({ id: t.id, startDate: new Date().toLocaleDateString('en-CA') })}
             />
           ))}
         </div>
