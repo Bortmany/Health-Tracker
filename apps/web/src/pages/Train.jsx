@@ -162,6 +162,7 @@ function ProgramBuilder({ onCreated }) {
                 value={ex.name}
                 onChange={(e) => updateExercise(day.key, ex.key, { name: e.target.value })}
                 placeholder="Exercise name"
+                list="exercise-library"
               />
               <button
                 type="button"
@@ -406,6 +407,7 @@ export default function Train() {
                   placeholder="Exercise name"
                   value={ex.name}
                   onChange={(e) => updateExerciseRow(ex.key, { name: e.target.value })}
+                  list="exercise-library"
                 />
                 <button
                   type="button"
