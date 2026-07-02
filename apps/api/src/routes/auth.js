@@ -23,7 +23,13 @@ function cookieOptions() {
 }
 
 function toPublicUser(row) {
-  return { id: row.id, email: row.email, displayName: row.display_name, createdAt: row.created_at };
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.display_name,
+    planTier: row.plan_tier ?? 'free',
+    createdAt: row.created_at,
+  };
 }
 
 router.post('/register', asyncHandler(async (req, res) => {
@@ -47,7 +53,7 @@ router.post('/register', asyncHandler(async (req, res) => {
     const { rows } = await client.query(
       `INSERT INTO users (email, password_hash, display_name)
        VALUES ($1, $2, $3)
-       RETURNING id, email, display_name, created_at`,
+       RETURNING id, email, display_name, plan_tier, created_at`,
       [email.toLowerCase(), passwordHash, displayName]
     );
     const user = rows[0];

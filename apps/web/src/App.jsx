@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import Log from './pages/Log.jsx';
 import Login from './pages/Login.jsx';
 import More from './pages/More.jsx';
+import Onboarding from './pages/Onboarding.jsx';
 import Progress from './pages/Progress.jsx';
 import Register from './pages/Register.jsx';
 import Train from './pages/Train.jsx';
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route element={<ProtectedRoute />}>
+          <Route path="/onboarding" element={<Onboarding />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/log" element={<Log />} />

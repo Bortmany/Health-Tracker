@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMe, useLogout } from '../hooks/useAuth.js';
 import { useSettings, useUpdateSettings } from '../hooks/useSettings.js';
 import styles from './More.module.css';
@@ -70,10 +71,23 @@ export default function More() {
           <div>
             <div>{user?.displayName}</div>
             <div className={styles.accountLabel}>{user?.email}</div>
+            <div className={styles.accountLabel}>
+              {user?.planTier === 'premium' ? 'Premium plan' : 'Free plan — upgrades coming soon'}
+            </div>
           </div>
           <button className={styles.logoutButton} onClick={() => logout.mutate()} disabled={logout.isPending} type="button">
             {logout.isPending ? 'Logging out...' : 'Log out'}
           </button>
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Training quiz</h2>
+        <div className={styles.accountRow}>
+          <div className={styles.accountLabel}>Your answers shape which workout plans we recommend.</div>
+          <Link className={styles.logoutButton} to="/onboarding" style={{ textDecoration: 'none' }}>
+            Retake quiz
+          </Link>
         </div>
       </section>
 
