@@ -32,6 +32,21 @@ router.post('/', asyncHandler(async (req, res) => {
         error: { message: 'Every entry needs a date in YYYY-MM-DD format', code: 'INVALID_INPUT' },
       });
     }
+    // Reject bad readings with a clear message instead of a server error.
+    for (const field of ['weight', 'sleep']) {
+      if (entry[field] != null && !Number.isFinite(Number(entry[field]))) {
+        return res.status(400).json({
+          error: { message: `${field} must be a number (entry for ${entry.date})`, code: 'INVALID_INPUT' },
+        });
+      }
+    }
+    for (const field of ['steps', 'calories']) {
+      if (entry[field] != null && !Number.isInteger(Number(entry[field]))) {
+        return res.status(400).json({
+          error: { message: `${field} must be a whole number (entry for ${entry.date})`, code: 'INVALID_INPUT' },
+        });
+      }
+    }
   }
 
   const client = await pool.connect();
