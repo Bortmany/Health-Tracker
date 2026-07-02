@@ -299,4 +299,7 @@ CREATE INDEX coach_clients_coach_id_idx ON coach_clients(coach_id);
 CREATE UNIQUE INDEX coach_clients_coach_id_client_id_idx ON coach_clients(coach_id, client_id) WHERE client_id IS NOT NULL;
 
 -- 014: one active coach per client, enforced by the database
--- CREATE UNIQUE INDEX coach_clients_one_active_coach_idx ON coach_clients(client_id) WHERE status = 'active';
+CREATE UNIQUE INDEX coach_clients_one_active_coach_idx ON coach_clients(client_id) WHERE status = 'active';
+
+-- 015: billing
+ALTER TABLE users ADD COLUMN stripe_customer_id TEXT;

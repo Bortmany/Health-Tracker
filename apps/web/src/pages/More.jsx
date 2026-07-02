@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMe, useLogout } from '../hooks/useAuth.js';
+import { useBillingStatus, useCheckout } from '../hooks/useBilling.js';
 import { useMyCoach, useRedeemCoachCode, useRemoveMyCoach } from '../hooks/useCoach.js';
 import { useSettings, useUpdateSettings } from '../hooks/useSettings.js';
 import styles from './More.module.css';
@@ -25,6 +27,39 @@ function buildForm(settings) {
     stepGoal: settings?.stepGoal ?? '',
     sleepGoal: settings?.sleepGoal ?? '',
   };
+}
+
+function PlanTierLine({ planTier }) {
+  const { data: billing } = useBillingStatus();
+  const checkout = useCheckout();
+
+  if (planTier === 'premium') {
+    return <div className={styles.accountLabel}>Premium plan</div>;
+  }
+  if (!billing?.enabled) {
+    return <div className={styles.accountLabel}>Free plan — upgrades coming soon</div>;
+  }
+  return (
+    <div className={styles.accountLabel}>
+      Free plan{' — '}
+      <button
+        type="button"
+        onClick={() => checkout.mutate()}
+        disabled={checkout.isPending}
+        style={{
+          background: 'none',
+          border: 'none',
+          color: 'var(--accent)',
+          cursor: 'pointer',
+          padding: 0,
+          font: 'inherit',
+        }}
+      >
+        {checkout.isPending ? 'Opening checkout...' : 'Upgrade to Premium'}
+      </button>
+      {checkout.isError && <span> ({checkout.error.message})</span>}
+    </div>
+  );
 }
 
 function CoachSection() {
@@ -92,6 +127,18 @@ export default function More() {
   const updateSettings = useUpdateSettings();
   const logout = useLogout();
   const [form, setForm] = useState(buildForm(settings));
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
+
+  // Coming back from a successful Stripe checkout: refresh the account so
+  // the Premium label shows up without a manual reload.
+  useEffect(() => {
+    if (searchParams.get('upgraded')) {
+      queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+      queryClient.invalidateQueries({ queryKey: ['billingStatus'] });
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, queryClient]);
 
   useEffect(() => {
     if (settings) setForm(buildForm(settings));
@@ -131,9 +178,7 @@ export default function More() {
           <div>
             <div>{user?.displayName}</div>
             <div className={styles.accountLabel}>{user?.email}</div>
-            <div className={styles.accountLabel}>
-              {user?.planTier === 'premium' ? 'Premium plan' : 'Free plan — upgrades coming soon'}
-            </div>
+            <PlanTierLine planTier={user?.planTier} />
             {user?.role === 'coach' && <div className={styles.accountLabel}>Coach account</div>}
           </div>
           <button className={styles.logoutButton} onClick={() => logout.mutate()} disabled={logout.isPending} type="button">

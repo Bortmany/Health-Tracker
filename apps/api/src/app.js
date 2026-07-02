@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import { pool } from './db/pool.js';
 import activitiesRouter from './routes/activities.js';
 import authRouter from './routes/auth.js';
+import billingRouter from './routes/billing.js';
 import coachRouter from './routes/coach.js';
 import coachLinkRouter from './routes/coachLink.js';
 import exercisesRouter from './routes/exercises.js';
@@ -26,6 +27,9 @@ export const app = express();
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(compression());
+// Stripe's webhook signature is checked against the raw request bytes, so
+// that one path must skip JSON parsing. It's registered before express.json.
+app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }));
@@ -54,6 +58,7 @@ app.get('/api/health', async (_req, res) => {
 });
 
 app.use('/api/auth', authRouter);
+app.use('/api/billing', billingRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/habits', habitsRouter);
 app.use('/api/activities', activitiesRouter);
