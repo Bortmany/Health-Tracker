@@ -1,0 +1,269 @@
+.screen {
+  padding: 1.25rem 1rem 1rem;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: 1.25rem;
+}
+
+.section {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.sectionTitle {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin: 0 0 0.75rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.fieldLabel {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.input,
+.select,
+.textarea {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 0.55rem 0.7rem;
+  font-size: 0.95rem;
+  font-family: var(--font-mono);
+  width: 100%;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.saveButton {
+  background: var(--accent);
+  color: #0a0a0a;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.saveButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.editButton {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.removeButton {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 8px;
+  height: 2.4rem;
+  width: 2.4rem;
+  cursor: pointer;
+}
+
+.addButton {
+  background: none;
+  border: 1px dashed var(--border);
+  color: var(--accent);
+  border-radius: 8px;
+  padding: 0.5rem;
+  width: 100%;
+  cursor: pointer;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.error {
+  color: #ff6b6b;
+  font-size: 0.875rem;
+  margin: 0 0 1rem;
+}
+
+.empty {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.inviteCodeBox {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.inviteCode {
+  font-family: var(--font-mono);
+  font-size: 1.4rem;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  flex: 1;
+}
+
+.hint {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  margin: 0.4rem 0 1rem;
+}
+
+.inviteRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.inviteRow:last-child {
+  border-bottom: none;
+}
+
+.inviteRowCode {
+  color: var(--text);
+  letter-spacing: 0.05em;
+}
+
+.clientRow {
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 0;
+}
+
+.clientRow:last-child {
+  border-bottom: none;
+}
+
+.clientHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.clientName {
+  font-weight: 600;
+}
+
+.clientEmail {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.clientDetail {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--border);
+}
+
+.detailSectionTitle {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin: 0.75rem 0 0.5rem;
+}
+
+.sessionRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+.sessionRow:last-child {
+  border-bottom: none;
+}
+
+.sessionMeta {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+}
+
+.programRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.1rem 0.45rem;
+}
+
+.dayCard {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.dayHeaderRow {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  align-items: center;
+}
+
+.exerciseRow {
+  display: grid;
+  grid-template-columns: 1fr 4rem 4rem 2rem;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.linkButton {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+}

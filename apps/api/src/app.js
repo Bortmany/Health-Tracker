@@ -9,6 +9,8 @@ import { fileURLToPath } from 'url';
 import { pool } from './db/pool.js';
 import activitiesRouter from './routes/activities.js';
 import authRouter from './routes/auth.js';
+import coachRouter from './routes/coach.js';
+import coachLinkRouter from './routes/coachLink.js';
 import exercisesRouter from './routes/exercises.js';
 import habitsRouter from './routes/habits.js';
 import injuriesRouter from './routes/injuries.js';
@@ -38,6 +40,8 @@ const authLimiter = rateLimit({
   message: { error: { message: 'Too many attempts. Please wait 15 minutes and try again.', code: 'RATE_LIMITED' } },
 });
 app.use('/api/auth', authLimiter);
+// Invite codes get the same guessing protection as passwords.
+app.use('/api/coach-link/redeem', authLimiter);
 
 app.get('/api/health', async (_req, res) => {
   try {
@@ -52,6 +56,8 @@ app.use('/api/auth', authRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/habits', habitsRouter);
 app.use('/api/activities', activitiesRouter);
+app.use('/api/coach', coachRouter);
+app.use('/api/coach-link', coachLinkRouter);
 app.use('/api/exercises', exercisesRouter);
 app.use('/api/injuries', injuriesRouter);
 app.use('/api/logs', logsRouter);

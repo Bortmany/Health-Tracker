@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useMe } from '../hooks/useAuth.js';
 import styles from './BottomNav.module.css';
 
 const TABS = [
@@ -9,10 +10,14 @@ const TABS = [
   { to: '/more', label: 'More' },
 ];
 
+const COACH_TAB = { to: '/clients', label: 'Clients' };
+
 export default function BottomNav() {
+  const { data: user } = useMe();
+  const tabs = user?.role === 'coach' ? [...TABS.slice(0, 4), COACH_TAB, TABS[4]] : TABS;
   return (
     <nav className={styles.nav}>
-      {TABS.map((tab) => (
+      {tabs.map((tab) => (
         <NavLink
           key={tab.to}
           to={tab.to}

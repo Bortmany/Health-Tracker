@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMe, useLogout } from '../hooks/useAuth.js';
+import { useMyCoach, useRedeemCoachCode, useRemoveMyCoach } from '../hooks/useCoach.js';
 import { useSettings, useUpdateSettings } from '../hooks/useSettings.js';
 import styles from './More.module.css';
 
@@ -24,6 +25,65 @@ function buildForm(settings) {
     stepGoal: settings?.stepGoal ?? '',
     sleepGoal: settings?.sleepGoal ?? '',
   };
+}
+
+function CoachSection() {
+  const { data: coach, isLoading } = useMyCoach();
+  const redeemCode = useRedeemCoachCode();
+  const removeCoach = useRemoveMyCoach();
+  const [code, setCode] = useState('');
+  const [success, setSuccess] = useState(null);
+
+  function handleRedeem(e) {
+    e.preventDefault();
+    if (!code) return;
+    redeemCode.mutate(code, {
+      onSuccess: (result) => {
+        setSuccess(result.coach?.displayName ?? null);
+        setCode('');
+      },
+    });
+  }
+
+  function handleRemove() {
+    if (window.confirm('Disconnect from your coach?')) {
+      removeCoach.mutate(undefined, { onSuccess: () => setSuccess(null) });
+    }
+  }
+
+  return (
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>Your coach</h2>
+      {isLoading ? (
+        <div className="skeleton" style={{ height: 60 }} />
+      ) : coach ? (
+        <div className={styles.accountRow}>
+          <div>Coached by {coach.displayName}</div>
+          <button className={styles.logoutButton} onClick={handleRemove} disabled={removeCoach.isPending} type="button">
+            Remove coach
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handleRedeem}>
+          {success && <p className={styles.accountLabel}>Connected with {success}.</p>}
+          {redeemCode.isError && <p className={styles.error}>{redeemCode.error.message}</p>}
+          <div className={styles.accountRow}>
+            <input
+              className={styles.input}
+              type="text"
+              placeholder="Invite code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              style={{ marginRight: '0.75rem' }}
+            />
+            <button className={styles.logoutButton} type="submit" disabled={redeemCode.isPending}>
+              {redeemCode.isPending ? 'Connecting...' : 'Connect'}
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
+  );
 }
 
 export default function More() {
@@ -74,12 +134,15 @@ export default function More() {
             <div className={styles.accountLabel}>
               {user?.planTier === 'premium' ? 'Premium plan' : 'Free plan — upgrades coming soon'}
             </div>
+            {user?.role === 'coach' && <div className={styles.accountLabel}>Coach account</div>}
           </div>
           <button className={styles.logoutButton} onClick={() => logout.mutate()} disabled={logout.isPending} type="button">
             {logout.isPending ? 'Logging out...' : 'Log out'}
           </button>
         </div>
       </section>
+
+      {user?.role !== 'coach' && <CoachSection />}
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Training quiz</h2>

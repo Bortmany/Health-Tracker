@@ -331,7 +331,10 @@ export default function Train() {
             {programs.map((p) => (
               <div className={styles.programRow} key={p.id}>
                 <span>{p.name}</span>
-                <span className={styles.programMeta}>{p.days.length} day(s)</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {p.fromCoach && <span className={styles.tag}>From your coach</span>}
+                  <span className={styles.programMeta}>{p.days.length} day(s)</span>
+                </span>
               </div>
             ))}
           </div>

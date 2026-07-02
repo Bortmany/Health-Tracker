@@ -12,6 +12,7 @@ function toPublicProgram(row, days) {
     description: row.description,
     createdAt: row.created_at,
     archivedAt: row.archived_at,
+    fromCoach: row.created_by_coach_id != null,
     days,
   };
 }
@@ -35,7 +36,7 @@ function toPublicExercise(row) {
   };
 }
 
-async function fetchNestedDays(client, programId) {
+export async function fetchNestedDays(client, programId) {
   const { rows: dayRows } = await client.query(
     'SELECT * FROM program_days WHERE program_id = $1 ORDER BY sort_order',
     [programId]
@@ -55,7 +56,7 @@ async function fetchNestedDays(client, programId) {
   );
 }
 
-async function replaceDays(client, programId, days) {
+export async function replaceDays(client, programId, days) {
   await client.query('DELETE FROM program_days WHERE program_id = $1', [programId]);
   for (const [dayIndex, day] of days.entries()) {
     if (!day?.name) continue;
