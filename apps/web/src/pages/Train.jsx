@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import PlanSection from '../components/PlanSection.jsx';
+import RestTimer from '../components/RestTimer.jsx';
+import { useExercises } from '../hooks/useExercises.js';
 import { useActivePrograms, useCreateProgram } from '../hooks/usePrograms.js';
 import {
   useCreateTrainingLog,
@@ -160,6 +162,7 @@ function ProgramBuilder({ onCreated }) {
                 value={ex.name}
                 onChange={(e) => updateExercise(day.key, ex.key, { name: e.target.value })}
                 placeholder="Exercise name"
+                list="exercise-library"
               />
               <button
                 type="button"
@@ -196,6 +199,7 @@ function ProgramBuilder({ onCreated }) {
 export default function Train() {
   const { data: programs = [] } = useActivePrograms();
   const { data: sessions = [] } = useTrainingLogs();
+  const { data: exerciseOptions = [] } = useExercises();
   const createTrainingLog = useCreateTrainingLog();
   const updateTrainingLog = useUpdateTrainingLog();
   const [editingId, setEditingId] = useState(null);
@@ -310,6 +314,12 @@ export default function Train() {
 
       {mutationError && <p className={styles.error}>{mutationError.message}</p>}
 
+      <datalist id="exercise-library">
+        {exerciseOptions.map((ex) => (
+          <option key={ex.id} value={ex.name} />
+        ))}
+      </datalist>
+
       <PlanSection />
 
       <section className={styles.section}>
@@ -339,6 +349,8 @@ export default function Train() {
               </button>
             )}
           </div>
+
+          <RestTimer />
 
           <div className={styles.topRow}>
             <label className={styles.field}>
@@ -395,6 +407,7 @@ export default function Train() {
                   placeholder="Exercise name"
                   value={ex.name}
                   onChange={(e) => updateExerciseRow(ex.key, { name: e.target.value })}
+                  list="exercise-library"
                 />
                 <button
                   type="button"

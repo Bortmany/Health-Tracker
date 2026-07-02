@@ -120,6 +120,28 @@ router.get('/exercise-history', asyncHandler(async (req, res) => {
   });
 }));
 
+// Personal records: each exercise's single best (heaviest) logged set.
+router.get('/personal-records', asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT * FROM (
+       SELECT DISTINCT ON (te.name)
+         te.name, s.weight, s.reps, tl.date
+       FROM training_log_sets s
+       JOIN training_log_exercises te ON te.id = s.training_log_exercise_id
+       JOIN training_logs tl ON tl.id = te.training_log_id
+       WHERE tl.user_id = $1 AND s.weight IS NOT NULL
+       ORDER BY te.name, s.weight DESC
+     ) best
+     ORDER BY weight DESC
+     LIMIT 20`,
+    [req.userId]
+  );
+
+  res.json({
+    records: rows.map((r) => ({ name: r.name, weight: r.weight, reps: r.reps, date: r.date })),
+  });
+}));
+
 router.get('/:id', asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM training_logs WHERE id = $1 AND user_id = $2', [
     req.params.id,

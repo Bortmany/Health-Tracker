@@ -23,3 +23,7 @@ export function getLog(date) {
 export function putLog(date, payload) {
   return request(`/logs/${date}`, { method: 'PUT', body: JSON.stringify(payload) });
 }
+
+export function getStreak() {
+  return request('/logs/streak');
+}

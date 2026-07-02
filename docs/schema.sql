@@ -263,3 +263,12 @@ CREATE TABLE user_plans (
 
 -- Seed data: 010_plan_seed.sql inserts 14 curated plan templates
 -- (49 days, 213 exercises) into the plan_template tables.
+
+-- Global, read-only reference data: not user-scoped, no user_id column.
+CREATE TABLE exercise_library (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT UNIQUE NOT NULL,
+  muscle_group TEXT,
+  equipment TEXT,
+  instructions TEXT
+);

@@ -56,6 +56,36 @@ router.get('/habit-summary', asyncHandler(async (req, res) => {
   res.json({ days: rows.map((r) => ({ date: r.date, possible: r.possible, completed: r.completed })) });
 }));
 
+// Current streak of consecutive days with a log, counting back from today.
+// A streak that ended yesterday (no entry logged yet today) still counts.
+router.get('/streak', asyncHandler(async (req, res) => {
+  // date::text keeps calendar dates as plain strings, avoiding timezone
+  // shifts that happen when the database driver turns them into JS Dates.
+  const { rows } = await pool.query(
+    'SELECT date::text AS date FROM daily_logs WHERE user_id = $1 ORDER BY date DESC LIMIT 400',
+    [req.userId]
+  );
+
+  const dates = new Set(rows.map((r) => r.date));
+
+  const cursor = new Date();
+  let streak = 0;
+
+  // If there's no entry for today yet, the streak still counts as long as
+  // yesterday has one, so start checking from today and stop at the first gap
+  // (but don't let a missing "today" alone break a streak that ended yesterday).
+  if (!dates.has(cursor.toISOString().slice(0, 10))) {
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+  }
+
+  while (dates.has(cursor.toISOString().slice(0, 10))) {
+    streak += 1;
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+  }
+
+  res.json({ streak });
+}));
+
 router.get('/:date', asyncHandler(async (req, res) => {
   const { date } = req.params;
   if (!DATE_RE.test(date)) {

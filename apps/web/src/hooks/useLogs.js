@@ -23,6 +23,13 @@ export function useHabitSummary({ from, to } = {}) {
   });
 }
 
+export function useStreak() {
+  return useQuery({
+    queryKey: ['streak'],
+    queryFn: async () => (await logsApi.getStreak()).streak,
+  });
+}
+
 export function usePutLog(date) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -31,6 +38,7 @@ export function usePutLog(date) {
       queryClient.invalidateQueries({ queryKey: ['log', date] });
       queryClient.invalidateQueries({ queryKey: ['logs'] });
       queryClient.invalidateQueries({ queryKey: ['habitSummary'] });
+      queryClient.invalidateQueries({ queryKey: ['streak'] });
     },
   });
 }
