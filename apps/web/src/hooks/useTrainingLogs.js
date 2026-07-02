@@ -58,6 +58,9 @@ export function useDeleteTrainingLog() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: trainingLogsApi.deleteTrainingLog,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['trainingLogs'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trainingLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['personalRecords'] });
+    },
   });
 }

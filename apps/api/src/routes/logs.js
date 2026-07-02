@@ -59,12 +59,14 @@ router.get('/habit-summary', asyncHandler(async (req, res) => {
 // Current streak of consecutive days with a log, counting back from today.
 // A streak that ended yesterday (no entry logged yet today) still counts.
 router.get('/streak', asyncHandler(async (req, res) => {
+  // date::text keeps calendar dates as plain strings, avoiding timezone
+  // shifts that happen when the database driver turns them into JS Dates.
   const { rows } = await pool.query(
-    'SELECT date FROM daily_logs WHERE user_id = $1 ORDER BY date DESC LIMIT 400',
+    'SELECT date::text AS date FROM daily_logs WHERE user_id = $1 ORDER BY date DESC LIMIT 400',
     [req.userId]
   );
 
-  const dates = new Set(rows.map((r) => new Date(r.date).toISOString().slice(0, 10)));
+  const dates = new Set(rows.map((r) => r.date));
 
   const cursor = new Date();
   let streak = 0;
