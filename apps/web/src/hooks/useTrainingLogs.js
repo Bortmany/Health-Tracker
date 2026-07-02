@@ -24,11 +24,21 @@ export function useExerciseHistory(name, { before } = {}) {
   });
 }
 
+export function usePersonalRecords() {
+  return useQuery({
+    queryKey: ['personalRecords'],
+    queryFn: async () => (await trainingLogsApi.getPersonalRecords()).records,
+  });
+}
+
 export function useCreateTrainingLog() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: trainingLogsApi.createTrainingLog,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['trainingLogs'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trainingLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['personalRecords'] });
+    },
   });
 }
 
@@ -39,6 +49,7 @@ export function useUpdateTrainingLog() {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['trainingLogs'] });
       queryClient.invalidateQueries({ queryKey: ['trainingLog', id] });
+      queryClient.invalidateQueries({ queryKey: ['personalRecords'] });
     },
   });
 }

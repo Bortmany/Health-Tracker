@@ -29,3 +29,7 @@ export function getExerciseHistory(name, { before } = {}) {
   if (before) params.set('before', before);
   return request(`/training-logs/exercise-history?${params.toString()}`);
 }
+
+export function getPersonalRecords() {
+  return request('/training-logs/personal-records');
+}
