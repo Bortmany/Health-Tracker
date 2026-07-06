@@ -53,7 +53,7 @@ Tests: `npm test` (integration tests against the local Postgres). Build check: `
 /docs
   schema.sql   always-current full schema dump
   mobile.md    how to publish native iPhone/Android apps
-/.claude/agents  project helper agents (code review, verification, builders)
+(project helper agents — code review, verification, builders — live in the central Agents repo)
 ```
 
 ## Migrations

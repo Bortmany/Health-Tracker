@@ -30,7 +30,7 @@ All planned phases are built, tested, reviewed, and merged to `main`. 48/48 back
 
 ## Workflow (established with the owner)
 
-1. Design the phase centrally, then dispatch the project agents in `.claude/agents/` (they load automatically): `backend-builder`, `frontend-builder`, `content-curator` (seed data) — in parallel where independent, with exact API contracts in the prompts.
+1. Design the phase centrally, then dispatch the project agents: `backend-builder`, `frontend-builder`, `content-curator` (seed data) — in parallel where independent, with exact API contracts in the prompts. **The agents now live in the central `Agents` repo** (under `.claude/agents/dev/`) — a session must include the Agents repo as a source or no agents will load. The `dev-lead` commander there can run the whole build → verify → review loop as one delegated step.
 2. `verifier` agent runs migrations + tests + build (+ prod smoke when warranted).
 3. `code-reviewer` agent reviews the diff; fix real findings before committing.
 4. Commit with a short plain-English message, push to the work branch, merge `--no-ff` to `main`, push — Render auto-deploys `main`.
@@ -58,5 +58,5 @@ Possible future work: Stripe customer portal (manage/cancel), password reset via
 | `docs/schema.sql` | Always-current schema dump |
 | `docs/mobile.md` | Step-by-step for App Store / Play Store |
 | `render.yaml` | Render Blueprint (service + database) |
-| `.claude/agents/` | The six project agents and their encoded conventions |
+| `Agents` repo, `.claude/agents/dev/` | The six project agents and their encoded conventions (moved to the central Agents repo — include it in the session) |
 | `apps/api/src/db/migrations/` | 15 migrations so far; runner is `src/db/migrate.js` |
