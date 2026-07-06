@@ -25,6 +25,10 @@ import trainingLogsRouter from './routes/trainingLogs.js';
 
 export const app = express();
 
+// Railway (like most hosts) puts a proxy in front of the app. Trusting it means
+// the rate limiter sees each visitor's real address instead of the proxy's.
+app.set('trust proxy', 1);
+
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(compression());
 // Stripe's webhook signature is checked against the raw request bytes, so
