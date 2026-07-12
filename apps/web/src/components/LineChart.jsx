@@ -73,5 +73,11 @@ export default function LineChart({ labels, values, rawValues = null, color = '-
     if (chartRef.current) applyData(chartRef.current);
   }, [labels, values, rawValues, color]);
 
-  return <canvas ref={canvasRef} style={{ height, width: '100%' }} />;
+  // Chart.js sizes itself to the parent, so the fixed height must live on a
+  // wrapper div — putting it on the canvas lets the chart grow without limit.
+  return (
+    <div style={{ height, width: '100%', position: 'relative' }}>
+      <canvas ref={canvasRef} />
+    </div>
+  );
 }
