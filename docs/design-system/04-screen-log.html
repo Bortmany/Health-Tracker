@@ -1,0 +1,83 @@
+<!-- @dsCard group="Screens" -->
+<title>Cut — Log screen</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="preview.css">
+<div class="ds-page">
+  <header>
+    <div class="ds-kicker">Screen mockup</div>
+    <div class="ds-title">Log — calmer, grouped, faster</div>
+    <p class="ds-sub">The densest screen becomes collapsible section cards. Yesterday's values are one tap away, because repeat-logging speed is the #1 retention lever in this category.</p>
+  </header>
+
+  <div class="phone">
+    <div class="viewport">
+      <div class="content">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="screen-title">Log</div>
+          <button class="btn primary sm">Save</button>
+        </div>
+
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-3) var(--space-4)">
+          <button class="btn ghost sm">←</button>
+          <div style="text-align:center">
+            <div style="font-weight:600">Today</div>
+            <div style="color:var(--color-text-faint);font-size:var(--text-xs);font-family:var(--font-mono)">SAT 12 JUL</div>
+          </div>
+          <button class="btn ghost sm" disabled>→</button>
+        </div>
+
+        <!-- metrics group: open -->
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="label">Body &amp; recovery</span>
+            <button class="btn ghost sm">Copy yesterday</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-top:var(--space-3)">
+            <div class="field"><span class="label">Weight (kg)</span><input class="input" value="82.4"></div>
+            <div class="field"><span class="label">Sleep (h)</span><input class="input" value="7.5"></div>
+            <div class="field"><span class="label">Steps</span><input class="input" placeholder="8,000"></div>
+            <div class="field"><span class="label">Waist (cm)</span><input class="input" placeholder="—"></div>
+          </div>
+        </div>
+
+        <!-- nutrition group: open -->
+        <div class="card">
+          <span class="label">Nutrition</span>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-2);margin-top:var(--space-3)">
+            <div class="field"><span class="label">kcal</span><input class="input" value="1850"></div>
+            <div class="field"><span class="label">P</span><input class="input" value="140"></div>
+            <div class="field"><span class="label">C</span><input class="input" placeholder="—"></div>
+            <div class="field"><span class="label">F</span><input class="input" placeholder="—"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--color-chart-grid)">
+            <span style="font-size:var(--text-sm);color:var(--color-text-muted)">2 meals logged</span>
+            <button class="btn secondary sm">+ Add meal</button>
+          </div>
+        </div>
+
+        <!-- collapsed groups -->
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-3) var(--space-4)">
+          <span class="label">Habits · 2 of 3 done</span>
+          <span style="color:var(--color-text-faint)">▾</span>
+        </div>
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-3) var(--space-4)">
+          <span class="label">Activities · 1 added</span>
+          <span style="color:var(--color-text-faint)">▾</span>
+        </div>
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-3) var(--space-4)">
+          <span class="label">Notes</span>
+          <span style="color:var(--color-text-faint)">▾</span>
+        </div>
+      </div>
+
+      <nav class="bottom-nav">
+        <a class="tab"><span class="dot"></span>Today</a>
+        <a class="tab active"><span class="dot"></span>Log</a>
+        <a class="tab"><span class="dot"></span>Train</a>
+        <a class="tab"><span class="dot"></span>Progress</a>
+        <a class="tab"><span class="dot"></span>More</a>
+      </nav>
+    </div>
+  </div>
+  <p class="ds-note" style="text-align:center;margin-top:var(--space-4)">Injury check-in appears as its own group only while an injury is active. Sections remember their open/closed state. Nothing turns red for eating over target.</p>
+</div>

@@ -1,0 +1,89 @@
+<!-- @dsCard group="Screens" -->
+<title>Cut — Today screen</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="preview.css">
+<div class="ds-page">
+  <header>
+    <div class="ds-kicker">Screen mockup</div>
+    <div class="ds-title">Today (was “Dashboard”)</div>
+    <p class="ds-sub">One glance answers “what should I do right now, and how is it going?”. The hero is today's session from the user's plan — the pattern that makes Fitbod's home screen work — followed by the dual-line weight trend.</p>
+  </header>
+
+  <div class="phone">
+    <div class="viewport">
+      <div class="content">
+        <div>
+          <span class="label">Saturday, 12 July</span>
+          <div class="screen-title" style="margin-top:4px">Hey, Sara</div>
+        </div>
+
+        <!-- hero: today's session -->
+        <div class="card" style="border-color:color-mix(in srgb, var(--color-accent) 35%, var(--color-border))">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="label">Today's session</span>
+            <span class="chip">Week 3 of 8</span>
+          </div>
+          <div style="font-family:var(--font-display);font-weight:700;font-size:var(--text-xl);margin-top:var(--space-2)">Lower body — day 2</div>
+          <div style="color:var(--color-text-muted);font-size:var(--text-sm);margin-top:var(--space-1)">5 exercises · about 40 min · slightly heavier than last week, as planned</div>
+          <button class="btn primary block" style="margin-top:var(--space-4)">Start session</button>
+        </div>
+
+        <!-- stats row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+          <div class="stat-card">
+            <span class="label">Weight</span>
+            <div class="value">82.4</div>
+            <div class="sub">↓ 0.6 kg this week</div>
+          </div>
+          <div class="stat-card">
+            <span class="label">Streak</span>
+            <div class="value">12</div>
+            <div class="sub good">days logging</div>
+          </div>
+        </div>
+
+        <!-- weight trend -->
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <span class="label">Weight trend</span>
+            <span style="color:var(--color-text-faint);font-family:var(--font-mono);font-size:var(--text-xs)">60 days</span>
+          </div>
+          <div class="chart" style="margin-top:var(--space-3)">
+            <svg viewBox="0 0 340 150" preserveAspectRatio="none">
+              <polyline fill="none" stroke="var(--color-chart-raw)" stroke-width="1.5"
+                points="0,52 20,66 40,48 60,72 80,58 100,80 120,62 140,88 160,70 180,95 200,78 220,102 240,86 260,108 280,94 300,118 320,102 340,116"/>
+              <path fill="none" stroke="var(--color-chart-line)" stroke-width="2.5" stroke-linecap="round"
+                d="M0,58 C60,64 120,76 180,86 C240,96 300,104 340,110"/>
+            </svg>
+          </div>
+          <p class="chart-caption">The pale line is the scale; the bright line is what's really happening. Day-to-day jumps are normal.</p>
+        </div>
+
+        <!-- habits + quick log -->
+        <div style="display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--space-3);align-items:stretch">
+          <div class="card" style="display:flex;gap:var(--space-3);align-items:center">
+            <div class="ring" style="background:conic-gradient(var(--color-accent) 0 71%, var(--color-surface-2) 71% 100%)"><div class="inner">71%</div></div>
+            <div><span class="label">Habits</span><div style="font-size:var(--text-sm);color:var(--color-text-muted);margin-top:2px">this week</div></div>
+          </div>
+          <div class="card" style="display:flex;flex-direction:column;justify-content:center;gap:var(--space-2);min-width:0">
+            <span class="label">Quick log</span>
+            <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+              <button class="btn secondary sm">Weight</button>
+              <button class="btn secondary sm">Meal</button>
+              <button class="btn secondary sm">Steps</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <nav class="bottom-nav">
+        <a class="tab active"><span class="dot"></span>Today</a>
+        <a class="tab"><span class="dot"></span>Log</a>
+        <a class="tab"><span class="dot"></span>Train</a>
+        <a class="tab"><span class="dot"></span>Progress</a>
+        <a class="tab"><span class="dot"></span>More</a>
+      </nav>
+    </div>
+  </div>
+  <p class="ds-note" style="text-align:center;margin-top:var(--space-4)">No plan yet → the hero card becomes an invitation: “Take the 2-minute quiz and we'll build your plan.” Rest day → “Rest day — recovery is part of the plan.”</p>
+</div>

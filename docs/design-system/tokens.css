@@ -1,0 +1,114 @@
+/*
+  Cut design tokens — the single source of truth for the app's look.
+  Pure custom properties only: no @import, no selectors other than the
+  theme blocks. docs/design-system/tokens.css must be a byte-for-byte
+  copy of this file — never edit that copy by hand, run
+  `npm run design:sync-tokens -w web` after changing this one.
+*/
+
+:root {
+  /* ---- Color: core roles (dark is Cut's native theme) ---- */
+  --color-bg: #0b0b0d;             /* page background */
+  --color-surface: #151518;        /* cards, inputs, nav */
+  --color-surface-2: #1d1d22;      /* nested / hover surfaces */
+  --color-border: #26262c;         /* hairline borders */
+  --color-text: #f4f4f2;           /* primary text */
+  --color-text-muted: #9b9ba3;     /* secondary text, labels */
+  --color-text-faint: #6e6e77;     /* tertiary: timestamps, hints */
+
+  /* ---- Color: brand ---- */
+  --color-accent: #c8f135;         /* the Cut lime — actions, active states */
+  --color-accent-strong: #d7fb55;  /* hover / pressed on accent */
+  --color-on-accent: #0b0b0d;      /* text/icons on top of accent */
+
+  /* ---- Color: feedback (used sparingly — never to shame a missed target) ---- */
+  --color-success: #6ee787;
+  --color-warning: #f0b429;
+  --color-danger: #f87171;
+
+  /* ---- Color: charts ---- */
+  --color-chart-line: #c8f135;     /* primary series (trend) */
+  --color-chart-line-2: #8fa926;   /* secondary series (calories) */
+  --color-chart-raw: #4a4a54;      /* pale raw-data line under a trend line */
+  --color-chart-grid: #1c1c21;
+  --color-chart-tick: #7c7c86;
+
+  /* ---- Typography ---- */
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Inter Tight', system-ui, sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, monospace;
+
+  --text-xs: 0.7rem;       /* mono micro-labels */
+  --text-sm: 0.8125rem;    /* metadata, captions */
+  --text-base: 0.9375rem;  /* body */
+  --text-lg: 1.125rem;     /* card titles */
+  --text-xl: 1.375rem;     /* screen titles */
+  --text-2xl: 1.75rem;     /* hero numbers */
+  --text-3xl: 2.375rem;    /* the one big number on a screen */
+  --tracking-label: 0.05em; /* with --font-mono + uppercase = Cut's label style */
+
+  /* ---- Spacing (4px base) ---- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 2rem;
+  --space-8: 2.5rem;
+  --space-9: 3rem;
+
+  /* ---- Shape ---- */
+  --radius-sm: 8px;        /* inputs, small buttons */
+  --radius-md: 12px;       /* buttons, chips */
+  --radius-lg: 16px;       /* cards */
+  --radius-full: 999px;    /* pills, rings */
+
+  /* ---- Elevation (dark theme leans on borders; shadows add depth on overlays) ---- */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --surface-outline: 1px solid var(--color-border);
+
+  /* ---- Layout ---- */
+  --nav-height: 4rem;
+  --screen-max-width: 640px;
+}
+
+/*
+  Light theme — defined so a future toggle is one attribute flip away.
+  Not wired to any UI yet; Cut ships dark-native.
+*/
+:root[data-theme='light'] {
+  --color-bg: #f6f6f3;
+  --color-surface: #ffffff;
+  --color-surface-2: #efefec;
+  --color-border: #e2e2dd;
+  --color-text: #191a16;
+  --color-text-muted: #5e6057;
+  --color-text-faint: #8f9187;
+  --color-accent: #9fc716;
+  --color-accent-strong: #8db310;
+  --color-on-accent: #14150f;
+  --color-chart-line: #86a812;
+  --color-chart-line-2: #5e7710;
+  --color-chart-raw: #c9c9c2;
+  --color-chart-grid: #e8e8e3;
+  --color-chart-tick: #8f9187;
+  --shadow-1: 0 1px 2px rgba(25, 26, 22, 0.08);
+  --shadow-2: 0 10px 30px rgba(25, 26, 22, 0.12);
+}
+
+/*
+  Legacy aliases — keep every un-rebuilt screen rendering during the
+  redesign migration. Deleted in the final cleanup pass once no CSS
+  module references them.
+*/
+:root {
+  --bg: var(--color-bg);
+  --bg-raised: var(--color-surface);
+  --border: var(--color-border);
+  --text: var(--color-text);
+  --text-dim: var(--color-text-muted);
+  --accent: var(--color-accent);
+  --accent-dim: var(--color-chart-line-2);
+}

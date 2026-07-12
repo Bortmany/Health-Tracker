@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "design:sync-tokens": "cp src/styles/tokens.css ../../docs/design-system/tokens.css"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.0",

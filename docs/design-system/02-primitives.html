@@ -1,0 +1,143 @@
+<!-- @dsCard group="Components" -->
+<title>Cut — Primitives</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="preview.css">
+<div class="ds-page">
+  <header>
+    <div class="ds-kicker">Cut design system</div>
+    <div class="ds-title">Primitives — every reusable piece</div>
+    <p class="ds-sub">These mirror the shared React components in <code>apps/web/src/components/ui/</code>. Every screen is assembled from these — no more copy-pasted styles per page.</p>
+  </header>
+
+  <div class="ds-section">
+    <h2>Buttons</h2>
+    <div class="ds-row">
+      <button class="btn primary">Save today's log</button>
+      <button class="btn secondary">Load day's exercises</button>
+      <button class="btn ghost">Skip for now</button>
+      <button class="btn danger">Remove client</button>
+      <button class="btn primary" disabled>Saving…</button>
+    </div>
+    <div class="ds-row" style="margin-top:var(--space-3)">
+      <button class="btn primary sm">Add set</button>
+      <button class="btn secondary sm">Copy code</button>
+      <button class="btn ghost sm">Edit</button>
+    </div>
+    <p class="ds-note">Primary = lime with near-black text, one per screen region. Danger is outlined, reserved for destructive actions.</p>
+  </div>
+
+  <div class="ds-section">
+    <h2>Cards &amp; section labels</h2>
+    <div class="ds-row" style="align-items:stretch">
+      <div class="card" style="flex:1;min-width:220px">
+        <span class="label">Weight trend</span>
+        <p style="color:var(--color-text-muted);font-size:var(--text-sm)">Any content sits on a surface card: 16px radius, hairline border, 16px padding.</p>
+      </div>
+      <div class="stat-card" style="width:160px">
+        <span class="label">Current weight</span>
+        <div class="value">82.4</div>
+        <div class="sub">↓ 0.6 kg this week</div>
+      </div>
+      <div class="stat-card" style="width:160px">
+        <span class="label">Streak</span>
+        <div class="value">12</div>
+        <div class="sub good">days logging</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ds-section">
+    <h2>Form field</h2>
+    <div class="ds-row" style="align-items:flex-start">
+      <div class="field" style="width:200px">
+        <span class="label">Weight (kg)</span>
+        <input class="input" placeholder="82.4">
+      </div>
+      <div class="field" style="width:200px">
+        <span class="label">Sleep (hours)</span>
+        <input class="input" value="7.5">
+      </div>
+      <div class="field" style="width:200px">
+        <span class="label">Program</span>
+        <select class="input"><option>Beginner Fat Loss</option></select>
+      </div>
+    </div>
+    <p class="ds-note" style="margin-top:var(--space-3)"><span class="error-text">Couldn't save — check your connection and try again.</span> Errors are plain English, next to the thing that failed.</p>
+  </div>
+
+  <div class="ds-section">
+    <h2>Chips &amp; badges</h2>
+    <div class="ds-row">
+      <span class="chip accent">From your coach</span>
+      <span class="chip">Week 3 of 8</span>
+      <span class="chip warn">Easy week</span>
+      <span class="chip">Premium</span>
+    </div>
+  </div>
+
+  <div class="ds-section">
+    <h2>Empty state — always encouraging</h2>
+    <div class="empty" style="max-width:420px">
+      Nothing logged yet — today's a good day to start.<br>
+      <button class="btn primary sm" style="margin-top:var(--space-3)">Log today</button>
+    </div>
+  </div>
+
+  <div class="ds-section">
+    <h2>Loading — skeletons, never spinners</h2>
+    <div class="ds-row">
+      <div class="skeleton" style="width:160px;height:88px"></div>
+      <div class="skeleton" style="width:160px;height:88px"></div>
+      <div class="skeleton" style="width:240px;height:88px"></div>
+    </div>
+  </div>
+
+  <div class="ds-section">
+    <h2>Progress ring</h2>
+    <div class="ds-row">
+      <div class="ring" style="background:conic-gradient(var(--color-accent) 0 71%, var(--color-surface-2) 71% 100%)"><div class="inner">71%</div></div>
+      <div class="ring" style="background:conic-gradient(var(--color-accent) 0 100%, var(--color-surface-2) 0)"><div class="inner">100%</div></div>
+      <div class="ring" style="background:conic-gradient(var(--color-accent) 0 20%, var(--color-surface-2) 20% 100%)"><div class="inner">20%</div></div>
+    </div>
+    <p class="ds-note">Weekly habit compliance. A low week still renders in brand lime — progress is never painted red.</p>
+  </div>
+
+  <div class="ds-section">
+    <h2>Set row — the Train screen's core interaction</h2>
+    <div class="card" style="max-width:420px;display:flex;flex-direction:column;gap:var(--space-3)">
+      <div class="set-row label" style="text-transform:uppercase"><span>#</span><span>Last time</span><span>kg</span><span>Reps</span><span></span></div>
+      <div class="set-row"><span class="prev">1</span><span class="prev">60 × 8</span><input class="input" value="62.5"><input class="input" value="8"><div class="check done">✓</div></div>
+      <div class="set-row"><span class="prev">2</span><span class="prev">60 × 8</span><input class="input" value="62.5"><input class="input" placeholder="8"><div class="check"></div></div>
+      <div class="set-row"><span class="prev">3</span><span class="prev">60 × 7</span><input class="input" placeholder="62.5"><input class="input" placeholder="7"><div class="check"></div></div>
+    </div>
+    <p class="ds-note">Last session's numbers sit beside the inputs — the number to beat, no navigation needed. Ticking a set auto-starts the rest timer.</p>
+  </div>
+
+  <div class="ds-section">
+    <h2>Bottom navigation</h2>
+    <div style="max-width:420px;border:var(--surface-outline);border-radius:var(--radius-lg);overflow:hidden;padding:0 var(--space-4)">
+      <nav class="bottom-nav">
+        <a class="tab active"><span class="dot"></span>Today</a>
+        <a class="tab"><span class="dot"></span>Log</a>
+        <a class="tab"><span class="dot"></span>Train</a>
+        <a class="tab"><span class="dot"></span>Progress</a>
+        <a class="tab"><span class="dot"></span>More</a>
+      </nav>
+    </div>
+    <p class="ds-note">Home becomes “Today”. Coaches get a sixth “Clients” tab. Dot + mono label stays — it's Cut's signature.</p>
+  </div>
+
+  <div class="ds-section">
+    <h2>Consistency calendar (new, Progress screen)</h2>
+    <div class="card" style="max-width:320px">
+      <span class="label">June — days you showed up</span>
+      <div class="cal">
+        <div class="d on"></div><div class="d on"></div><div class="d half"></div><div class="d on"></div><div class="d"></div><div class="d on"></div><div class="d on"></div>
+        <div class="d on"></div><div class="d half"></div><div class="d on"></div><div class="d on"></div><div class="d on"></div><div class="d"></div><div class="d on"></div>
+        <div class="d on"></div><div class="d on"></div><div class="d on"></div><div class="d half"></div><div class="d on"></div><div class="d on"></div><div class="d"></div>
+        <div class="d on"></div><div class="d on"></div><div class="d on"></div><div class="d on"></div><div class="d half"></div><div class="d on"></div><div class="d on"></div>
+      </div>
+      <p class="chart-caption">Full = logged + trained · Faded = logged only. Users of every competitor ask for this view; almost none ship it.</p>
+    </div>
+  </div>
+</div>
