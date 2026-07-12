@@ -1,136 +1,86 @@
-.screen {
-  padding: 1.25rem 1rem 1rem;
-  max-width: 640px;
-  margin: 0 auto;
-}
+/* Today screen — everything sits in a single vertical stack of cards. */
 
-.greeting {
-  font-size: 1.4rem;
-  margin-bottom: 1.25rem;
+.stack {
+  display: grid;
+  gap: var(--space-4);
 }
 
 .greetingDim {
-  color: var(--text-dim);
+  color: var(--color-text-muted);
   font-weight: 500;
 }
 
-.cardsGrid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
+/* Hero — Today's session card */
 
-.card {
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1rem;
-}
-
-.cardLabel {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-dim);
-  margin: 0 0 0.4rem;
-}
-
-.cardValue {
-  font-family: var(--font-display);
-  font-size: 1.6rem;
-}
-
-.cardSub {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  margin-top: 0.25rem;
-}
-
-.trendUp {
-  color: #ff6b6b;
-}
-
-.trendDown {
-  color: var(--accent);
-}
-
-.trendFlat {
-  color: var(--text-dim);
-}
-
-.section {
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-
-.sectionTitle {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-dim);
-  margin: 0 0 0.75rem;
-}
-
-.sessionRow {
+.heroTitleRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
-.sessionEmpty {
-  color: var(--text-dim);
-  font-size: 0.9rem;
+.heroName {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-lg);
+  margin: 0;
 }
+
+.heroMeta {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: var(--space-1) 0 0;
+}
+
+.heroNext {
+  font-size: var(--text-base);
+  margin: var(--space-3) 0 0;
+}
+
+.heroGuidance {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: var(--space-2) 0 0;
+}
+
+.heroAction {
+  margin-top: var(--space-4);
+}
+
+/* Quick-log shortcuts — wraps to a second line rather than shrinking. */
+
+.quickRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Stat row — three cards side by side. */
+
+.statRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+
+/* Weekly habit ring */
 
 .ringRow {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
-}
-
-.ring {
-  width: 5rem;
-  height: 5rem;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.ringInner {
-  width: 3.6rem;
-  height: 3.6rem;
-  border-radius: 50%;
-  background: var(--bg-raised);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-mono);
-  font-size: 0.95rem;
+  gap: var(--space-5);
 }
 
 .ringMeta {
-  color: var(--text-dim);
-  font-size: 0.85rem;
-  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
 }
 
-.chartStub {
-  height: 140px;
-  border: 1px dashed var(--border);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-dim);
-  font-size: 0.85rem;
-  text-align: center;
-  padding: 1rem;
+/* Weight trend caption — the normalizing line under the chart. */
+
+.chartCaption {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: var(--space-3) 0 0;
 }

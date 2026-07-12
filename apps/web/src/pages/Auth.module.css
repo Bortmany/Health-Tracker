@@ -3,108 +3,79 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
+  padding: var(--space-6);
+}
+
+.shell {
+  width: 100%;
+  max-width: 380px;
 }
 
 .card {
-  width: 100%;
-  max-width: 360px;
+  padding: var(--space-6);
 }
 
-.title {
-  font-size: 1.75rem;
-  margin-bottom: 0.25rem;
+.wordmark {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-3xl);
+  margin-bottom: var(--space-1);
 }
 
 .subtitle {
-  color: var(--text-dim);
-  font-size: 0.875rem;
-  margin: 0 0 1.5rem;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-6);
 }
 
 .form {
   display: flex;
   flex-direction: column;
-  gap: 0.875rem;
+  gap: var(--space-4);
 }
 
-.label {
+.roleLabel {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--text-dim);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.input {
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  padding: 0.7rem 0.8rem;
-  font-size: 1rem;
-  font-family: var(--font-body);
-}
-
-.input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.submit {
-  background: var(--accent);
-  color: #0a0a0a;
-  border: none;
-  border-radius: 8px;
-  padding: 0.75rem;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  margin-top: 0.25rem;
-}
-
-.submit:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.error {
-  color: #ff6b6b;
-  font-size: 0.875rem;
-  margin: 0;
-}
-
-.switch {
-  margin-top: 1.25rem;
-  font-size: 0.875rem;
-  color: var(--text-dim);
-  text-align: center;
-}
-
-.switch a {
-  color: var(--accent);
-  text-decoration: none;
+  color: var(--color-text-muted);
+  margin-bottom: calc(-1 * var(--space-2));
 }
 
 .roleToggle {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .roleOption {
   flex: 1;
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  border-radius: 8px;
-  padding: 0.65rem 0.5rem;
-  font-size: 0.85rem;
+  background: var(--color-surface-2);
+  border: var(--surface-outline);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-2);
+  font-size: var(--text-sm);
+  font-family: var(--font-body);
   cursor: pointer;
+  min-height: 2.75rem;
 }
 
 .roleOptionActive {
-  background: var(--accent);
-  color: #0a0a0a;
-  border-color: var(--accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
   font-weight: 600;
+}
+
+.switch {
+  margin-top: var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.switch a {
+  color: var(--color-accent);
+  text-decoration: none;
 }

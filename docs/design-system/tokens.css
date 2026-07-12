@@ -97,18 +97,3 @@
   --shadow-1: 0 1px 2px rgba(25, 26, 22, 0.08);
   --shadow-2: 0 10px 30px rgba(25, 26, 22, 0.12);
 }
-
-/*
-  Legacy aliases — keep every un-rebuilt screen rendering during the
-  redesign migration. Deleted in the final cleanup pass once no CSS
-  module references them.
-*/
-:root {
-  --bg: var(--color-bg);
-  --bg-raised: var(--color-surface);
-  --border: var(--color-border);
-  --text: var(--color-text);
-  --text-dim: var(--color-text-muted);
-  --accent: var(--color-accent);
-  --accent-dim: var(--color-chart-line-2);
-}

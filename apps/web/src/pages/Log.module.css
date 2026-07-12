@@ -1,124 +1,138 @@
-.screen {
-  padding: 1.25rem 1rem 1rem;
-  max-width: 640px;
-  margin: 0 auto;
+/* Log screen — sticky date/save header, quick strip, collapsible groups. */
+
+.stack {
+  display: grid;
+  gap: var(--space-4);
 }
 
+/* Sticky header: stretches to the Screen padding edges so content
+   scrolls cleanly underneath it. */
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--color-bg);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.25rem;
+  gap: var(--space-3);
+  margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) var(--space-4);
+  padding: var(--space-4);
 }
 
 .dateNav {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--space-2);
 }
 
-.dateNav button {
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 8px;
-  width: 2.25rem;
-  height: 2.25rem;
-  font-size: 1rem;
+.dateNavButton {
+  background: var(--color-surface-2);
+  border: var(--surface-outline);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  width: 2.75rem;
+  height: 2.75rem;
+  font-size: var(--text-base);
   cursor: pointer;
+}
+
+.dateNavButton:hover {
+  border-color: var(--color-text-faint);
 }
 
 .dateLabel {
   font-family: var(--font-mono);
-  font-size: 0.9rem;
-  color: var(--text-dim);
+  font-size: var(--text-sm);
+  color: var(--color-text);
   min-width: 6.5rem;
   text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
-.saveButton {
-  background: var(--accent);
-  color: #0a0a0a;
+/* Quick strip — the three most-logged metrics, always visible. */
+
+.quickStrip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+
+.yesterdayRow {
+  margin-top: var(--space-3);
+}
+
+/* Collapsible group cards */
+
+.groupHeader {
+  width: 100%;
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: none;
   border: none;
-  border-radius: 8px;
-  padding: 0.6rem 1.1rem;
-  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.chevron {
+  color: var(--color-text-faint);
+  font-size: var(--text-base);
+}
+
+.groupBody {
+  margin-top: var(--space-3);
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* Field layouts inside groups */
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+.rowGrid {
+  display: grid;
+  grid-template-columns: 1fr 5.5rem 2.75rem;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.removeButton {
+  background: none;
+  border: var(--surface-outline);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  height: 2.75rem;
   cursor: pointer;
 }
 
-.saveButton:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.removeButton:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-faint);
 }
 
-.section {
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-
-.sectionTitle {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-dim);
-  margin: 0 0 0.75rem;
-}
-
-.metricsGrid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.fieldLabel {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--text-dim);
-}
-
-.input,
-.select,
-.textarea {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  padding: 0.55rem 0.7rem;
-  font-size: 0.95rem;
-  font-family: var(--font-mono);
-  width: 100%;
-}
-
-.textarea {
-  font-family: var(--font-body);
-  min-height: 4rem;
-  resize: vertical;
-}
-
-.input:focus,
-.select:focus,
-.textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-}
+/* Habits */
 
 .habitRow {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.95rem;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--text-base);
+  min-height: 2.75rem;
+  cursor: pointer;
 }
 
 .habitRow:last-child {
@@ -126,87 +140,70 @@
 }
 
 .checkbox {
-  width: 1.2rem;
-  height: 1.2rem;
-  accent-color: var(--accent);
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--color-accent);
 }
 
-.activityRow {
-  display: grid;
-  grid-template-columns: 1fr 5.5rem 2rem;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-.removeButton {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  border-radius: 8px;
-  height: 2.4rem;
-  cursor: pointer;
-}
-
-.addButton {
-  background: none;
-  border: 1px dashed var(--border);
-  color: var(--accent);
-  border-radius: 8px;
-  padding: 0.5rem;
-  width: 100%;
-  cursor: pointer;
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
-}
+/* Injury check-in */
 
 .injuryCard {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
-.injuryCard:last-child {
-  margin-bottom: 0;
+  border: var(--surface-outline);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
 }
 
 .injuryRegion {
   font-weight: 600;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-3);
 }
 
 .painGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 .toggleRow {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .toggleButton {
   flex: 1;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  border-radius: 8px;
-  padding: 0.5rem;
-  font-size: 0.85rem;
+  min-height: 2.75rem;
+  background: var(--color-surface-2);
+  border: var(--surface-outline);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
 .toggleButtonActive {
-  background: var(--accent);
-  color: #0a0a0a;
-  border-color: var(--accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
 }
 
-.error {
-  color: #ff6b6b;
-  font-size: 0.875rem;
-  margin: 0 0 1rem;
+/* Notes */
+
+.textarea {
+  background: var(--color-surface);
+  border: var(--surface-outline);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  padding: var(--space-3);
+  width: 100%;
+  min-height: 4.5rem;
+  resize: vertical;
+  outline: none;
+}
+
+.textarea:focus {
+  border-color: var(--color-accent);
 }

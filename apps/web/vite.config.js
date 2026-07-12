@@ -11,8 +11,8 @@ export default defineConfig({
         name: 'Cut',
         short_name: 'Cut',
         description: 'Track your weight, workouts, food, and habits.',
-        theme_color: '#0a0a0a',
-        background_color: '#0a0a0a',
+        theme_color: '#0b0b0d',
+        background_color: '#0b0b0d',
         display: 'standalone',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },

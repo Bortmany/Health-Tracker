@@ -92,3 +92,47 @@ test('a second user cannot read another user\'s training log', async () => {
   const getRes = await fetch(`${baseUrl}/training-logs/${trainingLogId}`, { headers: { Cookie: otherCookie } });
   assert.equal(getRes.status, 404);
 });
+
+test('editing a program keeps past sessions linked to the matching day', async () => {
+  const headers = { 'Content-Type': 'application/json', Cookie: cookie };
+
+  const programRes = await fetch(`${baseUrl}/programs`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      name: 'Relink Test Program',
+      days: [{ name: 'Day A', exercises: [{ name: 'Squat', targetSets: 3, targetReps: 8 }] }],
+    }),
+  });
+  const { program } = await programRes.json();
+  const oldDayId = program.days[0].id;
+
+  const logRes = await fetch(`${baseUrl}/training-logs`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      date: '2026-03-01',
+      programId: program.id,
+      programDayId: oldDayId,
+      exercises: [{ name: 'Squat', sets: [{ weight: 80, reps: 8 }] }],
+    }),
+  });
+  const { trainingLog } = await logRes.json();
+
+  // Replacing the program's days used to silently unlink every past session.
+  const putRes = await fetch(`${baseUrl}/programs/${program.id}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({
+      days: [{ name: 'Day A', exercises: [{ name: 'Squat', targetSets: 4, targetReps: 6 }] }],
+    }),
+  });
+  assert.equal(putRes.status, 200);
+  const updated = await putRes.json();
+  const newDayId = updated.program.days[0].id;
+  assert.notEqual(newDayId, oldDayId);
+
+  const getRes = await fetch(`${baseUrl}/training-logs/${trainingLog.id}`, { headers: { Cookie: cookie } });
+  const fetched = await getRes.json();
+  assert.equal(fetched.trainingLog.programDayId, newDayId);
+});
