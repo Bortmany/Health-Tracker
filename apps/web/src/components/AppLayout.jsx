@@ -1,9 +1,10 @@
 import { Outlet } from 'react-router-dom';
 import BottomNav from './BottomNav.jsx';
+import styles from './AppLayout.module.css';
 
 export default function AppLayout() {
   return (
-    <div style={{ paddingBottom: '4.5rem' }}>
+    <div className={styles.layout}>
       <Outlet />
       <BottomNav />
     </div>

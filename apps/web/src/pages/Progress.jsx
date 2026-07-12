@@ -47,7 +47,7 @@ export default function Progress() {
           <LineChart
             labels={calorieDays.map((l) => l.date.slice(5, 10))}
             values={calorieDays.map((l) => l.calories)}
-            color="#8fa926"
+            color="--color-chart-line-2"
           />
         ) : (
           <p className={styles.empty}>No food logged yet.</p>

@@ -1,0 +1,16 @@
+.ring {
+  border-radius: var(--radius-full);
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.inner {
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-sm);
+}

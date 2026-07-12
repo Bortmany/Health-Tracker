@@ -1,0 +1,32 @@
+.card {
+  background: var(--color-surface);
+  border: var(--surface-outline);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-2xl);
+  margin-top: var(--space-2);
+  line-height: 1.1;
+}
+
+.sub {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin-top: var(--space-1);
+}
+
+.good {
+  color: var(--color-success);
+}
