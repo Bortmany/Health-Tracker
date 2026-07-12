@@ -1,0 +1,4 @@
+/* Room at the bottom so content never hides behind the fixed nav. */
+.layout {
+  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
+}

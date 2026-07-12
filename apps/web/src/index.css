@@ -1,17 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Inter+Tight:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+@import './styles/tokens.css';
 
-:root {
-  --bg: #0a0a0a;
-  --bg-raised: #151515;
-  --border: #262626;
-  --text: #f2f2f2;
-  --text-dim: #9a9a9a;
-  --accent: #c8f135;
-  --accent-dim: #8fa926;
-  --font-display: 'Bricolage Grotesque', sans-serif;
-  --font-body: 'Inter Tight', sans-serif;
-  --font-mono: 'DM Mono', monospace;
-}
+/* All colors, fonts, spacing and radii come from styles/tokens.css
+   (which also carries the legacy --bg/--text aliases for un-migrated pages). */
 
 * {
   box-sizing: border-box;
@@ -21,9 +12,12 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--color-bg);
+  color: var(--color-text);
   font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 #root {
@@ -44,15 +38,15 @@ button {
 @keyframes pulse {
   0%,
   100% {
-    opacity: 0.4;
+    opacity: 1;
   }
   50% {
-    opacity: 0.8;
+    opacity: 0.45;
   }
 }
 
 .skeleton {
-  background: var(--bg-raised);
-  border-radius: 8px;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
   animation: pulse 1.4s ease-in-out infinite;
 }

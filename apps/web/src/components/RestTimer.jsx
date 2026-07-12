@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import styles from './RestTimer.module.css';
 
 const PRESETS = [
@@ -6,6 +6,8 @@ const PRESETS = [
   { label: '90s', seconds: 90 },
   { label: '2m', seconds: 120 },
 ];
+
+const DEFAULT_SECONDS = 90;
 
 function formatTime(totalSeconds) {
   const m = Math.floor(totalSeconds / 60);
@@ -34,10 +36,14 @@ function playBeep() {
   }
 }
 
-export default function RestTimer() {
+// The rest timer bar. Besides its own preset buttons it can be started from
+// outside (ticking a set's "Done" box) via a ref: restTimerRef.current.start()
+// re-runs the last-used duration (90s until a preset has been used).
+const RestTimer = forwardRef(function RestTimer(_props, ref) {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [running, setRunning] = useState(false);
   const intervalRef = useRef(null);
+  const lastDurationRef = useRef(DEFAULT_SECONDS);
 
   useEffect(() => {
     if (!running) return undefined;
@@ -61,8 +67,10 @@ export default function RestTimer() {
   }, [running]);
 
   function start(seconds) {
+    const duration = seconds ?? lastDurationRef.current;
+    lastDurationRef.current = duration;
     clearInterval(intervalRef.current);
-    setSecondsLeft(seconds);
+    setSecondsLeft(duration);
     setRunning(true);
   }
 
@@ -71,6 +79,8 @@ export default function RestTimer() {
     setRunning(false);
     setSecondsLeft(0);
   }
+
+  useImperativeHandle(ref, () => ({ start }));
 
   return (
     <div className={styles.bar}>
@@ -100,4 +110,6 @@ export default function RestTimer() {
       )}
     </div>
   );
-}
+});
+
+export default RestTimer;

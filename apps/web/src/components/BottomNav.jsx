@@ -3,7 +3,7 @@ import { useMe } from '../hooks/useAuth.js';
 import styles from './BottomNav.module.css';
 
 const TABS = [
-  { to: '/', label: 'Home' },
+  { to: '/', label: 'Today' },
   { to: '/log', label: 'Log' },
   { to: '/progress', label: 'Progress' },
   { to: '/train', label: 'Train' },

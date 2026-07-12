@@ -1,0 +1,74 @@
+<!-- @dsCard group="Screens" -->
+<title>Cut — Train screen</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="preview.css">
+<div class="ds-page">
+  <header>
+    <div class="ds-kicker">Screen mockup</div>
+    <div class="ds-title">Train — the Hevy/Strong-grade logging loop</div>
+    <p class="ds-sub">Last session's numbers sit beside every input, the rest timer starts itself when a set is ticked, and the plan explains its own progression in plain English — transparency where Fitbod gets criticized for opacity.</p>
+  </header>
+
+  <div class="phone">
+    <div class="viewport">
+      <div class="content">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="screen-title">Train</div>
+          <span class="chip accent">Session in progress</span>
+        </div>
+
+        <!-- plan context -->
+        <div class="card" style="padding:var(--space-3) var(--space-4)">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <span class="label">Beginner Fat Loss · Lower body</span>
+              <div style="font-size:var(--text-sm);color:var(--color-text-muted);margin-top:2px">This week: same exercises, one extra rep per set — that's the plan working.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- rest timer bar -->
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-3) var(--space-4);border-color:color-mix(in srgb, var(--color-accent) 35%, var(--color-border))">
+          <span class="label" style="color:var(--color-accent)">Rest · 1:12</span>
+          <div style="display:flex;gap:var(--space-2)">
+            <button class="btn secondary sm">+30s</button>
+            <button class="btn ghost sm">Skip</button>
+          </div>
+        </div>
+
+        <!-- exercise block -->
+        <div class="card" style="display:flex;flex-direction:column;gap:var(--space-3)">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-weight:600">Goblet squat</div>
+            <button class="btn ghost sm">Swap</button>
+          </div>
+          <div class="set-row label" style="text-transform:uppercase"><span>#</span><span>Last time</span><span>kg</span><span>Reps</span><span></span></div>
+          <div class="set-row"><span class="prev">1</span><span class="prev">16 × 10</span><input class="input" value="16"><input class="input" value="11"><div class="check done">✓</div></div>
+          <div class="set-row"><span class="prev">2</span><span class="prev">16 × 10</span><input class="input" value="16"><input class="input" placeholder="11"><div class="check"></div></div>
+          <div class="set-row"><span class="prev">3</span><span class="prev">16 × 9</span><input class="input" placeholder="16"><input class="input" placeholder="10"><div class="check"></div></div>
+          <button class="btn secondary sm" style="align-self:flex-start">+ Add set</button>
+        </div>
+
+        <!-- next exercise, collapsed -->
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-3) var(--space-4)">
+          <div>
+            <div style="font-weight:600;font-size:var(--text-sm)">Romanian deadlift</div>
+            <span style="color:var(--color-text-faint);font-size:var(--text-xs);font-family:var(--font-mono)">3 SETS · LAST: 40 × 8</span>
+          </div>
+          <span style="color:var(--color-text-faint)">▾</span>
+        </div>
+
+        <button class="btn primary block">Finish session</button>
+        <p class="chart-caption" style="text-align:center">Swapping an exercise asks: “Just for today, or update the program?” — always an explicit choice.</p>
+      </div>
+
+      <nav class="bottom-nav">
+        <a class="tab"><span class="dot"></span>Today</a>
+        <a class="tab"><span class="dot"></span>Log</a>
+        <a class="tab active"><span class="dot"></span>Train</a>
+        <a class="tab"><span class="dot"></span>Progress</a>
+        <a class="tab"><span class="dot"></span>More</a>
+      </nav>
+    </div>
+  </div>
+</div>

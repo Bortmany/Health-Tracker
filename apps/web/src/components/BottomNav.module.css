@@ -4,33 +4,38 @@
   left: 0;
   right: 0;
   display: flex;
-  background: var(--bg-raised);
-  border-top: 1px solid var(--border);
+  justify-content: space-around;
+  align-items: stretch;
+  height: calc(var(--nav-height) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
+  background: var(--color-surface);
+  border-top: var(--surface-outline);
 }
 
+/* Whole column is the tap target — full width, at least 44px tall. */
 .link {
   flex: 1;
+  min-height: 44px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.6rem 0;
+  justify-content: center;
+  gap: 4px;
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-dim);
+  color: var(--color-text-faint);
   text-decoration: none;
 }
 
 .linkActive {
-  color: var(--accent);
+  color: var(--color-accent);
 }
 
 .dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: currentColor;
 }

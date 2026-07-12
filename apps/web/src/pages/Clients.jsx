@@ -1,16 +1,42 @@
 import { useState } from 'react';
 import LineChart from '../components/LineChart.jsx';
 import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorText,
+  Field,
+  Input,
+  Screen,
+  SectionTitle,
+  Skeleton,
+} from '../components/ui/index.js';
+import {
   useAssignProgram,
   useClients,
   useClientSummary,
   useCreateInvite,
   useRemoveClient,
 } from '../hooks/useCoach.js';
+import { smoothSeries, trendCaption } from '../lib/trend.js';
 import styles from './Clients.module.css';
 
 function formatDateLabel(date) {
   return new Date(`${date.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function startOfThisWeek() {
+  const d = new Date();
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // back to Monday
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function daysSince(dateStr) {
+  const then = new Date(`${dateStr.slice(0, 10)}T00:00:00`);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return Math.round((now - then) / 86400000);
 }
 
 function blankDay(index) {
@@ -98,54 +124,44 @@ function AssignProgramBuilder({ clientId }) {
 
   if (!open) {
     return (
-      <button type="button" className={styles.linkButton} onClick={() => setOpen(true)}>
+      <Button variant="ghost" block onClick={() => setOpen(true)}>
         + Assign a program
-      </button>
+      </Button>
     );
   }
 
   return (
-    <div>
-      <div className={styles.field} style={{ marginBottom: '0.75rem' }}>
-        <span className={styles.fieldLabel}>Program name</span>
-        <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Push Pull Legs" />
-      </div>
-      <div className={styles.field} style={{ marginBottom: '0.75rem' }}>
-        <span className={styles.fieldLabel}>Description (optional)</span>
-        <input className={styles.input} value={description} onChange={(e) => setDescription(e.target.value)} />
-      </div>
+    <div className={styles.builder}>
+      <Field label="Program name">
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Push Pull Legs" />
+      </Field>
+      <Field label="Description (optional)">
+        <Input value={description} onChange={(e) => setDescription(e.target.value)} />
+      </Field>
 
       {days.map((day) => (
         <div className={styles.dayCard} key={day.key}>
           <div className={styles.dayHeaderRow}>
-            <input
-              className={styles.input}
-              value={day.name}
-              onChange={(e) => updateDay(day.key, { name: e.target.value })}
-              placeholder="Day name"
-            />
+            <Input value={day.name} onChange={(e) => updateDay(day.key, { name: e.target.value })} placeholder="Day name" />
             <button type="button" className={styles.removeButton} onClick={() => removeDay(day.key)} aria-label="Remove day">
               ✕
             </button>
           </div>
           {day.exercises.map((ex) => (
             <div className={styles.exerciseRow} key={ex.key}>
-              <input
-                className={styles.input}
+              <Input
                 value={ex.name}
                 onChange={(e) => updateExercise(day.key, ex.key, { name: e.target.value })}
                 placeholder="Exercise name"
               />
-              <input
-                className={styles.input}
+              <Input
                 type="number"
                 inputMode="numeric"
                 placeholder="sets"
                 value={ex.targetSets}
                 onChange={(e) => updateExercise(day.key, ex.key, { targetSets: e.target.value })}
               />
-              <input
-                className={styles.input}
+              <Input
                 type="number"
                 inputMode="numeric"
                 placeholder="reps"
@@ -162,81 +178,160 @@ function AssignProgramBuilder({ clientId }) {
               </button>
             </div>
           ))}
-          <button type="button" className={styles.addButton} onClick={() => addExercise(day.key)}>
+          <Button variant="ghost" block onClick={() => addExercise(day.key)}>
             + Add exercise
-          </button>
+          </Button>
         </div>
       ))}
 
-      <button type="button" className={styles.addButton} onClick={addDay}>
+      <Button variant="ghost" block onClick={addDay}>
         + Add day
-      </button>
+      </Button>
 
-      {assignProgram.isError && <p className={styles.error}>{assignProgram.error.message}</p>}
+      {assignProgram.isError && <ErrorText>{assignProgram.error.message}</ErrorText>}
 
-      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-        <button
-          type="button"
-          className={styles.saveButton}
-          onClick={handleAssign}
-          disabled={assignProgram.isPending || !name}
-        >
+      <div className={styles.buttonRow}>
+        <Button onClick={handleAssign} disabled={assignProgram.isPending || !name}>
           {assignProgram.isPending ? 'Assigning...' : 'Assign program'}
-        </button>
-        <button type="button" className={styles.editButton} onClick={() => setOpen(false)}>
+        </Button>
+        <Button variant="secondary" onClick={() => setOpen(false)}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );
 }
 
-function ClientDetail({ clientId }) {
-  const { data: summary, isLoading } = useClientSummary(clientId);
-
+function ClientDetail({ clientId, summary, isLoading }) {
   if (isLoading || !summary) {
-    return <div className="skeleton" style={{ height: 160 }} />;
+    return <Skeleton height={160} style={{ marginTop: 'var(--space-3)' }} />;
   }
 
   const weighIns = summary.weighIns ?? [];
   const recentSessions = summary.recentSessions ?? [];
   const programs = summary.programs ?? [];
+  const rawWeights = weighIns.map((w) => Number(w.weight));
+  const trend = smoothSeries(rawWeights);
+  const caption = trendCaption(weighIns, trend);
 
   return (
     <div className={styles.clientDetail}>
-      <h3 className={styles.detailSectionTitle}>Weight trend</h3>
-      {weighIns.length > 0 ? (
-        <LineChart labels={weighIns.map((w) => w.date.slice(5, 10))} values={weighIns.map((w) => w.weight)} height={140} />
-      ) : (
-        <p className={styles.empty}>No weigh-ins logged yet.</p>
-      )}
+      <div className={styles.detailSection}>
+        <SectionTitle>Weight trend</SectionTitle>
+        {weighIns.length > 0 ? (
+          <>
+            <LineChart
+              labels={weighIns.map((w) => w.date.slice(5, 10))}
+              values={trend}
+              rawValues={rawWeights}
+              height={140}
+            />
+            {caption && <p className={styles.trendCaption}>{caption}</p>}
+          </>
+        ) : (
+          <p className={styles.mutedLine}>No weigh-ins logged yet.</p>
+        )}
+      </div>
 
-      <h3 className={styles.detailSectionTitle}>Recent sessions</h3>
-      {recentSessions.length > 0 ? (
-        recentSessions.map((s) => (
-          <div className={styles.sessionRow} key={s.id}>
-            <span className={styles.sessionMeta}>{formatDateLabel(s.date)}</span>
-            <span>{s.notes || 'No notes'}</span>
-          </div>
-        ))
-      ) : (
-        <p className={styles.empty}>No sessions logged yet.</p>
-      )}
+      <div className={styles.detailSection}>
+        <SectionTitle>Recent sessions</SectionTitle>
+        {recentSessions.length > 0 ? (
+          recentSessions.map((s) => (
+            <div className={styles.sessionRow} key={s.id}>
+              <span className={styles.sessionMeta}>{formatDateLabel(s.date)}</span>
+              <span>{s.notes || 'No notes'}</span>
+            </div>
+          ))
+        ) : (
+          <p className={styles.mutedLine}>No sessions logged yet.</p>
+        )}
+      </div>
 
-      <h3 className={styles.detailSectionTitle}>Programs</h3>
-      {programs.length > 0 ? (
-        programs.map((p) => (
-          <div className={styles.programRow} key={p.id}>
-            <span>{p.name}</span>
-            {p.fromMe && <span className={styles.tag}>yours</span>}
-          </div>
-        ))
-      ) : (
-        <p className={styles.empty}>No programs yet.</p>
-      )}
+      <div className={styles.detailSection}>
+        <SectionTitle>Programs</SectionTitle>
+        {programs.length > 0 ? (
+          programs.map((p) => (
+            <div className={styles.programRow} key={p.id}>
+              <span>{p.name}</span>
+              {p.fromMe && <span className={styles.tag}>yours</span>}
+            </div>
+          ))
+        ) : (
+          <p className={styles.mutedLine}>No programs yet.</p>
+        )}
+      </div>
 
-      <h3 className={styles.detailSectionTitle}>Assign a program</h3>
-      <AssignProgramBuilder clientId={clientId} />
+      <div className={styles.detailSection}>
+        <SectionTitle>Assign a program</SectionTitle>
+        <AssignProgramBuilder clientId={clientId} />
+      </div>
+    </div>
+  );
+}
+
+// One triage row: name, weight direction, sessions this week, last log.
+// The summary loads for every row up front so the coach can scan without
+// tapping; expanding is instant because the data is already cached.
+function ClientRow({ client, expanded, onToggle, onRemove }) {
+  const { data: summary, isLoading } = useClientSummary(client.clientId);
+
+  const weighIns = summary?.weighIns ?? [];
+  const recentSessions = summary?.recentSessions ?? [];
+
+  let direction = null;
+  if (weighIns.length >= 2) {
+    const diff = Number(weighIns[weighIns.length - 1].weight) - Number(weighIns[weighIns.length - 2].weight);
+    direction = Math.abs(diff) < 0.05 ? 'steady' : `${diff < 0 ? '↓' : '↑'} ${Math.abs(diff).toFixed(1)} kg`;
+  }
+
+  const weekStart = startOfThisWeek();
+  const sessionsThisWeek = recentSessions.filter(
+    (s) => new Date(`${s.date.slice(0, 10)}T00:00:00`) >= weekStart
+  ).length;
+
+  // Approximation: the most recent of the last weigh-in and last session
+  // (the summary endpoint has no general "last log of any kind" date yet).
+  const lastDates = [weighIns[weighIns.length - 1]?.date, recentSessions[0]?.date].filter(Boolean);
+  let lastLog = 'No logs yet';
+  if (lastDates.length > 0) {
+    const days = Math.min(...lastDates.map(daysSince));
+    lastLog = days <= 0 ? 'Logged today' : days === 1 ? 'Last log: yesterday' : `Last log: ${days} days ago`;
+  }
+
+  return (
+    <div className={styles.clientRow}>
+      <div className={styles.clientHead} onClick={onToggle}>
+        <div className={styles.clientInfo}>
+          <div className={styles.clientName}>{client.displayName}</div>
+          <div className={styles.clientEmail}>{client.email}</div>
+          {isLoading ? (
+            <Skeleton width="70%" height="0.8rem" style={{ marginTop: 'var(--space-1)' }} />
+          ) : (
+            <div className={styles.triageStats}>
+              {direction && <span>{direction}</span>}
+              <span>
+                {sessionsThisWeek} session{sessionsThisWeek === 1 ? '' : 's'} this week
+              </span>
+              <span>{lastLog}</span>
+            </div>
+          )}
+        </div>
+        <div className={styles.rowActions}>
+          <button
+            type="button"
+            className={styles.removeGhost}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            aria-label={`Remove ${client.displayName}`}
+          >
+            ✕
+          </button>
+          <span className={styles.chevron}>{expanded ? '▲' : '▼'}</span>
+        </div>
+      </div>
+      {expanded && <ClientDetail clientId={client.clientId} summary={summary} isLoading={isLoading} />}
     </div>
   );
 }
@@ -266,36 +361,31 @@ export default function Clients() {
   const pendingInvites = data?.pendingInvites ?? [];
 
   return (
-    <div className={styles.screen}>
-      <div className={styles.header}>
-        <h1>Clients</h1>
-      </div>
-
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Invite a client</h2>
-        {createInvite.isError && <p className={styles.error}>{createInvite.error.message}</p>}
+    <Screen title="Clients">
+      <Card className={styles.stackCard} title="Invite a client">
         {newCode && (
           <div className={styles.inviteCodeBox}>
             <span className={styles.inviteCode}>{newCode}</span>
-            <button type="button" className={styles.editButton} onClick={() => copyCode(newCode)}>
+            <Button variant="secondary" size="sm" onClick={() => copyCode(newCode)}>
               Copy
-            </button>
+            </Button>
           </div>
         )}
-        <button type="button" className={styles.saveButton} onClick={handleCreateInvite} disabled={createInvite.isPending}>
+        <Button onClick={handleCreateInvite} disabled={createInvite.isPending}>
           {createInvite.isPending ? 'Generating...' : 'Generate invite code'}
-        </button>
+        </Button>
+        {createInvite.isError && <ErrorText>{createInvite.error.message}</ErrorText>}
         <p className={styles.hint}>Share this code with your client — they enter it under More.</p>
 
         {pendingInvites.length > 0 && (
-          <>
-            <h3 className={styles.detailSectionTitle}>Pending invites</h3>
+          <div className={styles.pendingBlock}>
+            <SectionTitle>Pending invites</SectionTitle>
             {pendingInvites.map((invite) => (
               <div className={styles.inviteRow} key={invite.linkId}>
                 <span className={styles.inviteRowCode}>{invite.inviteCode}</span>
                 <button
                   type="button"
-                  className={styles.removeButton}
+                  className={styles.removeGhost}
                   onClick={() => removeClient.mutate(invite.linkId)}
                   aria-label="Remove invite"
                 >
@@ -303,49 +393,31 @@ export default function Clients() {
                 </button>
               </div>
             ))}
-          </>
+          </div>
         )}
-      </section>
+      </Card>
 
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Your clients</h2>
+      <Card className={styles.stackCard} title="Your clients">
         {isLoading ? (
-          <div className="skeleton" style={{ height: 120 }} />
+          <Skeleton height="3.5rem" count={3} />
         ) : clients.length === 0 ? (
-          <p className={styles.empty}>No clients yet. Send an invite code to get started.</p>
+          <EmptyState>No clients yet. Send an invite code to get started.</EmptyState>
         ) : (
           clients.map((client) => (
-            <div className={styles.clientRow} key={client.linkId}>
-              <div
-                className={styles.clientHead}
-                onClick={() => setExpandedId((id) => (id === client.clientId ? null : client.clientId))}
-              >
-                <div>
-                  <div className={styles.clientName}>{client.displayName}</div>
-                  <div className={styles.clientEmail}>{client.email}</div>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    className={styles.removeButton}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (window.confirm(`Remove ${client.displayName} as a client?`)) {
-                        removeClient.mutate(client.linkId);
-                      }
-                    }}
-                    aria-label="Remove client"
-                  >
-                    ✕
-                  </button>
-                  <span>{expandedId === client.clientId ? '▲' : '▼'}</span>
-                </div>
-              </div>
-              {expandedId === client.clientId && <ClientDetail clientId={client.clientId} />}
-            </div>
+            <ClientRow
+              key={client.linkId}
+              client={client}
+              expanded={expandedId === client.clientId}
+              onToggle={() => setExpandedId((id) => (id === client.clientId ? null : client.clientId))}
+              onRemove={() => {
+                if (window.confirm(`Remove ${client.displayName} as a client?`)) {
+                  removeClient.mutate(client.linkId);
+                }
+              }}
+            />
           ))
         )}
-      </section>
-    </div>
+      </Card>
+    </Screen>
   );
 }

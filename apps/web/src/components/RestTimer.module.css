@@ -2,54 +2,57 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.6rem 0.75rem;
-  margin-bottom: 0.75rem;
+  gap: var(--space-3);
+  background: var(--color-surface-2);
+  border: var(--surface-outline);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  min-height: 2.75rem;
 }
 
 .label {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--text-dim);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-label);
 }
 
 .presets {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .presetButton {
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 0.4rem 0.7rem;
-  font-size: 0.85rem;
+  background: var(--color-surface);
+  border: var(--surface-outline);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  min-height: 2.75rem;
+  font-size: var(--text-sm);
   font-family: var(--font-mono);
   cursor: pointer;
 }
 
 .presetButton:hover {
-  border-color: var(--accent);
+  border-color: var(--color-accent);
 }
 
 .countdown {
   font-family: var(--font-mono);
-  font-size: 1.4rem;
-  color: var(--accent);
+  font-size: var(--text-xl);
+  color: var(--color-accent);
 }
 
 .stopButton {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 0.5rem 1rem;
-  font-size: 0.85rem;
+  background: var(--color-surface);
+  border: var(--surface-outline);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-4);
+  min-height: 2.75rem;
+  font-size: var(--text-sm);
   cursor: pointer;
 }

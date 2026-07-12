@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button, Card, Chip, EmptyState, ErrorText, SectionTitle, Skeleton } from './ui/index.js';
 import { useAdoptTemplate, useDeleteMyPlan, useMyPlan, useRecommendedTemplates, useTemplates } from '../hooks/usePlans.js';
 import styles from './PlanSection.module.css';
 
@@ -8,13 +9,13 @@ function TemplateCard({ template, onAdopt, adopting }) {
       <div className={styles.templateName}>{template.name}</div>
       <p className={styles.templateDescription}>{template.description}</p>
       <div className={styles.tagRow}>
-        <span className={styles.tag}>{template.goal}</span>
-        <span className={styles.tag}>{template.experience}</span>
-        <span className={styles.tag}>{template.daysPerWeek} days/week</span>
+        <Chip>{template.goal}</Chip>
+        <Chip>{template.experience}</Chip>
+        <Chip>{template.daysPerWeek} days/week</Chip>
       </div>
-      <button type="button" className={styles.adoptButton} onClick={onAdopt} disabled={adopting}>
+      <Button variant="primary" size="sm" onClick={onAdopt} disabled={adopting}>
         {adopting ? 'Setting up...' : 'Use this plan'}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -27,18 +28,18 @@ export default function PlanSection() {
   const stopPlan = useDeleteMyPlan();
   const [browsing, setBrowsing] = useState(false);
 
-  if (isLoading) return <div className="skeleton" style={{ height: 120, marginBottom: '1rem' }} />;
+  if (isLoading) return <Skeleton height={120} style={{ marginBottom: 'var(--space-4)' }} />;
 
   if (plan) {
     return (
-      <section className={styles.section}>
+      <Card className={styles.card}>
         <div className={styles.planHeader}>
-          <h2 className={styles.sectionTitle}>
+          <SectionTitle>
             Your plan — week {plan.weekNumber} of {plan.durationWeeks}
-          </h2>
-          <button
-            type="button"
-            className={styles.stopButton}
+          </SectionTitle>
+          <Button
+            variant="danger"
+            size="sm"
             onClick={() => {
               if (window.confirm('Stop this plan? Your program and logged sessions stay.')) {
                 stopPlan.mutate();
@@ -46,30 +47,34 @@ export default function PlanSection() {
             }}
           >
             Stop plan
-          </button>
+          </Button>
         </div>
-        <div className={styles.planName}>{plan.name}</div>
+        <div className={styles.planName}>
+          {plan.name}
+          {plan.deload && <Chip tone="accent">Easy week</Chip>}
+        </div>
+        {/* The plain-English progression note gets its own prominent line. */}
+        <p className={styles.guidance}>
+          {plan.completed
+            ? 'Plan complete — great work! Pick a new plan below or keep training freestyle.'
+            : plan.guidance}
+        </p>
         {plan.phase && (
           <p className={styles.phase}>
             Phase: <strong>{plan.phase.name}</strong> — {plan.phase.focus}
           </p>
         )}
-        {plan.deload && <span className={styles.deloadBadge}>Easy week</span>}
-        <p className={styles.guidance}>{plan.completed ? 'Plan complete — great work! Pick a new plan below or keep training freestyle.' : plan.guidance}</p>
-      </section>
+      </Card>
     );
   }
 
   const shown = browsing ? allTemplates : recommended;
 
   return (
-    <section className={styles.section}>
-      <h2 className={styles.sectionTitle}>{browsing ? 'All plans' : 'Recommended for you'}</h2>
-      {adopt.isError && <p className={styles.error}>{adopt.error.message}</p>}
+    <Card className={styles.card} title={browsing ? 'All plans' : 'Recommended for you'}>
+      {adopt.isError && <ErrorText>{adopt.error.message}</ErrorText>}
       {shown.length === 0 ? (
-        <p className={styles.empty}>
-          No matching plans yet. Fill in the quiz under More to get recommendations.
-        </p>
+        <EmptyState>No matching plans yet. Fill in the quiz under More to get recommendations.</EmptyState>
       ) : (
         <div className={styles.templateList}>
           {shown.map((t) => (
@@ -82,9 +87,11 @@ export default function PlanSection() {
           ))}
         </div>
       )}
-      <button type="button" className={styles.browseButton} onClick={() => setBrowsing((b) => !b)}>
-        {browsing ? 'Show recommendations' : 'Browse all plans'}
-      </button>
-    </section>
+      <div className={styles.browseRow}>
+        <Button variant="ghost" block onClick={() => setBrowsing((b) => !b)}>
+          {browsing ? 'Show recommendations' : 'Browse all plans'}
+        </Button>
+      </div>
+    </Card>
   );
 }

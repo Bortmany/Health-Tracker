@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { Button, Card, ErrorText, Field, Input, Screen, Skeleton } from '../components/ui/index.js';
 import { useMe, useLogout } from '../hooks/useAuth.js';
 import { useBillingStatus, useCheckout } from '../hooks/useBilling.js';
 import { useMyCoach, useRedeemCoachCode, useRemoveMyCoach } from '../hooks/useCoach.js';
@@ -34,26 +35,19 @@ function PlanTierLine({ planTier }) {
   const checkout = useCheckout();
 
   if (planTier === 'premium') {
-    return <div className={styles.accountLabel}>Premium plan</div>;
+    return <div className={styles.mutedLine}>Premium plan</div>;
   }
   if (!billing?.enabled) {
-    return <div className={styles.accountLabel}>Free plan — upgrades coming soon</div>;
+    return <div className={styles.mutedLine}>Free plan — upgrades coming soon</div>;
   }
   return (
-    <div className={styles.accountLabel}>
+    <div className={styles.mutedLine}>
       Free plan{' — '}
       <button
         type="button"
+        className={styles.inlineLinkButton}
         onClick={() => checkout.mutate()}
         disabled={checkout.isPending}
-        style={{
-          background: 'none',
-          border: 'none',
-          color: 'var(--accent)',
-          cursor: 'pointer',
-          padding: 0,
-          font: 'inherit',
-        }}
       >
         {checkout.isPending ? 'Opening checkout...' : 'Upgrade to Premium'}
       </button>
@@ -87,37 +81,29 @@ function CoachSection() {
   }
 
   return (
-    <section className={styles.section}>
-      <h2 className={styles.sectionTitle}>Your coach</h2>
+    <Card className={styles.stackCard} title="Your coach">
       {isLoading ? (
-        <div className="skeleton" style={{ height: 60 }} />
+        <Skeleton height={60} />
       ) : coach ? (
-        <div className={styles.accountRow}>
+        <div className={styles.row}>
           <div>Coached by {coach.displayName}</div>
-          <button className={styles.logoutButton} onClick={handleRemove} disabled={removeCoach.isPending} type="button">
+          <Button variant="danger" size="sm" onClick={handleRemove} disabled={removeCoach.isPending}>
             Remove coach
-          </button>
+          </Button>
         </div>
       ) : (
         <form onSubmit={handleRedeem}>
-          {success && <p className={styles.accountLabel}>Connected with {success}.</p>}
-          {redeemCode.isError && <p className={styles.error}>{redeemCode.error.message}</p>}
-          <div className={styles.accountRow}>
-            <input
-              className={styles.input}
-              type="text"
-              placeholder="Invite code"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              style={{ marginRight: '0.75rem' }}
-            />
-            <button className={styles.logoutButton} type="submit" disabled={redeemCode.isPending}>
+          {success && <p className={styles.mutedLine}>Connected with {success}.</p>}
+          <div className={styles.connectRow}>
+            <Input type="text" placeholder="Invite code" value={code} onChange={(e) => setCode(e.target.value)} />
+            <Button type="submit" disabled={redeemCode.isPending}>
               {redeemCode.isPending ? 'Connecting...' : 'Connect'}
-            </button>
+            </Button>
           </div>
+          {redeemCode.isError && <ErrorText>{redeemCode.error.message}</ErrorText>}
         </form>
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -162,67 +148,62 @@ export default function More() {
   }
 
   return (
-    <div className={styles.screen}>
-      <div className={styles.header}>
-        <h1>More</h1>
-        <button className={styles.saveButton} onClick={handleSubmit} disabled={isLoading || updateSettings.isPending} type="button">
+    <Screen
+      title="More"
+      actions={
+        <Button onClick={handleSubmit} disabled={isLoading || updateSettings.isPending}>
           {updateSettings.isPending ? 'Saving...' : 'Save'}
-        </button>
-      </div>
+        </Button>
+      }
+    >
+      {updateSettings.isError && <ErrorText>{updateSettings.error.message}</ErrorText>}
 
-      {updateSettings.isError && <p className={styles.error}>{updateSettings.error.message}</p>}
-
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Account</h2>
-        <div className={styles.accountRow}>
-          <div>
+      <Card className={styles.stackCard} title="Account">
+        <div className={styles.row}>
+          <div className={styles.accountInfo}>
             <div>{user?.displayName}</div>
-            <div className={styles.accountLabel}>{user?.email}</div>
+            <div className={styles.mutedLine}>{user?.email}</div>
             <PlanTierLine planTier={user?.planTier} />
-            {user?.role === 'coach' && <div className={styles.accountLabel}>Coach account</div>}
+            {user?.role === 'coach' && <div className={styles.mutedLine}>Coach account</div>}
           </div>
-          <button className={styles.logoutButton} onClick={() => logout.mutate()} disabled={logout.isPending} type="button">
+          <Button variant="secondary" onClick={() => logout.mutate()} disabled={logout.isPending}>
             {logout.isPending ? 'Logging out...' : 'Log out'}
-          </button>
+          </Button>
         </div>
-      </section>
+      </Card>
 
       {user?.role !== 'coach' && <CoachSection />}
 
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Training quiz</h2>
-        <div className={styles.accountRow}>
-          <div className={styles.accountLabel}>Your answers shape which workout plans we recommend.</div>
-          <Link className={styles.logoutButton} to="/onboarding" style={{ textDecoration: 'none' }}>
+      <Card className={styles.stackCard} title="Training quiz">
+        <div className={styles.row}>
+          <div className={styles.mutedLine}>Your answers shape which workout plans we recommend.</div>
+          <Link className={styles.linkAsButton} to="/onboarding">
             Retake quiz
           </Link>
         </div>
-      </section>
+      </Card>
 
       {isLoading ? (
-        <div className="skeleton" style={{ height: 220 }} />
+        <Skeleton height={220} />
       ) : (
         <form onSubmit={handleSubmit}>
-          <section className={styles.section}>
-            <h2 className={styles.sectionTitle}>Goals</h2>
+          <Card className={styles.stackCard} title="Goals">
             <div className={styles.grid}>
               {FIELDS.map(({ key, label, step, type }) => (
-                <label className={styles.field} key={key}>
-                  <span className={styles.fieldLabel}>{label}</span>
-                  <input
-                    className={styles.input}
+                <Field label={label} key={key}>
+                  <Input
                     type={type ?? 'number'}
                     inputMode={type ? undefined : 'decimal'}
                     step={step}
                     value={form[key]}
                     onChange={(e) => updateField(key, e.target.value)}
                   />
-                </label>
+                </Field>
               ))}
             </div>
-          </section>
+          </Card>
         </form>
       )}
-    </div>
+    </Screen>
   );
 }

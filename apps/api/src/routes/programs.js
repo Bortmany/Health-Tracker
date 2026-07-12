@@ -57,7 +57,22 @@ export async function fetchNestedDays(client, programId) {
 }
 
 export async function replaceDays(client, programId, days) {
+  // Deleting the days would silently unlink every past session logged against
+  // them (the foreign key sets them to null). Remember the old days and which
+  // sessions point at each one, so the links can be moved to the new days.
+  const { rows: oldDays } = await client.query(
+    'SELECT id, name, sort_order FROM program_days WHERE program_id = $1 ORDER BY sort_order',
+    [programId]
+  );
+  const { rows: linkedLogs } = await client.query(
+    `SELECT id, program_day_id FROM training_logs
+     WHERE program_day_id IN (SELECT id FROM program_days WHERE program_id = $1)`,
+    [programId]
+  );
+
   await client.query('DELETE FROM program_days WHERE program_id = $1', [programId]);
+
+  const newDays = [];
   for (const [dayIndex, day] of days.entries()) {
     if (!day?.name) continue;
     const { rows } = await client.query(
@@ -65,6 +80,7 @@ export async function replaceDays(client, programId, days) {
       [programId, day.name, day.sortOrder ?? dayIndex]
     );
     const dayId = rows[0].id;
+    newDays.push({ id: dayId, name: day.name });
     for (const [exIndex, ex] of (day.exercises ?? []).entries()) {
       if (!ex?.name) continue;
       await client.query(
@@ -73,6 +89,20 @@ export async function replaceDays(client, programId, days) {
         [dayId, ex.name, ex.targetSets ?? null, ex.targetReps ?? null, ex.sortOrder ?? exIndex]
       );
     }
+  }
+
+  // Point past sessions at the replacement day: same name first, same position
+  // as a fallback. A day that was truly removed leaves its sessions unlinked,
+  // which is the correct outcome.
+  for (const [position, oldDay] of oldDays.entries()) {
+    const replacement = newDays.find((d) => d.name === oldDay.name) ?? newDays[position];
+    if (!replacement) continue;
+    const logIds = linkedLogs.filter((l) => l.program_day_id === oldDay.id).map((l) => l.id);
+    if (logIds.length === 0) continue;
+    await client.query(
+      'UPDATE training_logs SET program_day_id = $1 WHERE id = ANY($2::uuid[])',
+      [replacement.id, logIds]
+    );
   }
 }
 
