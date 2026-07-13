@@ -2,7 +2,7 @@
 
 ## What this is
 
-Cut is a fat-loss and training tracker for people who aren't sure what to train, plus the coaches who train them. React + Vite frontend, Express + raw `pg` + Postgres backend (no ORM), npm workspaces monorepo, installable PWA, deployed on Render from `main`. The owner is **not a developer** — write all comments, commit messages, and reports in plain English a non-developer can understand.
+Cut is a fat-loss and training tracker for people who aren't sure what to train, plus the coaches who train them. React + Vite frontend, Express + raw `pg` + Postgres backend (no ORM), npm workspaces monorepo, installable PWA, deployed on Railway from `main`. The owner is **not a developer** — write all comments, commit messages, and reports in plain English a non-developer can understand.
 
 ## Current state (roadmap complete)
 
@@ -15,7 +15,7 @@ All planned phases are built, tested, reviewed, and merged to `main`. 48/48 back
 - Charts (Chart.js, lazy-loaded), PWA manifest + service worker, weekly habit summary endpoint
 - `POST /api/health-sync` for future native apps (device data fills blanks, never overwrites manual entries)
 
-**Dormant switches** (code shipped, asleep until env vars are set on Render):
+**Dormant switches** (code shipped, asleep until env vars are set on Railway):
 - `ANTHROPIC_API_KEY` → AI plan writer (`apps/api/src/lib/aiPlanGenerator.js`)
 - `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` + `STRIPE_PRICE_ID` + `APP_URL` → paid Premium upgrades (`apps/api/src/routes/billing.js`; webhook uses raw body, wired in `app.js` before `express.json`)
 
@@ -33,7 +33,7 @@ All planned phases are built, tested, reviewed, and merged to `main`. 48/48 back
 1. Design the phase centrally, then dispatch the dev crew: the generic `builder` (run two in parallel — one on the server side, one on the screens — with exact API contracts in the prompts) and `content-curator` (seed data). **The agents live in the central `Agents` repo** (under `.claude/agents/dev/`) — a session must include the Agents repo as a source or no agents will load. The crew is generic and works on any repo: it reads THIS file's Conventions section first (the registry in `Agents/docs/apps.md` points here). The `dev-lead` commander can run the whole build → verify → review loop as one delegated step — tell it the repo is Health-Tracker.
 2. `verifier` agent runs migrations + tests + build (+ prod smoke when warranted).
 3. `code-reviewer` agent reviews the diff; fix real findings before committing.
-4. Commit with a short plain-English message, push to the work branch, merge `--no-ff` to `main`, push — Render auto-deploys `main`.
+4. Commit with a short plain-English message, push to the work branch, merge `--no-ff` to `main`, push — Railway auto-deploys `main`.
 5. Report to the owner in plain English; pause for review between major phases unless told to batch.
 
 **Environment notes:** local Postgres stops when the sandbox idles — `service postgresql status || service postgresql start` before anything DB-related. Historical work branch: `claude/loving-clarke-eep2es` (a fresh session may get its own designated branch — follow the session's instructions). Token-lean habits the owner asked for: don't re-read unchanged files, lean verification (tests + build), short commits.
@@ -42,11 +42,11 @@ All planned phases are built, tested, reviewed, and merged to `main`. 48/48 back
 
 | Item | What's needed |
 |---|---|
-| Confirm Render deploy is green | render.com dashboard; open the `.onrender.com` URL |
+| Confirm Railway deploy is green | railway.app dashboard; open the app's public URL |
 | Real payments | Stripe account, one subscription Price, set the 4 env vars, point a webhook at `/api/billing/webhook` |
-| AI-written plans | Set `ANTHROPIC_API_KEY` on Render |
+| AI-written plans | Set `ANTHROPIC_API_KEY` on Railway |
 | Native iPhone/Android apps | Apple Developer $99/yr, Google Play $25, a Mac — follow `docs/mobile.md` |
-| Premium meanwhile | `UPDATE users SET plan_tier = 'premium' WHERE email = '...';` in Render's DB shell |
+| Premium meanwhile | `UPDATE users SET plan_tier = 'premium' WHERE email = '...';` in Railway's DB shell |
 
 Possible future work: Stripe customer portal (manage/cancel), password reset via email, progress photos (needs file storage), coach chat/notes, push notification reminders.
 
@@ -57,6 +57,6 @@ Possible future work: Stripe customer portal (manage/cancel), password reset via
 | `README.md` | Full app description, env var table, deploy steps |
 | `docs/schema.sql` | Always-current schema dump |
 | `docs/mobile.md` | Step-by-step for App Store / Play Store |
-| `render.yaml` | Render Blueprint (service + database) |
+| `railway.json` | Railway deploy config (build, migrate, start, health check) |
 | `Agents` repo, `.claude/agents/dev/` | The generic dev crew (builder, verifier, code-reviewer, researcher, content-curator) — works on any repo by reading this file's conventions; include the Agents repo in the session |
 | `apps/api/src/db/migrations/` | 15 migrations so far; runner is `src/db/migrate.js` |

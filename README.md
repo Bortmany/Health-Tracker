@@ -28,9 +28,9 @@ A fat-loss and training tracker for people who aren't sure what to train — and
 
 Tests: `npm test` (integration tests against the local Postgres). Build check: `npm run build`.
 
-## Deploying (Render)
+## Deploying (Railway)
 
-`render.yaml` is a Render Blueprint: New → Blueprint → pick this repo → Apply. It creates the web service and the Postgres database, generates `JWT_SECRET`, and runs migrations on every deploy. Deploys happen automatically on push to `main`.
+`railway.json` is the deploy config: create a Railway project from this repo, attach a Postgres plugin (sets `DATABASE_URL`), and set the environment variables below. Railway builds with NIXPACKS, runs the database migrations before each deploy (`preDeployCommand`), starts the API, and health-checks `/api/health`. Deploys happen automatically on push to `main`.
 
 ## Environment variables
 
@@ -38,7 +38,7 @@ Tests: `npm test` (integration tests against the local Postgres). Build check: `
 |---|---|---|
 | `DATABASE_URL` | Yes | Postgres connection string |
 | `JWT_SECRET` | Yes | Signs login cookies |
-| `DATABASE_SSL` | Hosted DBs | `true` on Render and most hosted Postgres |
+| `DATABASE_SSL` | Hosted DBs | `true` on Railway and most hosted Postgres |
 | `NODE_ENV` | Yes | `production` makes Express serve the built frontend |
 | `PORT`, `CORS_ORIGIN` | No | Defaults fine locally |
 | `ANTHROPIC_API_KEY` | Optional switch | Wakes the AI plan writer (personalized plans written by Claude instead of picked from the library) |
