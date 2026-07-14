@@ -29,7 +29,30 @@ export const app = express();
 // the rate limiter sees each visitor's real address instead of the proxy's.
 app.set('trust proxy', 1);
 
-app.use(helmet({ contentSecurityPolicy: false }));
+// Content-Security-Policy: tells the browser exactly which sources it may load
+// from, which blocks most injected-script attacks. These values are scoped to
+// what the Cut frontend actually uses: its own scripts/styles (same origin),
+// Google Fonts, and same-origin API calls. Stripe checkout is a full-page
+// redirect (no embedded script), so it needs nothing extra here.
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      // React renders inline style="" attributes throughout, so 'unsafe-inline'
+      // is required for styles (not for scripts). Google Fonts stylesheet host.
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:'],
+      connectSrc: ["'self'"],
+      workerSrc: ["'self'"],
+      manifestSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+}));
 app.use(compression());
 // Stripe's webhook signature is checked against the raw request bytes, so
 // that one path must skip JSON parsing. It's registered before express.json.
