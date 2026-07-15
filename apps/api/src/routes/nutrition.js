@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import * as validate from '../lib/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Guard against a runaway request stuffing thousands of rows into one day.
+const MAX_MEALS = 50;
 
 function toPublicLog(row) {
   if (!row) return null;
@@ -70,6 +73,34 @@ router.put('/:date', asyncHandler(async (req, res) => {
 
   const { calories, protein, carbs, fat, notes, meals = [] } = req.body ?? {};
 
+  // Validate the day's totals: each macro is optional, but if given it must be a
+  // finite, non-negative number. Bad values are rejected with a clear message.
+  const cleanCalories = validate.nonNegativeNumber(calories, 'calories', { optional: true, max: 100000 });
+  const cleanProtein = validate.nonNegativeNumber(protein, 'protein', { optional: true, max: 100000 });
+  const cleanCarbs = validate.nonNegativeNumber(carbs, 'carbs', { optional: true, max: 100000 });
+  const cleanFat = validate.nonNegativeNumber(fat, 'fat', { optional: true, max: 100000 });
+  const cleanNotes = validate.stringLength(notes, 'notes', { optional: true, max: 2000 });
+
+  if (!Array.isArray(meals)) {
+    throw new validate.ValidationError('meals must be a list');
+  }
+  if (meals.length > MAX_MEALS) {
+    throw new validate.ValidationError(`You can log at most ${MAX_MEALS} meals for one day`);
+  }
+  // Blank rows the form may send are skipped; any meal with a name gets its name
+  // and macros validated the same way as the day totals.
+  const cleanMeals = [];
+  for (const meal of meals) {
+    if (meal?.name == null || String(meal.name).trim() === '') continue;
+    cleanMeals.push({
+      name: validate.stringLength(meal.name, 'meal name', { max: 200 }),
+      calories: validate.nonNegativeNumber(meal.calories, 'meal calories', { optional: true, max: 100000 }),
+      protein: validate.nonNegativeNumber(meal.protein, 'meal protein', { optional: true, max: 100000 }),
+      carbs: validate.nonNegativeNumber(meal.carbs, 'meal carbs', { optional: true, max: 100000 }),
+      fat: validate.nonNegativeNumber(meal.fat, 'meal fat', { optional: true, max: 100000 }),
+    });
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -81,17 +112,16 @@ router.put('/:date', asyncHandler(async (req, res) => {
          calories = EXCLUDED.calories, protein = EXCLUDED.protein, carbs = EXCLUDED.carbs,
          fat = EXCLUDED.fat, notes = EXCLUDED.notes
        RETURNING *`,
-      [req.userId, date, calories ?? null, protein ?? null, carbs ?? null, fat ?? null, notes ?? null]
+      [req.userId, date, cleanCalories, cleanProtein, cleanCarbs, cleanFat, cleanNotes]
     );
     const log = rows[0];
 
     await client.query('DELETE FROM nutrition_log_meals WHERE nutrition_log_id = $1', [log.id]);
-    for (const [index, meal] of meals.entries()) {
-      if (!meal?.name) continue;
+    for (const [index, meal] of cleanMeals.entries()) {
       await client.query(
         `INSERT INTO nutrition_log_meals (nutrition_log_id, name, calories, protein, carbs, fat, sort_order)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [log.id, meal.name, meal.calories ?? null, meal.protein ?? null, meal.carbs ?? null, meal.fat ?? null, index]
+        [log.id, meal.name, meal.calories, meal.protein, meal.carbs, meal.fat, index]
       );
     }
 

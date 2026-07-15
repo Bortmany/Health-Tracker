@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { signToken } from '../lib/jwt.js';
+import * as validate from '../lib/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -40,6 +41,8 @@ router.post('/register', asyncHandler(async (req, res) => {
       error: { message: 'email, password, and displayName are required', code: 'INVALID_INPUT' },
     });
   }
+  // Reject malformed addresses up front (returns it trimmed + lower-cased).
+  const normalizedEmail = validate.email(email);
   if (password.length < 8) {
     return res.status(400).json({
       error: { message: 'Password must be at least 8 characters long', code: 'WEAK_PASSWORD' },
@@ -60,7 +63,7 @@ router.post('/register', asyncHandler(async (req, res) => {
       `INSERT INTO users (email, password_hash, display_name, role)
        VALUES ($1, $2, $3, $4)
        RETURNING id, email, display_name, plan_tier, role, created_at`,
-      [email.toLowerCase(), passwordHash, displayName, role ?? 'consumer']
+      [normalizedEmail, passwordHash, displayName, role ?? 'consumer']
     );
     const user = rows[0];
     await client.query('INSERT INTO user_settings (user_id) VALUES ($1)', [user.id]);
