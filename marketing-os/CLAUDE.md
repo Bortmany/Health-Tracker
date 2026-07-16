@@ -26,7 +26,7 @@ Brand truth lives in `brands/*.md` — read the relevant profile before writing 
 
 ## Connected tools
 
-Notion (Marketing Queue board), Canva (graphics), Gmail (Friday report + email drafts). Scheduler (Publer) and Reddit API credentials arrive via the owner's setup — see `docs/setup.md`; until then Publisher runs in "prepare only" mode.
+Notion (Marketing Queue board), Canva (graphics — the branding half of every visual), Gmail (Friday report + email drafts), Higgsfield (AI imagery + video reels — the owner connects this MCP themselves; until then the designer works Canva-only). Publishing runs through Publer Business, but `publisher` is DORMANT until the business is up and running and the owner connects Publer + Reddit — see `playbooks/activation-checklist.md`; until then every run ends at Awaiting approval and nothing is posted anywhere. API keys are never written into any repo — they live in Publer's own settings and the owner's MCP connections.
 
 ## Conventions
 
