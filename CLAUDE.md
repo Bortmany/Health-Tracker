@@ -30,7 +30,7 @@ All planned phases are built, tested, reviewed, and merged to `main`. 48/48 back
 
 ## Workflow (established with the owner)
 
-1. Design the phase centrally, then dispatch the dev crew: the generic `builder` (run two in parallel — one on the server side, one on the screens — with exact API contracts in the prompts) and `content-curator` (seed data). **The agents live in the central `Agents` repo** (under `.claude/agents/dev/`) — a session must include the Agents repo as a source or no agents will load. The crew is generic and works on any repo: it reads THIS file's Conventions section first (the registry in `Agents/docs/apps.md` points here). The `dev-lead` commander can run the whole build → verify → review loop as one delegated step — tell it the repo is Health-Tracker.
+1. Design the phase centrally, then dispatch the dev crew: the generic `builder` (run two in parallel — one on the server side, one on the screens — with exact API contracts in the prompts) and `content-curator` (seed data). **The agents live in the central `Agents` repo** (under `.claude/agents/development/`) — a session must include the Agents repo as a source or no agents will load. The crew is generic and works on any repo: it reads THIS file's Conventions section first (the registry in `Agents/docs/apps.md` points here). The `dev-lead` commander can run the whole build → verify → review loop as one delegated step — tell it the repo is Health-Tracker.
 2. `verifier` agent runs migrations + tests + build (+ prod smoke when warranted).
 3. `code-reviewer` agent reviews the diff; fix real findings before committing.
 4. Commit with a short plain-English message, push to the work branch, merge `--no-ff` to `main`, push — Railway auto-deploys `main`.
@@ -58,5 +58,5 @@ Possible future work: Stripe customer portal (manage/cancel), password reset via
 | `docs/schema.sql` | Always-current schema dump |
 | `docs/mobile.md` | Step-by-step for App Store / Play Store |
 | `railway.json` | Railway deploy config (build, migrate, start, health check) |
-| `Agents` repo, `.claude/agents/dev/` | The generic dev crew (builder, verifier, code-reviewer, researcher, content-curator) — works on any repo by reading this file's conventions; include the Agents repo in the session |
+| `Agents` repo, `.claude/agents/` | The generic dev crew (builder, researcher, content-curator in `development/`; verifier, code-reviewer in `quality/` — full roster in that repo's CLAUDE.md) — works on any repo by reading this file's conventions; include the Agents repo in the session |
 | `apps/api/src/db/migrations/` | 15 migrations so far; runner is `src/db/migrate.js` |
