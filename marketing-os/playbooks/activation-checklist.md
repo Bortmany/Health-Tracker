@@ -6,7 +6,7 @@
 |---|---|---|---|
 | `ops-watchdog` | The Cut Render URL is confirmed live (owner opens it once and says "that's it") | Pointless before there's a site to watch; critical the day there is | ~0 — only hear from it when something breaks |
 | `support-agent` | A support email address exists AND the first real user email arrives | No inbox, nothing to triage | ~5 min/day approving reply drafts (scales with users) |
-| `publisher` (full mode) | Publer + Reddit accounts connected (the 25-min setup) | Until then it runs prepare-only | 0 extra |
+| `publisher` | **The business is up and running** (owner's call) AND the owner subscribes to Publer Business (~$21/mo), connects the social accounts (Instagram, X, Facebook), and generates the API key | Publishing before there's a running business wastes money and attention; Publer's built-in "pending approval" state also gives the owner a final tap-to-approve on every single post | ~5 min/day approving queued posts in the Publer app |
 | `feedback-curator` (#4) | **25 total signups** OR the first piece of unsolicited user feedback, whichever first | Below that, "patterns" are noise — one person is an anecdote | ~5 min/month reading the ranked list |
 | `maintenance` (#5) | Cut live for **2 weeks with no deploy rollbacks** | Updating dependencies during launch churn multiplies risk; on a stable app it's pure health | ~10 min/month reading + merging the prepared update |
 | `competitor-watch` (#6) | Marketing has run **4 full weeks** (4 Friday reports exist) | Needs our own baseline first, or the digest has no "so what for us" | ~10 min/month reading the digest |
