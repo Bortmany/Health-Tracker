@@ -24,4 +24,8 @@ Plain-English list of what to set up before launch. Full context: `Agents/docs/g
 - None wired (password reset / welcome email are future backlog only).
 
 ## Security note
-No committed secrets; JWT in a secure httpOnly cookie; bcrypt passwords; login is rate-limited; coach access verifies an active coach↔client link; all SQL is parameterized. Solid for launch. (Minor future tidy: the content-security-policy header is currently disabled in helmet.)
+No committed secrets; JWT in a secure httpOnly cookie; bcrypt passwords; login is rate-limited; coach access verifies an active coach↔client link; all SQL is parameterized. The content-security-policy header is on and scoped to what the app actually loads (see `apps/api/src/app.js` — an earlier version of this note said it was disabled; that's stale). Solid for launch.
+
+## Scaling notes (only matters if the app runs more than one copy)
+- **Database connections:** each running copy of the server opens up to 10 database connections by default. If Railway ever runs several copies, keep (copies × 10) under the database's connection limit — or lower the per-copy cap with the `PG_POOL_MAX` env var (see `apps/api/src/db/pool.js`).
+- **Rate limits are per copy:** the login and save-speed limits are counted in each server copy's own memory. With one copy (today's setup) that's exact; with several copies each keeps its own count, so the effective limit loosens — fine for now, but worth a shared store (e.g. Redis) if the app ever scales out.

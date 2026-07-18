@@ -1,0 +1,83 @@
+/* Shared layout for the public Privacy Policy and Terms pages. */
+
+.screen {
+  min-height: 100vh;
+  padding: var(--space-6);
+  display: flex;
+  justify-content: center;
+}
+
+.shell {
+  width: 100%;
+  max-width: 640px;
+}
+
+.wordmark {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-2xl);
+  margin-bottom: var(--space-4);
+}
+
+.wordmark a {
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.title {
+  font-size: var(--text-3xl);
+  margin-bottom: var(--space-2);
+}
+
+.updated {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-5);
+}
+
+/* The visible "this is a template" warning the owner must keep until the
+   document has been professionally reviewed. */
+.reviewNotice {
+  background: var(--color-surface-2);
+  border: var(--surface-outline);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-5);
+}
+
+.body h2 {
+  font-size: var(--text-lg);
+  margin: var(--space-5) 0 var(--space-2);
+}
+
+.body p,
+.body li {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.body p {
+  margin: 0 0 var(--space-3);
+}
+
+.body ul {
+  margin: 0 0 var(--space-3);
+  padding-left: var(--space-5);
+}
+
+.body a {
+  color: var(--color-accent);
+}
+
+.footerLinks {
+  margin: var(--space-6) 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.footerLinks a {
+  color: var(--color-text-muted);
+}

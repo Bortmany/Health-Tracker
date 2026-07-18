@@ -79,3 +79,15 @@
   color: var(--color-accent);
   text-decoration: none;
 }
+
+/* The "you agree to the Terms and Privacy Policy" line under the sign-up button. */
+.legalNote {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.legalNote a {
+  color: var(--color-text-muted);
+}

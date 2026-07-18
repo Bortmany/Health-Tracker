@@ -4,6 +4,7 @@ import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { signToken } from '../lib/jwt.js';
 import * as validate from '../lib/validate.js';
+import { withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -56,31 +57,28 @@ router.post('/register', asyncHandler(async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
 
-  const client = await pool.connect();
+  let user;
   try {
-    await client.query('BEGIN');
-    const { rows } = await client.query(
-      `INSERT INTO users (email, password_hash, display_name, role)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, email, display_name, plan_tier, role, created_at`,
-      [normalizedEmail, passwordHash, displayName, role ?? 'consumer']
-    );
-    const user = rows[0];
-    await client.query('INSERT INTO user_settings (user_id) VALUES ($1)', [user.id]);
-    await client.query('COMMIT');
-
-    const token = signToken(user.id);
-    res.cookie('token', token, cookieOptions());
-    res.status(201).json({ user: toPublicUser(user) });
+    user = await withTransaction(async (client) => {
+      const { rows } = await client.query(
+        `INSERT INTO users (email, password_hash, display_name, role)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, email, display_name, plan_tier, role, created_at`,
+        [normalizedEmail, passwordHash, displayName, role ?? 'consumer']
+      );
+      await client.query('INSERT INTO user_settings (user_id) VALUES ($1)', [rows[0].id]);
+      return rows[0];
+    });
   } catch (err) {
-    await client.query('ROLLBACK');
     if (err.code === '23505') {
       return res.status(400).json({ error: { message: 'Email already registered', code: 'EMAIL_TAKEN' } });
     }
     throw err;
-  } finally {
-    client.release();
   }
+
+  const token = signToken(user.id);
+  res.cookie('token', token, cookieOptions());
+  res.status(201).json({ user: toPublicUser(user) });
 }));
 
 router.post('/login', asyncHandler(async (req, res) => {

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { Rollback, withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -15,28 +16,26 @@ router.post('/redeem', asyncHandler(async (req, res) => {
 
   // Everything runs in one transaction with the invite row locked, so two
   // people redeeming at once (or one person redeeming two codes at once)
-  // can't slip past the checks.
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
+  // can't slip past the checks. When a check fails, the response is sent and
+  // Rollback aborts the transaction, leaving `coach` empty.
+  const coach = await withTransaction(async (client) => {
     const { rows: inviteRows } = await client.query(
       `SELECT * FROM coach_clients WHERE invite_code = $1 AND status = 'pending' FOR UPDATE`,
       [code]
     );
     const invite = inviteRows[0];
     if (!invite) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({
+      res.status(404).json({
         error: { message: 'That invite code was not found or has already been used', code: 'NOT_FOUND' },
       });
+      throw new Rollback();
     }
 
     if (invite.coach_id === req.userId) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({
+      res.status(400).json({
         error: { message: "You can't use your own invite code", code: 'INVALID_INPUT' },
       });
+      throw new Rollback();
     }
 
     const { rows: existingRows } = await client.query(
@@ -45,15 +44,16 @@ router.post('/redeem', asyncHandler(async (req, res) => {
     );
     const existing = existingRows[0];
     if (existing) {
-      await client.query('ROLLBACK');
       if (existing.coach_id === invite.coach_id) {
-        return res.status(400).json({
+        res.status(400).json({
           error: { message: "You're already connected to this coach", code: 'ALREADY_CONNECTED' },
         });
+      } else {
+        res.status(400).json({
+          error: { message: 'You already have a coach. Remove them first under More.', code: 'HAS_COACH' },
+        });
       }
-      return res.status(400).json({
-        error: { message: 'You already have a coach. Remove them first under More.', code: 'HAS_COACH' },
-      });
+      throw new Rollback();
     }
 
     const { rows, rowCount } = await client.query(
@@ -63,24 +63,20 @@ router.post('/redeem', asyncHandler(async (req, res) => {
       [req.userId, invite.id]
     );
     if (rowCount === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({
+      res.status(404).json({
         error: { message: 'That invite code was not found or has already been used', code: 'NOT_FOUND' },
       });
+      throw new Rollback();
     }
 
     const { rows: coachRows } = await client.query('SELECT display_name FROM users WHERE id = $1', [
       rows[0].coach_id,
     ]);
-    await client.query('COMMIT');
+    return { displayName: coachRows[0]?.display_name ?? null };
+  });
 
-    res.json({ coach: { displayName: coachRows[0]?.display_name ?? null } });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+  if (!coach) return;
+  res.json({ coach });
 }));
 
 router.get('/', asyncHandler(async (req, res) => {

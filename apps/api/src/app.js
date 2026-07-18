@@ -10,12 +10,14 @@ import { pool } from './db/pool.js';
 import { verifyToken } from './lib/jwt.js';
 import { logger } from './lib/logger.js';
 import { captureException, initSentry } from './lib/sentry.js';
+import accountRouter from './routes/account.js';
 import activitiesRouter from './routes/activities.js';
 import authRouter from './routes/auth.js';
 import billingRouter from './routes/billing.js';
 import coachRouter from './routes/coach.js';
 import coachLinkRouter from './routes/coachLink.js';
 import exercisesRouter from './routes/exercises.js';
+import exportRouter from './routes/export.js';
 import habitsRouter from './routes/habits.js';
 import healthSyncRouter from './routes/healthSync.js';
 import injuriesRouter from './routes/injuries.js';
@@ -77,6 +79,9 @@ const authLimiter = rateLimit({
 app.use('/api/auth', authLimiter);
 // Invite codes get the same guessing protection as passwords.
 app.use('/api/coach-link/redeem', authLimiter);
+// Deleting an account asks for your password first, so it gets the same
+// guessing protection as the login screen.
+app.use('/api/account', authLimiter);
 
 // Start Sentry error tracking if (and only if) SENTRY_DSN is configured.
 // With no DSN this returns immediately and nothing is imported or sent.
@@ -128,8 +133,10 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
+app.use('/api/account', accountRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/billing', billingRouter);
+app.use('/api/export', exportRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/habits', habitsRouter);
 app.use('/api/activities', activitiesRouter);
