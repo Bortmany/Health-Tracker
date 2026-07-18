@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { Rollback, withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireCoach } from '../middleware/requireCoach.js';
 import { fetchNestedDays, replaceDays } from './programs.js';
@@ -143,24 +144,16 @@ router.post('/clients/:clientId/programs', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: { message: 'name is required', code: 'INVALID_INPUT' } });
   }
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
+  const program = await withTransaction(async (client) => {
     const { rows } = await client.query(
       `INSERT INTO programs (user_id, name, description, created_by_coach_id)
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [req.params.clientId, name, description ?? null, req.userId]
     );
-    const program = rows[0];
-    await replaceDays(client, program.id, days);
-    await client.query('COMMIT');
-    res.status(201).json({ program: toPublicProgram(program, await fetchNestedDays(pool, program.id)) });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+    await replaceDays(client, rows[0].id, days);
+    return rows[0];
+  });
+  res.status(201).json({ program: toPublicProgram(program, await fetchNestedDays(pool, program.id)) });
 }));
 
 router.put('/clients/:clientId/programs/:programId', asyncHandler(async (req, res) => {
@@ -171,18 +164,13 @@ router.put('/clients/:clientId/programs/:programId', asyncHandler(async (req, re
 
   const { name, description, archived, days } = req.body ?? {};
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
+  const program = await withTransaction(async (client) => {
     const { rows: ownedRows } = await client.query(
       `SELECT id FROM programs
        WHERE id = $1 AND user_id = $2 AND created_by_coach_id = $3`,
       [req.params.programId, req.params.clientId, req.userId]
     );
-    if (!ownedRows[0]) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: { message: 'Program not found', code: 'NOT_FOUND' } });
-    }
+    if (!ownedRows[0]) throw new Rollback(null);
 
     const { rows } = await client.query(
       `UPDATE programs
@@ -195,20 +183,18 @@ router.put('/clients/:clientId/programs/:programId', asyncHandler(async (req, re
        RETURNING *`,
       [req.params.programId, name ?? null, description ?? null, archived ?? null]
     );
-    const program = rows[0];
 
     if (days) {
-      await replaceDays(client, program.id, days);
+      await replaceDays(client, rows[0].id, days);
     }
 
-    await client.query('COMMIT');
-    res.json({ program: toPublicProgram(program, await fetchNestedDays(pool, program.id)) });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
+    return rows[0];
+  });
+
+  if (!program) {
+    return res.status(404).json({ error: { message: 'Program not found', code: 'NOT_FOUND' } });
   }
+  res.json({ program: toPublicProgram(program, await fetchNestedDays(pool, program.id)) });
 }));
 
 export default router;

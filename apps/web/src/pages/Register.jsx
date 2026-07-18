@@ -79,6 +79,10 @@ export default function Register() {
             <Button type="submit" block disabled={register.isPending}>
               {register.isPending ? 'Creating account...' : 'Create account'}
             </Button>
+            <p className={styles.legalNote}>
+              By creating an account you agree to the <Link to="/terms">Terms</Link> and{' '}
+              <Link to="/privacy">Privacy Policy</Link>.
+            </p>
           </form>
           <p className={styles.switch}>
             Already have an account? <Link to="/login">Log in</Link>

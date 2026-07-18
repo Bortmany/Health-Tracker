@@ -7,8 +7,10 @@ import Log from './pages/Log.jsx';
 import Login from './pages/Login.jsx';
 import More from './pages/More.jsx';
 import Onboarding from './pages/Onboarding.jsx';
+import Privacy from './pages/Privacy.jsx';
 import Progress from './pages/Progress.jsx';
 import Register from './pages/Register.jsx';
+import Terms from './pages/Terms.jsx';
 import Train from './pages/Train.jsx';
 
 export default function App() {
@@ -17,6 +19,8 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/onboarding" element={<Onboarding />} />
           <Route element={<AppLayout />}>

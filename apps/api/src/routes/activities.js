@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { Rollback, withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -58,18 +59,12 @@ router.put('/:id', asyncHandler(async (req, res) => {
 }));
 
 router.delete('/:id', asyncHandler(async (req, res) => {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
+  const found = await withTransaction(async (client) => {
     const { rows: ownedRows } = await client.query(
       'SELECT id FROM activities WHERE id = $1 AND user_id = $2',
       [req.params.id, req.userId]
     );
-    if (!ownedRows[0]) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: { message: 'Activity not found', code: 'NOT_FOUND' } });
-    }
+    if (!ownedRows[0]) throw new Rollback(false);
 
     // Backfill the name onto logged entries before the FK sets activity_id to
     // NULL on delete, so history doesn't end up with neither field set.
@@ -82,14 +77,12 @@ router.delete('/:id', asyncHandler(async (req, res) => {
     );
 
     await client.query('DELETE FROM activities WHERE id = $1', [req.params.id]);
-    await client.query('COMMIT');
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+    return true;
+  });
 
+  if (!found) {
+    return res.status(404).json({ error: { message: 'Activity not found', code: 'NOT_FOUND' } });
+  }
   res.status(204).end();
 }));
 

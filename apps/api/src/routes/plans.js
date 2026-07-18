@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { rankTemplates, weekTargets } from '../lib/planGenerator.js';
+import { withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -114,10 +115,7 @@ router.post('/templates/:id/adopt', asyncHandler(async (req, res) => {
 
   const days = await fetchTemplateDays(template.id);
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
+  const programId = await withTransaction(async (client) => {
     const { rows: programRows } = await client.query(
       'INSERT INTO programs (user_id, name, description) VALUES ($1, $2, $3) RETURNING id',
       [req.userId, template.name, template.description]
@@ -146,14 +144,10 @@ router.post('/templates/:id/adopt', asyncHandler(async (req, res) => {
       [req.userId, template.id, programId, startDate, durationWeeks]
     );
 
-    await client.query('COMMIT');
-    res.status(201).json({ programId, durationWeeks, startDate });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+    return programId;
+  });
+
+  res.status(201).json({ programId, durationWeeks, startDate });
 }));
 
 router.get('/my-plan', asyncHandler(async (req, res) => {

@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -49,10 +49,7 @@ router.post('/', asyncHandler(async (req, res) => {
     }
   }
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
+  await withTransaction(async (client) => {
     for (const entry of entries) {
       const { date, weight, steps, calories, sleep } = entry;
       await client.query(
@@ -66,15 +63,9 @@ router.post('/', asyncHandler(async (req, res) => {
         [req.userId, date, weight ?? null, steps ?? null, calories ?? null, sleep ?? null]
       );
     }
+  });
 
-    await client.query('COMMIT');
-    res.json({ synced: entries.length });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+  res.json({ synced: entries.length });
 }));
 
 export default router;

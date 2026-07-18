@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, Card, ErrorText, Field, Input, Screen, Skeleton } from '../components/ui/index.js';
+import { useDeleteAccount, useExportData } from '../hooks/useAccount.js';
 import { useMe, useLogout } from '../hooks/useAuth.js';
 import { useBillingStatus, useCheckout } from '../hooks/useBilling.js';
 import { useMyCoach, useRedeemCoachCode, useRemoveMyCoach } from '../hooks/useCoach.js';
@@ -107,6 +108,85 @@ function CoachSection() {
   );
 }
 
+function DataSection() {
+  const exportData = useExportData();
+  const deleteAccount = useDeleteAccount();
+  const navigate = useNavigate();
+  const [confirming, setConfirming] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirmText, setConfirmText] = useState('');
+
+  function handleDelete(e) {
+    e.preventDefault();
+    deleteAccount.mutate(
+      { password },
+      { onSuccess: () => navigate('/login', { replace: true }) }
+    );
+  }
+
+  function handleCancel() {
+    setConfirming(false);
+    setPassword('');
+    setConfirmText('');
+    deleteAccount.reset();
+  }
+
+  return (
+    <Card className={styles.stackCard} title="Your data">
+      <div className={styles.row}>
+        <div className={styles.mutedLine}>Download a copy of everything you&apos;ve logged, as one file.</div>
+        <Button variant="secondary" onClick={() => exportData.mutate()} disabled={exportData.isPending}>
+          {exportData.isPending ? 'Preparing...' : 'Download my data'}
+        </Button>
+      </div>
+      {exportData.isError && <ErrorText>{exportData.error.message}</ErrorText>}
+
+      <div className={styles.dangerBlock}>
+        {!confirming ? (
+          <div className={styles.row}>
+            <div className={styles.mutedLine}>Permanently erase your account and everything in it.</div>
+            <Button variant="danger" onClick={() => setConfirming(true)}>
+              Delete my account
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handleDelete} className={styles.deleteForm}>
+            <p className={styles.mutedLine}>
+              This permanently deletes your account and every log, program, and record in it.
+              It cannot be undone — download your data first if you want to keep a copy.
+            </p>
+            <Field label="Your password">
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+            </Field>
+            <Field label="Type DELETE to confirm">
+              <Input type="text" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} required />
+            </Field>
+            {deleteAccount.isError && <ErrorText>{deleteAccount.error.message}</ErrorText>}
+            <div className={styles.deleteActions}>
+              <Button type="button" variant="secondary" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="danger"
+                disabled={confirmText !== 'DELETE' || !password || deleteAccount.isPending}
+              >
+                {deleteAccount.isPending ? 'Deleting...' : 'Delete forever'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 export default function More() {
   const { data: user } = useMe();
   const { data: settings, isLoading } = useSettings();
@@ -204,6 +284,12 @@ export default function More() {
           </Card>
         </form>
       )}
+
+      <DataSection />
+
+      <p className={styles.legalLinks}>
+        <Link to="/privacy">Privacy Policy</Link> · <Link to="/terms">Terms of Use</Link>
+      </p>
     </Screen>
   );
 }

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { normalizeCheckins } from '../lib/injuryCheckins.js';
+import { withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -155,10 +156,7 @@ router.put('/:date', asyncHandler(async (req, res) => {
 
   const normalizedCheckins = normalizeCheckins(injuryCheckins);
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
+  const log = await withTransaction(async (client) => {
     const { rows } = await client.query(
       `INSERT INTO daily_logs (user_id, date, weight, waist, sleep, hrv, recovery, strain, steps, calories, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -200,14 +198,10 @@ router.put('/:date', asyncHandler(async (req, res) => {
       );
     }
 
-    await client.query('COMMIT');
-    res.json({ log: toPublicLog(log) });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+    return log;
+  });
+
+  res.json({ log: toPublicLog(log) });
 }));
 
 export default router;

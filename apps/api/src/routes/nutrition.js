@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import * as validate from '../lib/validate.js';
+import { withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -101,10 +102,7 @@ router.put('/:date', asyncHandler(async (req, res) => {
     });
   }
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
+  const log = await withTransaction(async (client) => {
     const { rows } = await client.query(
       `INSERT INTO nutrition_logs (user_id, date, calories, protein, carbs, fat, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -125,18 +123,14 @@ router.put('/:date', asyncHandler(async (req, res) => {
       );
     }
 
-    await client.query('COMMIT');
-    const { rows: mealRows } = await pool.query(
-      'SELECT * FROM nutrition_log_meals WHERE nutrition_log_id = $1 ORDER BY sort_order',
-      [log.id]
-    );
-    res.json({ log: toPublicLog(log), meals: mealRows.map(toPublicMeal) });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+    return log;
+  });
+
+  const { rows: mealRows } = await pool.query(
+    'SELECT * FROM nutrition_log_meals WHERE nutrition_log_id = $1 ORDER BY sort_order',
+    [log.id]
+  );
+  res.json({ log: toPublicLog(log), meals: mealRows.map(toPublicMeal) });
 }));
 
 export default router;

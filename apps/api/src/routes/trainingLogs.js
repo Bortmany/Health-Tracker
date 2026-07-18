@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { normalizeExercises } from '../lib/trainingSets.js';
+import { Rollback, withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -160,26 +161,19 @@ router.post('/', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: { message: 'date must be YYYY-MM-DD', code: 'INVALID_INPUT' } });
   }
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
+  const trainingLog = await withTransaction(async (client) => {
     const { rows } = await client.query(
       `INSERT INTO training_logs (user_id, date, program_id, program_day_id, notes)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
       [req.userId, date, programId ?? null, programDayId ?? null, notes ?? null]
     );
-    const trainingLog = rows[0];
-    await replaceExercises(client, trainingLog.id, exercises);
-    await client.query('COMMIT');
-    const fullExercises = await fetchNestedExercises(pool, trainingLog.id);
-    res.status(201).json({ trainingLog: { ...toPublicLog(trainingLog), exercises: fullExercises } });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+    await replaceExercises(client, rows[0].id, exercises);
+    return rows[0];
+  });
+
+  const fullExercises = await fetchNestedExercises(pool, trainingLog.id);
+  res.status(201).json({ trainingLog: { ...toPublicLog(trainingLog), exercises: fullExercises } });
 }));
 
 router.put('/:id', asyncHandler(async (req, res) => {
@@ -188,17 +182,12 @@ router.put('/:id', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: { message: 'date must be YYYY-MM-DD', code: 'INVALID_INPUT' } });
   }
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
+  const trainingLog = await withTransaction(async (client) => {
     const { rows: ownedRows } = await client.query(
       'SELECT id FROM training_logs WHERE id = $1 AND user_id = $2',
       [req.params.id, req.userId]
     );
-    if (!ownedRows[0]) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: { message: 'Training log not found', code: 'NOT_FOUND' } });
-    }
+    if (!ownedRows[0]) throw new Rollback(null);
 
     const { rows } = await client.query(
       `UPDATE training_logs
@@ -210,21 +199,19 @@ router.put('/:id', asyncHandler(async (req, res) => {
        RETURNING *`,
       [req.params.id, date ?? null, programId ?? null, programDayId ?? null, notes ?? null]
     );
-    const trainingLog = rows[0];
 
     if (exercises) {
-      await replaceExercises(client, trainingLog.id, exercises);
+      await replaceExercises(client, rows[0].id, exercises);
     }
 
-    await client.query('COMMIT');
-    const fullExercises = await fetchNestedExercises(pool, trainingLog.id);
-    res.json({ trainingLog: { ...toPublicLog(trainingLog), exercises: fullExercises } });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
+    return rows[0];
+  });
+
+  if (!trainingLog) {
+    return res.status(404).json({ error: { message: 'Training log not found', code: 'NOT_FOUND' } });
   }
+  const fullExercises = await fetchNestedExercises(pool, trainingLog.id);
+  res.json({ trainingLog: { ...toPublicLog(trainingLog), exercises: fullExercises } });
 }));
 
 router.delete('/:id', asyncHandler(async (req, res) => {
