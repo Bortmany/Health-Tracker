@@ -6,12 +6,12 @@ Serves every app in the registry that has a brand profile in `brands/` (InvestIQ
 
 ## How it works in one paragraph
 
-Agents run on a schedule inside Claude Code sessions on this repo. They read the brand profiles in `brands/`, follow the playbooks in `playbooks/`, and put every piece of work — social posts, Reddit replies, emails, ad proposals — as a draft card on the **Marketing Queue board in Notion**. The owner drags cards to *Approved*; only then does the Publisher push them out (Instagram + X via the scheduler tool, Reddit via the Reddit API). Every Friday the Analyst emails a plain-English report.
+Agents run on a schedule inside Claude Code sessions on this repo. They read the brand profiles in `brands/`, follow the playbooks in `playbooks/`, and put every piece of work — social posts, Reddit replies, emails, ad proposals — as a draft card on the **Marketing Queue board in Notion**. The owner drags cards to *Approved*; only then does the Publisher push them out (Instagram + X via the scheduler tool, Reddit via the Reddit API). Every Thursday the Analyst emails a plain-English report.
 
 ## The team
 
 The roster — who exists, who's active, who's dormant — lives in the central Agents repo (`Agents/CLAUDE.md`); this file no longer keeps a copy that can drift.
-Dormant agents wake up when their written condition in `playbooks/activation-checklist.md` is met — the Friday report checks the conditions every week and tells the owner when it's time.
+Dormant agents wake up when their written condition in `playbooks/activation-checklist.md` is met — the Thursday report checks the conditions every week and tells the owner when it's time.
 
 ## Hard rules (also in CLAUDE.md — these are non-negotiable)
 

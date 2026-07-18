@@ -12,4 +12,4 @@ Card fields: Name · Status · Project (Cut/TradeOS/Bean & Brew/Oman Property/Du
 
 Campaign cards carry three extra fields: Budget cap, Kill threshold, Experiment ID. For a Campaign card, dragging to Approved means "I will press the platform buttons exactly as the card says" — the buttons themselves are always the owner's.
 
-Owner interaction model: drag to Approved = ship it as-is; comment without moving = revise (copywriter picks it up next run); drag to Rejected = drop it and learn. Nothing expires silently — stale cards get surfaced in the Friday report.
+Owner interaction model: drag to Approved = ship it as-is; comment without moving = revise (copywriter picks it up next run); drag to Rejected = drop it and learn. Nothing expires silently — stale cards get surfaced in the Thursday report.

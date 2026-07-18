@@ -15,7 +15,7 @@ Agents live ONLY in the central Agents repo — no agent files live here; a sess
 ## How a session runs
 
 - **Daily run:** follow `playbooks/daily-routine.md` (scout Reddit, draft content, publish approved cards).
-- **Friday run:** follow `playbooks/weekly-routine.md` (analyst report + activation switchboard).
+- **Thursday run:** follow `playbooks/weekly-routine.md` (analyst report + activation switchboard).
 - **Ad-hoc:** the owner may ask for anything directly ("announce feature X this week").
 
 Brand truth lives in `brands/*.md` — read the relevant profile before writing a single word for that brand. Voice mismatches are the #1 failure mode.
@@ -24,11 +24,11 @@ Brand truth lives in `brands/*.md` — read the relevant profile before writing 
 
 - `brands/<name>-communities.md` — the Reddit Scout's learned map of communities + their rules. Append-only discoveries; update rules when a sub's policy is learned.
 - `drafts/` — every batch of drafts also lands here as markdown (git is the archive; Notion is the workflow).
-- `playbooks/activation-checklist.md` — dormant-agent switch conditions; the Friday report evaluates these.
+- `playbooks/activation-checklist.md` — dormant-agent switch conditions; the Thursday report evaluates these.
 
 ## Connected tools
 
-Notion (Marketing Queue board), Canva (graphics), Gmail (Friday report + email drafts). Scheduler (Publer) and Reddit API credentials arrive via the owner's setup — see `docs/setup.md`; until then Publisher runs in "prepare only" mode.
+Notion (Marketing Queue board), Canva (graphics), Gmail (Thursday report + email drafts). Scheduler (Publer) and Reddit API credentials arrive via the owner's setup — see `docs/setup.md`; until then Publisher runs in "prepare only" mode.
 
 ## Conventions
 

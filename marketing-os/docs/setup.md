@@ -2,7 +2,7 @@
 
 ## Where and how this system runs (plain English)
 
-The agents are not a server you host — they run as **Claude Code cloud sessions on this repo**, the same way our dev sessions run. A schedule (a "routine") starts a session automatically — every morning for the daily run, every Friday for the report — the session follows the playbooks, writes to Notion/Canva/Gmail through your connected apps, commits its work here, and shuts down. There is nothing to keep running, no hosting bill; it runs on your Claude subscription. You interact from your phone: approve cards in Notion, read the Friday email, and message Claude any time for one-off asks. Claude sets up the schedules for you once the accounts below are connected — you never touch cron or code.
+The agents are not a server you host — they run as **Claude Code cloud sessions on this repo**, the same way our dev sessions run. A schedule (a "routine") starts a session automatically — every morning for the daily run, every Thursday for the report — the session follows the playbooks, writes to Notion/Canva/Gmail through your connected apps, commits its work here, and shuts down. There is nothing to keep running, no hosting bill; it runs on your Claude subscription. You interact from your phone: approve cards in Notion, read the Thursday email, and message Claude any time for one-off asks. Claude sets up the schedules for you once the accounts below are connected — you never touch cron or code.
 
 ## What to set up (in order)
 
