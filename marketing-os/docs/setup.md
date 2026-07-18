@@ -26,7 +26,8 @@ Claude creates the **Marketing Queue** board in your Notion. Open it once, check
 ### 6. Later, when relevant
 - **Brevo** (free) when Cut goes live — for welcome emails.
 - **Support address** — e.g. a `support@` alias or a Gmail label; activates the support agent.
-- **Meta/Google ad accounts + a budget** — wakes the ads manager.
+- **Ad accounts (Meta first; Google/TikTok later)** — create the account, set your monthly cap in `ads/accounts.md`, and decide access (CSV exports you paste, or a read-only API key). This wakes `ads-manager` on the approve-per-campaign model: agents propose and monitor, you press every launch and budget button.
+- **Higgsfield (media-generation tools)** — when connected, `ad-creative-producer` generates video/image ad variants directly; until then it produces Canva/production briefs.
 
 ## Secrets policy
 API keys live in the session environment settings, never committed to this repo. If a key ever appears in a file here, that's a bug — tell Claude to rotate it.
