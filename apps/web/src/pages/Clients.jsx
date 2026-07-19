@@ -10,6 +10,7 @@ import {
   Screen,
   SectionTitle,
   Skeleton,
+  Tooltip,
 } from '../components/ui/index.js';
 import {
   useAssignProgram,
@@ -143,9 +144,11 @@ function AssignProgramBuilder({ clientId }) {
         <div className={styles.dayCard} key={day.key}>
           <div className={styles.dayHeaderRow}>
             <Input value={day.name} onChange={(e) => updateDay(day.key, { name: e.target.value })} placeholder="Day name" />
-            <button type="button" className={styles.removeButton} onClick={() => removeDay(day.key)} aria-label="Remove day">
-              ✕
-            </button>
+            <Tooltip label="Remove day">
+              <button type="button" className={styles.removeButton} onClick={() => removeDay(day.key)} aria-label="Remove day">
+                ✕
+              </button>
+            </Tooltip>
           </div>
           {day.exercises.map((ex) => (
             <div className={styles.exerciseRow} key={ex.key}>
@@ -168,14 +171,16 @@ function AssignProgramBuilder({ clientId }) {
                 value={ex.targetReps}
                 onChange={(e) => updateExercise(day.key, ex.key, { targetReps: e.target.value })}
               />
-              <button
-                type="button"
-                className={styles.removeButton}
-                onClick={() => removeExercise(day.key, ex.key)}
-                aria-label="Remove exercise"
-              >
-                ✕
-              </button>
+              <Tooltip label="Remove exercise">
+                <button
+                  type="button"
+                  className={styles.removeButton}
+                  onClick={() => removeExercise(day.key, ex.key)}
+                  aria-label="Remove exercise"
+                >
+                  ✕
+                </button>
+              </Tooltip>
             </div>
           ))}
           <Button variant="ghost" block onClick={() => addExercise(day.key)}>
@@ -317,17 +322,19 @@ function ClientRow({ client, expanded, onToggle, onRemove }) {
           )}
         </div>
         <div className={styles.rowActions}>
-          <button
-            type="button"
-            className={styles.removeGhost}
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove();
-            }}
-            aria-label={`Remove ${client.displayName}`}
-          >
-            ✕
-          </button>
+          <Tooltip label={`Remove ${client.displayName}`}>
+            <button
+              type="button"
+              className={styles.removeGhost}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
+              aria-label={`Remove ${client.displayName}`}
+            >
+              ✕
+            </button>
+          </Tooltip>
           <span className={styles.chevron}>{expanded ? '▲' : '▼'}</span>
         </div>
       </div>

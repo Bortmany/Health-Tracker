@@ -1,0 +1,46 @@
+/*
+  Hover hint for icon-only buttons. Pure CSS: the bubble waits about 400ms
+  (the transition-delay below) before fading in on mouse hover, appears
+  immediately-ish on keyboard focus too, and never shows on touch screens.
+*/
+
+.wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Let the wrapped button stretch to fill the wrapper, so buttons that sit
+   in fixed grid columns or flex rows keep their original size. */
+.wrapper > :first-child {
+  flex: 1;
+}
+
+.bubble {
+  position: absolute;
+  inset-block-end: calc(100% + var(--space-1));
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  z-index: 10;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  border: var(--surface-outline);
+  box-shadow: var(--shadow-1);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  /* The bubble is decoration only — the mouse must never interact with it. */
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 120ms ease,
+    visibility 120ms;
+}
+
+.wrapper:hover .bubble,
+.wrapper:focus-within .bubble {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 400ms;
+}

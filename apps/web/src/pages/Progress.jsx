@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import LineChart from '../components/LineChart.jsx';
-import { Card, EmptyState, Screen, Skeleton } from '../components/ui/index.js';
+import { Card, EmptyState, Screen, Skeleton, Tooltip } from '../components/ui/index.js';
 import { useLogsRange } from '../hooks/useLogs.js';
 import { useNutritionRange } from '../hooks/useNutrition.js';
 import { usePersonalRecords, useTrainingLogs } from '../hooks/useTrainingLogs.js';
@@ -66,23 +66,27 @@ function ConsistencyCalendar() {
   return (
     <Card title="Consistency">
       <div className={styles.calHeader}>
-        <button
-          type="button"
-          className={styles.calNavButton}
-          onClick={() => setMonthStart((m) => shiftMonth(m, -1))}
-          aria-label="Previous month"
-        >
-          ←
-        </button>
+        <Tooltip label="Previous month">
+          <button
+            type="button"
+            className={styles.calNavButton}
+            onClick={() => setMonthStart((m) => shiftMonth(m, -1))}
+            aria-label="Previous month"
+          >
+            ←
+          </button>
+        </Tooltip>
         <span className={styles.calMonthLabel}>{monthLabel}</span>
-        <button
-          type="button"
-          className={styles.calNavButton}
-          onClick={() => setMonthStart((m) => shiftMonth(m, 1))}
-          aria-label="Next month"
-        >
-          →
-        </button>
+        <Tooltip label="Next month">
+          <button
+            type="button"
+            className={styles.calNavButton}
+            onClick={() => setMonthStart((m) => shiftMonth(m, 1))}
+            aria-label="Next month"
+          >
+            →
+          </button>
+        </Tooltip>
       </div>
 
       <div className={styles.calGrid}>

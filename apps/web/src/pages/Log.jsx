@@ -11,6 +11,7 @@ import {
   SectionTitle,
   Select,
   Skeleton,
+  Tooltip,
 } from '../components/ui/index.js';
 import { useActivities } from '../hooks/useActivities.js';
 import { useLog, usePutLog } from '../hooks/useLogs.js';
@@ -300,26 +301,30 @@ export default function Log() {
     <Screen>
       <div className={styles.header}>
         <div className={styles.dateNav}>
-          <button
-            type="button"
-            className={styles.dateNavButton}
-            onClick={() => setDate((d) => shiftDate(d, -1))}
-            aria-label="Previous day"
-          >
-            ←
-          </button>
+          <Tooltip label="Previous day">
+            <button
+              type="button"
+              className={styles.dateNavButton}
+              onClick={() => setDate((d) => shiftDate(d, -1))}
+              aria-label="Previous day"
+            >
+              ←
+            </button>
+          </Tooltip>
           <span className={styles.dateLabel}>
             {formatDateLabel(date)}
             {date === todayISO() && <Chip tone="accent">Today</Chip>}
           </span>
-          <button
-            type="button"
-            className={styles.dateNavButton}
-            onClick={() => setDate((d) => shiftDate(d, 1))}
-            aria-label="Next day"
-          >
-            →
-          </button>
+          <Tooltip label="Next day">
+            <button
+              type="button"
+              className={styles.dateNavButton}
+              onClick={() => setDate((d) => shiftDate(d, 1))}
+              aria-label="Next day"
+            >
+              →
+            </button>
+          </Tooltip>
         </div>
         <Button onClick={handleSubmit} disabled={!form || saving}>
           {saving ? 'Saving...' : 'Save'}
@@ -421,14 +426,16 @@ export default function Log() {
                     value={m.calories}
                     onChange={(e) => updateMealRow(m.key, { calories: e.target.value })}
                   />
-                  <button
-                    type="button"
-                    className={styles.removeButton}
-                    onClick={() => removeMealRow(m.key)}
-                    aria-label="Remove meal"
-                  >
-                    ✕
-                  </button>
+                  <Tooltip label="Remove meal">
+                    <button
+                      type="button"
+                      className={styles.removeButton}
+                      onClick={() => removeMealRow(m.key)}
+                      aria-label="Remove meal"
+                    >
+                      ✕
+                    </button>
+                  </Tooltip>
                 </div>
               ))}
               <div ref={addMealRef}>
@@ -497,14 +504,16 @@ export default function Log() {
                     </option>
                   ))}
                 </Select>
-                <button
-                  type="button"
-                  className={styles.removeButton}
-                  onClick={() => removeActivityRow(a.key)}
-                  aria-label="Remove activity"
-                >
-                  ✕
-                </button>
+                <Tooltip label="Remove activity">
+                  <button
+                    type="button"
+                    className={styles.removeButton}
+                    onClick={() => removeActivityRow(a.key)}
+                    aria-label="Remove activity"
+                  >
+                    ✕
+                  </button>
+                </Tooltip>
               </div>
             ))}
             <Button variant="ghost" size="sm" onClick={addActivityRow}>

@@ -13,6 +13,7 @@ import {
   SectionTitle,
   Select,
   Skeleton,
+  Tooltip,
 } from '../components/ui/index.js';
 import { useExercises } from '../hooks/useExercises.js';
 import { useActivePrograms, useCreateProgram, useUpdateProgram } from '../hooks/usePrograms.js';
@@ -84,9 +85,11 @@ function ExerciseBlock({ exercise, editingId, doneSets, onToggleDone, onUpdate, 
           onChange={(e) => onUpdate({ name: e.target.value })}
           list="exercise-library"
         />
-        <button type="button" className={styles.removeButton} onClick={onRemove} aria-label="Remove exercise">
-          ✕
-        </button>
+        <Tooltip label="Remove exercise">
+          <button type="button" className={styles.removeButton} onClick={onRemove} aria-label="Remove exercise">
+            ✕
+          </button>
+        </Tooltip>
       </div>
       {exercise.name && previous && (
         <p className={styles.previousHint}>
@@ -120,22 +123,26 @@ function ExerciseBlock({ exercise, editingId, doneSets, onToggleDone, onUpdate, 
               value={s.rpe}
               onChange={(e) => onUpdateSet(s.key, { rpe: e.target.value })}
             />
-            <label className={styles.doneToggle} title="Mark set done and start the rest timer">
-              <input
-                type="checkbox"
-                checked={done}
-                onChange={(e) => onToggleDone(s.key, e.target.checked)}
-                aria-label={`Set ${i + 1} done`}
-              />
-            </label>
-            <button
-              type="button"
-              className={styles.removeButton}
-              onClick={() => onRemoveSet(s.key)}
-              aria-label="Remove set"
-            >
-              ✕
-            </button>
+            <Tooltip label="Mark set done and start the rest timer">
+              <label className={styles.doneToggle}>
+                <input
+                  type="checkbox"
+                  checked={done}
+                  onChange={(e) => onToggleDone(s.key, e.target.checked)}
+                  aria-label={`Set ${i + 1} done`}
+                />
+              </label>
+            </Tooltip>
+            <Tooltip label="Remove set">
+              <button
+                type="button"
+                className={styles.removeButton}
+                onClick={() => onRemoveSet(s.key)}
+                aria-label="Remove set"
+              >
+                ✕
+              </button>
+            </Tooltip>
             {prevSet && (
               <span className={styles.setPrev}>
                 prev {prevSet.weight ?? '-'}×{prevSet.reps ?? '-'}
@@ -231,9 +238,11 @@ function ProgramBuilder({ onCreated }) {
         <div className={styles.dayCard} key={day.key}>
           <div className={styles.dayHeaderRow}>
             <Input value={day.name} onChange={(e) => updateDay(day.key, { name: e.target.value })} placeholder="Day name" />
-            <button type="button" className={styles.removeButton} onClick={() => removeDay(day.key)} aria-label="Remove day">
-              ✕
-            </button>
+            <Tooltip label="Remove day">
+              <button type="button" className={styles.removeButton} onClick={() => removeDay(day.key)} aria-label="Remove day">
+                ✕
+              </button>
+            </Tooltip>
           </div>
           {day.exercises.map((ex) => (
             <div className={styles.builderExerciseRow} key={ex.key}>
@@ -243,14 +252,16 @@ function ProgramBuilder({ onCreated }) {
                 placeholder="Exercise name"
                 list="exercise-library"
               />
-              <button
-                type="button"
-                className={styles.removeButton}
-                onClick={() => removeExercise(day.key, ex.key)}
-                aria-label="Remove exercise"
-              >
-                ✕
-              </button>
+              <Tooltip label="Remove exercise">
+                <button
+                  type="button"
+                  className={styles.removeButton}
+                  onClick={() => removeExercise(day.key, ex.key)}
+                  aria-label="Remove exercise"
+                >
+                  ✕
+                </button>
+              </Tooltip>
             </div>
           ))}
           <Button variant="ghost" block onClick={() => addExercise(day.key)}>

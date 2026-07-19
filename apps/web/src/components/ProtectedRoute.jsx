@@ -1,4 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom';
+import { Skeleton } from './ui/index.js';
 import { useMe } from '../hooks/useAuth.js';
 
 export default function ProtectedRoute() {
@@ -7,8 +8,8 @@ export default function ProtectedRoute() {
   if (isLoading) {
     return (
       <div style={{ padding: '1.5rem' }}>
-        <div className="skeleton" style={{ height: 24, width: '40%', marginBottom: 12 }} />
-        <div className="skeleton" style={{ height: 120, width: '100%' }} />
+        <Skeleton height={24} width="40%" style={{ marginBottom: 12 }} />
+        <Skeleton height={120} />
       </div>
     );
   }
