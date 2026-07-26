@@ -74,7 +74,7 @@ export async function generateAiPlan(answers, durationWeeks) {
   const client = new Anthropic();
 
   const response = await client.messages.create({
-    model: 'claude-opus-4-8',
+    model: 'claude-opus-5',
     max_tokens: 16000,
     system:
       'You are a strength and conditioning coach with 20 years of client experience. ' +
