@@ -45,7 +45,7 @@ All planned phases are built, tested, reviewed, and merged to `main`. 48/48 back
 | Confirm Railway deploy is green | railway.app dashboard; open the app's public URL |
 | Real payments | Stripe account, one subscription Price, set the 4 env vars, point a webhook at `/api/billing/webhook` |
 | AI-written plans | Set `ANTHROPIC_API_KEY` on Railway |
-| Native iPhone/Android apps | Apple Developer $99/yr, Google Play $25, a Mac — follow `docs/mobile.md` |
+| Native iPhone/Android apps | Code side is DONE (Capacitor installed, `apps/web/capacitor.config.json`, Apple Health sync in `apps/web/src/native/healthSync.js`). Still needs: Apple Developer $99/yr, Google Play $25, a Mac, and the real live URL in the config — follow `docs/mobile.md` |
 | Premium meanwhile | `UPDATE users SET plan_tier = 'premium' WHERE email = '...';` in Railway's DB shell |
 
 Possible future work: Stripe customer portal (manage/cancel), password reset via email, progress photos (needs file storage), coach chat/notes, push notification reminders.
