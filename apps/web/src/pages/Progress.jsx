@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import LineChart from '../components/LineChart.jsx';
 import { Card, EmptyState, Screen, Skeleton } from '../components/ui/index.js';
 import { useLogsRange } from '../hooks/useLogs.js';
@@ -173,6 +174,15 @@ export default function Progress() {
         </Card>
 
         <ConsistencyCalendar />
+
+        <Card title="Muscle heat">
+          <p className={styles.heatmapTeaser}>
+            See which muscles you have been hitting — and which you have been skipping.
+          </p>
+          <Link className={styles.heatmapLink} to="/heatmap">
+            Open the muscle map →
+          </Link>
+        </Card>
 
         <Card title="Personal records">
           {recordsLoading ? (

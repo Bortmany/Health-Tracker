@@ -1,0 +1,51 @@
+/* The tappable body silhouette. Colors come from the heat tokens. */
+
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.silhouette {
+  fill: var(--color-surface);
+  stroke: var(--color-border);
+  stroke-width: 1.5;
+}
+
+.region {
+  cursor: pointer;
+  transition: fill 200ms ease;
+  stroke: none;
+}
+
+.region:focus-visible {
+  outline: none;
+  stroke: var(--color-accent-strong);
+  stroke-width: 2;
+}
+
+.selected {
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+}
+
+/* Heat buckets: 0 = not trained, 1-4 = warming up to hot. */
+.heat0 {
+  fill: var(--color-surface-2);
+}
+
+.heat1 {
+  fill: var(--color-heat-1);
+}
+
+.heat2 {
+  fill: var(--color-heat-2);
+}
+
+.heat3 {
+  fill: var(--color-heat-3);
+}
+
+.heat4 {
+  fill: var(--color-heat-4);
+}

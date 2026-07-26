@@ -1,0 +1,481 @@
+.page {
+  min-height: 100vh;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* ---- Reveal-on-scroll ---- */
+.reveal {
+  opacity: 0;
+  transform: translateY(var(--space-6));
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    transition: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---- Header ---- */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-bg);
+  border-bottom: var(--surface-outline);
+}
+
+.wordmark {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-xl);
+}
+
+.headerNav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.headerLink {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: var(--text-sm);
+}
+
+.headerCta {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+}
+
+/* ---- Shared section shell ---- */
+.hero,
+.features,
+.planMatch,
+.coach,
+.pricing,
+.finalCta {
+  padding: var(--space-8) var(--space-5);
+  max-width: 68.75rem;
+  margin: 0 auto;
+}
+
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  margin: 0 0 var(--space-2);
+}
+
+.sectionSub {
+  color: var(--color-text-muted);
+  font-size: var(--text-base);
+  margin: 0 0 var(--space-6);
+  max-width: 42rem;
+}
+
+/* ---- Hero ---- */
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-7);
+  padding-top: var(--space-7);
+}
+
+.heroHeadline {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  line-height: 1.1;
+  margin: 0 0 var(--space-4);
+}
+
+.heroSub {
+  color: var(--color-text-muted);
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-6);
+}
+
+.heroActions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.primaryCta,
+.secondaryCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: var(--text-base);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-md);
+  min-height: 2.75rem;
+}
+
+.primaryCta {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.secondaryCta {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: var(--surface-outline);
+}
+
+/* ---- Phone demo ---- */
+.phone {
+  align-self: center;
+  width: 100%;
+  max-width: 20rem;
+}
+
+.phoneHint {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-accent);
+  text-align: center;
+  margin: 0 0 var(--space-3);
+}
+
+.phoneScreen {
+  background: var(--color-surface);
+  border: var(--surface-outline);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-2);
+}
+
+.phoneHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.phoneTitle {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.phoneRingLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.phoneCaption {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-4);
+}
+
+.phoneHabits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.habitChip {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  border: var(--surface-outline);
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  min-height: 2.25rem;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.habitChipDone {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+  font-weight: 600;
+}
+
+.phoneSetRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+
+.phoneSetLabel {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.phoneLogBtn {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  min-height: 2.25rem;
+}
+
+/* ---- Features ---- */
+.featureGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+.featureCard {
+  position: relative;
+  background: var(--color-surface);
+  border: var(--surface-outline);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+.featureCardNew {
+  border-color: var(--color-accent);
+}
+
+.featureTag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.featureTitle {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-2);
+}
+
+.featureBody {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+/* ---- Plan match quiz ---- */
+.quiz {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.questionLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-2);
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.quizChip {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: var(--surface-outline);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  min-height: 2.75rem;
+}
+
+.quizChipActive {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+  font-weight: 600;
+}
+
+.quizResult {
+  background: var(--color-surface);
+  border: var(--surface-outline);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  min-height: 5rem;
+}
+
+.quizResultLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-1);
+}
+
+.quizResultPlan {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--color-accent);
+  margin: 0;
+}
+
+.quizResultHint {
+  color: var(--color-text-faint);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+/* ---- Coach ---- */
+.coach {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+}
+
+/* ---- Pricing ---- */
+.pricingGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+.priceCard {
+  background: var(--color-surface);
+  border: var(--surface-outline);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.priceCardAccent {
+  border-color: var(--color-accent);
+}
+
+.priceTitle {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  margin: 0;
+}
+
+.pricePoint {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  margin: 0;
+}
+
+.priceBody {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-3);
+}
+
+.priceCta {
+  align-self: flex-start;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+}
+
+/* ---- Final CTA ---- */
+.finalCta {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.finalCtaHeadline {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  margin: 0;
+  max-width: 30rem;
+}
+
+/* ---- Footer ---- */
+.footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-5) var(--space-8);
+  color: var(--color-text-faint);
+  font-size: var(--text-sm);
+  border-top: var(--surface-outline);
+}
+
+.footerLinks {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.footerLinks a {
+  color: var(--color-text-faint);
+  text-decoration: none;
+}
+
+/* ---- Desktop layout ---- */
+@media (min-width: 56.25em) {
+  .hero {
+    flex-direction: row;
+    align-items: center;
+    padding-top: var(--space-9);
+  }
+
+  .heroCopy {
+    flex: 1;
+  }
+
+  .phone {
+    flex: 0 0 21.25rem;
+  }
+
+  .featureGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .pricingGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

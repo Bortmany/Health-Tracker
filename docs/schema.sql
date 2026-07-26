@@ -303,3 +303,24 @@ CREATE UNIQUE INDEX coach_clients_one_active_coach_idx ON coach_clients(client_i
 
 -- 015: billing
 ALTER TABLE users ADD COLUMN stripe_customer_id TEXT;
+
+-- 016: muscle heatmap — which body regions each library exercise works.
+-- Values are limited to the 16 region ids the frontend body map can draw.
+-- (Migration 016 also ran one UPDATE per seeded exercise to fill these in.)
+ALTER TABLE exercise_library
+  ADD COLUMN primary_muscles TEXT[] NOT NULL DEFAULT '{}',
+  ADD COLUMN secondary_muscles TEXT[] NOT NULL DEFAULT '{}';
+
+ALTER TABLE exercise_library
+  ADD CONSTRAINT exercise_library_muscles_valid CHECK (
+    primary_muscles <@ ARRAY[
+      'chest','front-delts','side-delts','rear-delts','biceps','triceps',
+      'forearms','traps','lats','lower-back','abs','obliques','glutes',
+      'quads','hamstrings','calves'
+    ]::TEXT[]
+    AND secondary_muscles <@ ARRAY[
+      'chest','front-delts','side-delts','rear-delts','biceps','triceps',
+      'forearms','traps','lats','lower-back','abs','obliques','glutes',
+      'quads','hamstrings','calves'
+    ]::TEXT[]
+  );

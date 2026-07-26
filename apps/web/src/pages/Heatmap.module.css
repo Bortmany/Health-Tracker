@@ -1,0 +1,234 @@
+/* Muscle heat screen — controls, the body map, legend, and detail cards. */
+
+.stack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.chipRow {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* Pill toggle buttons, styled like the Chip badge but pressable. */
+.chipButton {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-surface-2);
+  border: var(--surface-outline);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.chipButton:hover {
+  border-color: var(--color-text-faint);
+}
+
+.chipActive {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+/* One body view on small screens; both side by side from 480px up. */
+.views {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  justify-items: center;
+}
+
+.pane {
+  display: none;
+  width: 100%;
+  max-width: 15rem;
+}
+
+.paneActive {
+  display: block;
+}
+
+.viewLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  text-align: center;
+  margin: var(--space-2) 0 0;
+}
+
+@media (min-width: 480px) {
+  .pane {
+    display: block;
+  }
+
+  .views {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .viewToggle {
+    display: none;
+  }
+}
+
+/* ---- Legend ---- */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  color: var(--color-text-muted);
+}
+
+.swatch {
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: var(--space-1);
+  display: inline-block;
+}
+
+.swatch0 {
+  background: var(--color-surface-2);
+  border: var(--surface-outline);
+}
+
+.swatch1 {
+  background: var(--color-heat-1);
+}
+
+.swatch2 {
+  background: var(--color-heat-2);
+}
+
+.swatch3 {
+  background: var(--color-heat-3);
+}
+
+.swatch4 {
+  background: var(--color-heat-4);
+}
+
+/* ---- Muscle detail card ---- */
+
+.detailHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.muscleName {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  margin: 0;
+}
+
+.meterTrack {
+  height: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-2);
+  margin: var(--space-3) 0 var(--space-4);
+  overflow: hidden;
+}
+
+.meterFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 200ms ease;
+}
+
+.meterHeat1 {
+  background: var(--color-heat-1);
+}
+
+.meterHeat2 {
+  background: var(--color-heat-2);
+}
+
+.meterHeat3 {
+  background: var(--color-heat-3);
+}
+
+.meterHeat4 {
+  background: var(--color-heat-4);
+}
+
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: var(--space-3);
+}
+
+.exerciseList {
+  margin-top: var(--space-4);
+}
+
+.exerciseListTitle {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin: 0 0 var(--space-2);
+}
+
+.exerciseRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-2) 0;
+}
+
+.exerciseRow:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.exerciseName {
+  font-size: var(--text-base);
+}
+
+.exerciseSets {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.mutedLine {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-2);
+}
+
+.hint {
+  color: var(--color-text-faint);
+  font-size: var(--text-sm);
+  text-align: center;
+  margin: 0;
+}
