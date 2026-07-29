@@ -16,6 +16,18 @@
   animation: toastIn 0.15s ease;
 }
 
+/* Nothing to announce yet: the live region stays in the page but takes up
+   no space and shows nothing. */
+.idle {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 @keyframes toastIn {
   from {
     opacity: 0;

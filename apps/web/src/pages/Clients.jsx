@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import LineChart from '../components/LineChart.jsx';
 import {
   Button,
@@ -273,7 +273,7 @@ function ClientDetail({ clientId, summary, isLoading }) {
 // One triage row: name, weight direction, sessions this week, last log.
 // The summary loads for every row up front so the coach can scan without
 // tapping; expanding is instant because the data is already cached.
-function ClientRow({ client, expanded, onToggle, onRemove }) {
+function ClientRow({ client, expanded, onToggle, onRemove, removing = false }) {
   const { data: summary, isLoading } = useClientSummary(client.clientId);
 
   const weighIns = summary?.weighIns ?? [];
@@ -325,6 +325,7 @@ function ClientRow({ client, expanded, onToggle, onRemove }) {
               e.stopPropagation();
               onRemove();
             }}
+            disabled={removing}
             aria-label={`Remove ${client.displayName}`}
           >
             ✕
@@ -352,12 +353,18 @@ export default function Clients() {
     });
   }
 
+  // Copying twice quickly restarts the timer instead of letting the first
+  // one flip the label back early; the timer is dropped if the page closes.
+  const copiedTimerRef = useRef(null);
+  useEffect(() => () => window.clearTimeout(copiedTimerRef.current), []);
+
   async function copyCode(code) {
     try {
       await navigator.clipboard.writeText(code);
       // The button itself says "Copied" for a moment, then goes back.
+      window.clearTimeout(copiedTimerRef.current);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      copiedTimerRef.current = window.setTimeout(() => setCopied(false), 2000);
     } catch {
       // clipboard not available — ignore
     }
@@ -393,6 +400,7 @@ export default function Clients() {
                   type="button"
                   className={styles.removeGhost}
                   onClick={() => removeClient.mutate(invite.linkId)}
+                  disabled={removeClient.isPending}
                   aria-label="Remove invite"
                 >
                   ✕
@@ -416,6 +424,7 @@ export default function Clients() {
               expanded={expandedId === client.clientId}
               onToggle={() => setExpandedId((id) => (id === client.clientId ? null : client.clientId))}
               onRemove={() => setClientToRemove(client)}
+              removing={removeClient.isPending}
             />
           ))
         )}
@@ -425,9 +434,13 @@ export default function Clients() {
         open={Boolean(clientToRemove)}
         message={clientToRemove ? `Remove ${clientToRemove.displayName} as a client?` : ''}
         confirmLabel="Remove client"
+        busy={removeClient.isPending}
         onConfirm={() => {
-          removeClient.mutate(clientToRemove.linkId);
-          setClientToRemove(null);
+          // Stays open (with both buttons disabled) until the removal is
+          // done, so a second tap can't remove the same client twice.
+          removeClient.mutate(clientToRemove.linkId, {
+            onSettled: () => setClientToRemove(null),
+          });
         }}
         onCancel={() => setClientToRemove(null)}
       />

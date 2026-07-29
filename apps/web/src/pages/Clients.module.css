@@ -124,6 +124,12 @@
   font-size: var(--text-sm);
 }
 
+/* Greyed out while a removal is already going through. */
+.removeGhost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .clientDetail {
   margin-top: var(--space-3);
   padding-top: var(--space-3);

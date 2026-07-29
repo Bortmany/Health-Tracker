@@ -44,6 +44,29 @@ test('POST /training-logs creates a log with nested exercises and sets', async (
   assert.equal(body.trainingLog.exercises[0].sets[0].setNumber, 1);
 });
 
+test('GET /training-logs lists a session with how many exercises it holds', async () => {
+  await fetch(`${baseUrl}/training-logs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({
+      date: '2026-04-05',
+      exercises: [
+        { name: 'Deadlift', sets: [{ weight: 100, reps: 5 }] },
+        { name: 'Pull Up', sets: [{ weight: 0, reps: 10 }] },
+      ],
+    }),
+  });
+
+  const listRes = await fetch(`${baseUrl}/training-logs?from=2026-04-05&to=2026-04-05`, {
+    headers: { Cookie: cookie },
+  });
+  const { trainingLogs } = await listRes.json();
+
+  assert.equal(trainingLogs.length, 1);
+  assert.equal(trainingLogs[0].date.slice(0, 10), '2026-04-05');
+  assert.equal(trainingLogs[0].exerciseCount, 2);
+});
+
 test('GET /training-logs/exercise-history returns the most recent prior entry for that exercise', async () => {
   await fetch(`${baseUrl}/training-logs`, {
     method: 'POST',

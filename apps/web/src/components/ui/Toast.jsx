@@ -23,9 +23,10 @@ export function useToast(duration = 2000) {
 }
 
 export default function Toast({ message }) {
-  if (!message) return null;
+  // The wrapper is always in the page (invisible when there's nothing to
+  // say) so screen readers notice the message appearing and read it out.
   return (
-    <div className={styles.toast} role="status">
+    <div className={message ? styles.toast : styles.idle} role="status" aria-live="polite">
       {message}
     </div>
   );

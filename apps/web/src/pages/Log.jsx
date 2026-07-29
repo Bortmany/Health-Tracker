@@ -257,11 +257,11 @@ export default function Log() {
     });
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (!form) return;
 
-    putLog.mutate({
+    const savingLog = putLog.mutateAsync({
       weight: form.weight === '' ? null : Number(form.weight),
       waist: form.waist === '' ? null : Number(form.waist),
       sleep: form.sleep === '' ? null : Number(form.sleep),
@@ -287,9 +287,9 @@ export default function Log() {
         swelling: c.swelling,
         canTrainTomorrow: c.canTrainTomorrow,
       })),
-    }, { onSuccess: () => toast.show('Saved') });
+    });
 
-    putNutrition.mutate({
+    const savingNutrition = putNutrition.mutateAsync({
       calories: form.foodCalories === '' ? null : Number(form.foodCalories),
       protein: form.protein === '' ? null : Number(form.protein),
       carbs: form.carbs === '' ? null : Number(form.carbs),
@@ -302,6 +302,15 @@ export default function Log() {
           protein: m.protein === '' ? null : Number(m.protein),
         })),
     });
+
+    // "Saved" only appears once the day's numbers AND the food entries are
+    // both stored. If either fails, the red message below the form says so.
+    try {
+      await Promise.all([savingLog, savingNutrition]);
+      toast.show('Saved');
+    } catch {
+      // The failed mutation already shows its own message on screen.
+    }
   }
 
   const saving = putLog.isPending || putNutrition.isPending;

@@ -38,16 +38,23 @@ export default function PlanSection() {
           <SectionTitle>
             Your plan — week {plan.weekNumber} of {plan.durationWeeks}
           </SectionTitle>
-          <Button variant="danger" size="sm" onClick={() => setConfirmingStop(true)}>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={() => setConfirmingStop(true)}
+            disabled={stopPlan.isPending}
+          >
             Stop plan
           </Button>
           <ConfirmDialog
             open={confirmingStop}
             message="Stop this plan? Your program and logged sessions stay."
             confirmLabel="Stop plan"
+            busy={stopPlan.isPending}
             onConfirm={() => {
-              setConfirmingStop(false);
-              stopPlan.mutate();
+              // Kept open (buttons disabled) until it's done, so the plan
+              // can't be stopped twice by a double tap.
+              stopPlan.mutate(undefined, { onSettled: () => setConfirmingStop(false) });
             }}
             onCancel={() => setConfirmingStop(false)}
           />

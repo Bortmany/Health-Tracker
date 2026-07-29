@@ -88,8 +88,12 @@ function CoachSection() {
   }
 
   function handleRemove() {
-    setConfirmingRemove(false);
-    removeCoach.mutate(undefined, { onSuccess: () => setSuccess(null) });
+    // The dialog stays open (buttons disabled) until the disconnect is
+    // done, so it can't be triggered twice.
+    removeCoach.mutate(undefined, {
+      onSuccess: () => setSuccess(null),
+      onSettled: () => setConfirmingRemove(false),
+    });
   }
 
   return (
@@ -111,6 +115,7 @@ function CoachSection() {
             open={confirmingRemove}
             message="Disconnect from your coach? They'll lose access to your logs."
             confirmLabel="Disconnect"
+            busy={removeCoach.isPending}
             onConfirm={handleRemove}
             onCancel={() => setConfirmingRemove(false)}
           />
