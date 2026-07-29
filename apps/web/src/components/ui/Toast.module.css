@@ -1,0 +1,40 @@
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + var(--space-4));
+  transform: translateX(-50%);
+  z-index: 40;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-accent);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-4);
+  box-shadow: var(--shadow-2);
+  pointer-events: none;
+  animation: toastIn 0.15s ease;
+}
+
+/* Nothing to announce yet: the live region stays in the page but takes up
+   no space and shows nothing. */
+.idle {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}

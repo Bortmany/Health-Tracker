@@ -19,12 +19,20 @@
   border-radius: var(--radius-sm);
 }
 
+/* Pressed: every variant dips slightly so a tap is felt before its result. */
+.btn:active:not([disabled]) {
+  transform: scale(0.97);
+}
+
 .primary {
   background: var(--color-accent);
   color: var(--color-on-accent);
 }
 .primary:hover {
   background: var(--color-accent-strong);
+}
+.primary:active:not([disabled]) {
+  filter: brightness(0.88);
 }
 
 .secondary {
@@ -35,6 +43,10 @@
 .secondary:hover {
   border-color: var(--color-text-faint);
 }
+.secondary:active:not([disabled]) {
+  background: var(--color-surface);
+  border-color: var(--color-text-faint);
+}
 
 .ghost {
   background: transparent;
@@ -43,11 +55,18 @@
 .ghost:hover {
   color: var(--color-text);
 }
+.ghost:active:not([disabled]) {
+  color: var(--color-text);
+  background: var(--color-surface-2);
+}
 
 .danger {
   background: transparent;
   color: var(--color-danger);
   border-color: var(--color-danger);
+}
+.danger:active:not([disabled]) {
+  background: rgba(248, 113, 113, 0.12);
 }
 
 .btn[disabled] {

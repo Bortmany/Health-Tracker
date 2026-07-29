@@ -222,3 +222,14 @@
 .sessionRow:last-child {
   border-bottom: none;
 }
+
+.sessionInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sessionMeta {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}

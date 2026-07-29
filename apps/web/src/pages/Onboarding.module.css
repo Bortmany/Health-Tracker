@@ -7,6 +7,22 @@
   flex-direction: column;
 }
 
+/* Thin filled bar above the question — progress you can see at a glance. */
+.progressTrack {
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-2);
+  overflow: hidden;
+  margin-bottom: var(--space-3);
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  transition: width 0.2s ease;
+}
+
 .progress {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -51,6 +67,12 @@
 }
 
 .option:hover {
+  border-color: var(--color-accent);
+}
+
+/* Pressed: the tap itself is acknowledged, not just the step change after it. */
+.option:active:not(:disabled) {
+  background: var(--color-surface-2);
   border-color: var(--color-accent);
 }
 

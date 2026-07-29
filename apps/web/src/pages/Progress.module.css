@@ -95,11 +95,28 @@
 }
 
 .calLegend {
-  color: var(--color-text-faint);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-family: var(--font-mono);
   letter-spacing: var(--tracking-label);
   margin: var(--space-3) 0 0;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Small squares that match the calendar's three fill states exactly. */
+.legendSwatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  flex-shrink: 0;
 }
 
 /* ---- Personal records ---- */
@@ -131,7 +148,8 @@
 
 .recordValue {
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  /* The record itself is what the screen is for — it outranks its label. */
+  font-size: var(--text-lg);
   color: var(--color-text);
   white-space: nowrap;
 }

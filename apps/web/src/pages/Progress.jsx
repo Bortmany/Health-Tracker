@@ -115,9 +115,20 @@ function ConsistencyCalendar() {
           No days logged this month yet — every log fills in a square.
         </p>
       )}
-      <p className={styles.calLegend}>
-        Bright = logged + trained · Faded = logged · Outline = not yet
-      </p>
+      <div className={styles.calLegend}>
+        <span className={styles.legendItem}>
+          <span className={`${styles.legendSwatch} ${styles.dayFull}`} aria-hidden="true" />
+          Logged + trained
+        </span>
+        <span className={styles.legendItem}>
+          <span className={`${styles.legendSwatch} ${styles.dayLogged}`} aria-hidden="true" />
+          Logged
+        </span>
+        <span className={styles.legendItem}>
+          <span className={`${styles.legendSwatch} ${styles.dayEmpty}`} aria-hidden="true" />
+          Not yet
+        </span>
+      </div>
     </Card>
   );
 }

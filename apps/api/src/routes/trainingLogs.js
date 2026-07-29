@@ -17,6 +17,8 @@ function toPublicLog(row) {
     programDayId: row.program_day_id,
     notes: row.notes,
     createdAt: row.created_at,
+    // Only the list query computes this; other queries leave it out.
+    ...(row.exercise_count !== undefined && { exerciseCount: Number(row.exercise_count) }),
   };
 }
 
@@ -76,8 +78,15 @@ router.get('/', asyncHandler(async (req, res) => {
   const from = DATE_RE.test(req.query.from) ? req.query.from : '1970-01-01';
   const to = DATE_RE.test(req.query.to) ? req.query.to : '9999-12-31';
 
+  // Includes how many exercises each session holds, so the list can show
+  // "5 exercises" without loading every session's full detail.
   const { rows } = await pool.query(
-    'SELECT * FROM training_logs WHERE user_id = $1 AND date BETWEEN $2 AND $3 ORDER BY date DESC, created_at DESC',
+    `SELECT t.*, COUNT(e.id)::integer AS exercise_count
+     FROM training_logs t
+     LEFT JOIN training_log_exercises e ON e.training_log_id = t.id
+     WHERE t.user_id = $1 AND t.date BETWEEN $2 AND $3
+     GROUP BY t.id
+     ORDER BY t.date DESC, t.created_at DESC`,
     [req.userId, from, to]
   );
   res.json({ trainingLogs: rows.map(toPublicLog) });

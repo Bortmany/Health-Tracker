@@ -31,3 +31,8 @@
 .input::placeholder {
   color: var(--color-text-faint);
 }
+
+/* Error state: the box itself turns red, not just a message below it. */
+.fieldError .input {
+  border-color: var(--color-danger);
+}

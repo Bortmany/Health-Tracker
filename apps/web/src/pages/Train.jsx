@@ -13,6 +13,8 @@ import {
   SectionTitle,
   Select,
   Skeleton,
+  Toast,
+  useToast,
 } from '../components/ui/index.js';
 import { useExercises } from '../hooks/useExercises.js';
 import { useActivePrograms, useCreateProgram, useUpdateProgram } from '../hooks/usePrograms.js';
@@ -291,6 +293,7 @@ export default function Train() {
   // never saved — ticking one auto-starts the rest timer.
   const [doneSets, setDoneSets] = useState({});
   const [showSaveChoice, setShowSaveChoice] = useState(false);
+  const toast = useToast();
   const restTimerRef = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -408,10 +411,15 @@ export default function Train() {
   function saveSession() {
     const payload = buildPayload();
     if (editingId) {
-      updateTrainingLog.mutate({ id: editingId, ...payload });
+      updateTrainingLog.mutate(
+        { id: editingId, ...payload },
+        { onSuccess: () => toast.show('Session saved') }
+      );
     } else {
       createTrainingLog.mutate(payload, {
         onSuccess: () => {
+          // Confirm first, so the form clearing reads as success, not loss.
+          toast.show('Session saved');
           setForm(blankForm());
           setDoneSets({});
         },
@@ -429,7 +437,12 @@ export default function Train() {
     }
     updateTrainingLog.mutate(
       { id: editingId, ...buildPayload() },
-      { onSuccess: () => updateProgramDays() }
+      {
+        onSuccess: () => {
+          toast.show('Session saved');
+          updateProgramDays();
+        },
+      }
     );
   }
 
@@ -645,7 +658,14 @@ export default function Train() {
         ) : (
           sessions.map((s) => (
             <div className={styles.sessionRow} key={s.id}>
-              <span>{formatDateLabel(s.date.slice(0, 10))}</span>
+              <span className={styles.sessionInfo}>
+                <span>{formatDateLabel(s.date.slice(0, 10))}</span>
+                {s.exerciseCount > 0 && (
+                  <span className={styles.sessionMeta}>
+                    {s.exerciseCount} exercise{s.exerciseCount === 1 ? '' : 's'}
+                  </span>
+                )}
+              </span>
               <Button variant="secondary" size="sm" onClick={() => setEditingId(s.id)}>
                 Edit
               </Button>
@@ -653,6 +673,8 @@ export default function Train() {
           ))
         )}
       </Card>
+
+      <Toast message={toast.message} />
     </Screen>
   );
 }

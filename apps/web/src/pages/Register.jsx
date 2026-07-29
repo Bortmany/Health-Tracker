@@ -37,7 +37,7 @@ export default function Register() {
                 required
               />
             </Field>
-            <Field label="Email">
+            <Field label="Email" error={register.isError}>
               <Input
                 id="email"
                 type="email"
@@ -47,7 +47,7 @@ export default function Register() {
                 required
               />
             </Field>
-            <Field label="Password">
+            <Field label="Password" error={register.isError}>
               <Input
                 id="password"
                 type="password"
