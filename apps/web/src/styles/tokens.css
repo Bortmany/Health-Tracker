@@ -14,7 +14,7 @@
   --color-border: #26262c;         /* hairline borders */
   --color-text: #f4f4f2;           /* primary text */
   --color-text-muted: #9b9ba3;     /* secondary text, labels */
-  --color-text-faint: #6e6e77;     /* tertiary: timestamps, hints */
+  --color-text-faint: #86868f;     /* tertiary: timestamps, hints (≥4.5:1 on --color-bg) */
 
   /* ---- Color: brand ---- */
   --color-accent: #c8f135;         /* the Cut lime — actions, active states */

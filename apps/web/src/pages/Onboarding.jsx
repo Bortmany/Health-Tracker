@@ -213,6 +213,12 @@ export default function Onboarding() {
 
   return (
     <div className={styles.screen}>
+      <div className={styles.progressTrack} aria-hidden="true">
+        <div
+          className={styles.progressFill}
+          style={{ width: `${((stepIndex + 1) / STEPS.length) * 100}%` }}
+        />
+      </div>
       <p className={styles.progress}>
         {stepIndex + 1} of {STEPS.length}
       </p>

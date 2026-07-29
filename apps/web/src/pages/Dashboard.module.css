@@ -2,7 +2,8 @@
 
 .stack {
   display: grid;
-  gap: var(--space-4);
+  /* 32px between the five separate sections; tighter gaps stay inside cards. */
+  gap: var(--space-7);
 }
 
 .greetingDim {

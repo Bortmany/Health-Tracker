@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Card, Chip, EmptyState, ErrorText, SectionTitle, Skeleton } from './ui/index.js';
+import { Button, Card, Chip, ConfirmDialog, EmptyState, ErrorText, SectionTitle, Skeleton } from './ui/index.js';
 import { useAdoptTemplate, useDeleteMyPlan, useMyPlan, useRecommendedTemplates, useTemplates } from '../hooks/usePlans.js';
 import styles from './PlanSection.module.css';
 
@@ -27,6 +27,7 @@ export default function PlanSection() {
   const adopt = useAdoptTemplate();
   const stopPlan = useDeleteMyPlan();
   const [browsing, setBrowsing] = useState(false);
+  const [confirmingStop, setConfirmingStop] = useState(false);
 
   if (isLoading) return <Skeleton height={120} style={{ marginBottom: 'var(--space-4)' }} />;
 
@@ -37,17 +38,19 @@ export default function PlanSection() {
           <SectionTitle>
             Your plan — week {plan.weekNumber} of {plan.durationWeeks}
           </SectionTitle>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => {
-              if (window.confirm('Stop this plan? Your program and logged sessions stay.')) {
-                stopPlan.mutate();
-              }
-            }}
-          >
+          <Button variant="danger" size="sm" onClick={() => setConfirmingStop(true)}>
             Stop plan
           </Button>
+          <ConfirmDialog
+            open={confirmingStop}
+            message="Stop this plan? Your program and logged sessions stay."
+            confirmLabel="Stop plan"
+            onConfirm={() => {
+              setConfirmingStop(false);
+              stopPlan.mutate();
+            }}
+            onCancel={() => setConfirmingStop(false)}
+          />
         </div>
         <div className={styles.planName}>
           {plan.name}

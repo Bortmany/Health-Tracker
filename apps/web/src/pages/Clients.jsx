@@ -3,6 +3,7 @@ import LineChart from '../components/LineChart.jsx';
 import {
   Button,
   Card,
+  ConfirmDialog,
   EmptyState,
   ErrorText,
   Field,
@@ -342,6 +343,8 @@ export default function Clients() {
   const removeClient = useRemoveClient();
   const [newCode, setNewCode] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const [clientToRemove, setClientToRemove] = useState(null);
 
   function handleCreateInvite() {
     createInvite.mutate(undefined, {
@@ -352,6 +355,9 @@ export default function Clients() {
   async function copyCode(code) {
     try {
       await navigator.clipboard.writeText(code);
+      // The button itself says "Copied" for a moment, then goes back.
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
       // clipboard not available — ignore
     }
@@ -367,7 +373,7 @@ export default function Clients() {
           <div className={styles.inviteCodeBox}>
             <span className={styles.inviteCode}>{newCode}</span>
             <Button variant="secondary" size="sm" onClick={() => copyCode(newCode)}>
-              Copy
+              {copied ? 'Copied' : 'Copy'}
             </Button>
           </div>
         )}
@@ -409,15 +415,22 @@ export default function Clients() {
               client={client}
               expanded={expandedId === client.clientId}
               onToggle={() => setExpandedId((id) => (id === client.clientId ? null : client.clientId))}
-              onRemove={() => {
-                if (window.confirm(`Remove ${client.displayName} as a client?`)) {
-                  removeClient.mutate(client.linkId);
-                }
-              }}
+              onRemove={() => setClientToRemove(client)}
             />
           ))
         )}
       </Card>
+
+      <ConfirmDialog
+        open={Boolean(clientToRemove)}
+        message={clientToRemove ? `Remove ${clientToRemove.displayName} as a client?` : ''}
+        confirmLabel="Remove client"
+        onConfirm={() => {
+          removeClient.mutate(clientToRemove.linkId);
+          setClientToRemove(null);
+        }}
+        onCancel={() => setClientToRemove(null)}
+      />
     </Screen>
   );
 }

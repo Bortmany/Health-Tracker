@@ -1,7 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button, Card, ErrorText, Field, Input, Screen, Skeleton } from '../components/ui/index.js';
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  ErrorText,
+  Field,
+  Input,
+  Screen,
+  Skeleton,
+  Toast,
+  useToast,
+} from '../components/ui/index.js';
 import { useDeleteAccount, useExportData } from '../hooks/useAccount.js';
 import { useMe, useLogout } from '../hooks/useAuth.js';
 import { useBillingStatus, useCheckout } from '../hooks/useBilling.js';
@@ -63,6 +74,7 @@ function CoachSection() {
   const removeCoach = useRemoveMyCoach();
   const [code, setCode] = useState('');
   const [success, setSuccess] = useState(null);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   function handleRedeem(e) {
     e.preventDefault();
@@ -76,9 +88,8 @@ function CoachSection() {
   }
 
   function handleRemove() {
-    if (window.confirm('Disconnect from your coach?')) {
-      removeCoach.mutate(undefined, { onSuccess: () => setSuccess(null) });
-    }
+    setConfirmingRemove(false);
+    removeCoach.mutate(undefined, { onSuccess: () => setSuccess(null) });
   }
 
   return (
@@ -88,9 +99,21 @@ function CoachSection() {
       ) : coach ? (
         <div className={styles.row}>
           <div>Coached by {coach.displayName}</div>
-          <Button variant="danger" size="sm" onClick={handleRemove} disabled={removeCoach.isPending}>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={() => setConfirmingRemove(true)}
+            disabled={removeCoach.isPending}
+          >
             Remove coach
           </Button>
+          <ConfirmDialog
+            open={confirmingRemove}
+            message="Disconnect from your coach? They'll lose access to your logs."
+            confirmLabel="Disconnect"
+            onConfirm={handleRemove}
+            onCancel={() => setConfirmingRemove(false)}
+          />
         </div>
       ) : (
         <form onSubmit={handleRedeem}>
@@ -195,6 +218,7 @@ export default function More() {
   const [form, setForm] = useState(buildForm(settings));
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   // Coming back from a successful Stripe checkout: refresh the account so
   // the Premium label shows up without a manual reload.
@@ -216,15 +240,18 @@ export default function More() {
 
   function handleSubmit(e) {
     e.preventDefault();
-    updateSettings.mutate({
-      startWeight: form.startWeight === '' ? null : Number(form.startWeight),
-      targetWeight: form.targetWeight === '' ? null : Number(form.targetWeight),
-      targetDate: form.targetDate || null,
-      height: form.height === '' ? null : Number(form.height),
-      age: form.age === '' ? null : Number(form.age),
-      stepGoal: form.stepGoal === '' ? null : Number(form.stepGoal),
-      sleepGoal: form.sleepGoal === '' ? null : Number(form.sleepGoal),
-    });
+    updateSettings.mutate(
+      {
+        startWeight: form.startWeight === '' ? null : Number(form.startWeight),
+        targetWeight: form.targetWeight === '' ? null : Number(form.targetWeight),
+        targetDate: form.targetDate || null,
+        height: form.height === '' ? null : Number(form.height),
+        age: form.age === '' ? null : Number(form.age),
+        stepGoal: form.stepGoal === '' ? null : Number(form.stepGoal),
+        sleepGoal: form.sleepGoal === '' ? null : Number(form.sleepGoal),
+      },
+      { onSuccess: () => toast.show('Saved') }
+    );
   }
 
   return (
@@ -290,6 +317,8 @@ export default function More() {
       <p className={styles.legalLinks}>
         <Link to="/privacy">Privacy Policy</Link> · <Link to="/terms">Terms of Use</Link>
       </p>
+
+      <Toast message={toast.message} />
     </Screen>
   );
 }

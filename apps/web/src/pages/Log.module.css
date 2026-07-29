@@ -87,6 +87,20 @@
   font-size: var(--text-base);
 }
 
+.groupTitleWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Marks a collapsed group that already has entries for this day. */
+.groupDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+}
+
 .groupBody {
   margin-top: var(--space-3);
   display: grid;

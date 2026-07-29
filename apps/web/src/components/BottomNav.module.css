@@ -14,6 +14,7 @@
 
 /* Whole column is the tap target — full width, at least 44px tall. */
 .link {
+  position: relative;
   flex: 1;
   min-height: 44px;
   display: flex;
@@ -31,6 +32,18 @@
 
 .linkActive {
   color: var(--color-accent);
+}
+
+/* A filled top bar marks the active tab — legible beyond color alone. */
+.linkActive::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 3px;
+  background: var(--color-accent);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
 }
 
 .dot {

@@ -11,6 +11,8 @@ import {
   SectionTitle,
   Select,
   Skeleton,
+  Toast,
+  useToast,
 } from '../components/ui/index.js';
 import { useActivities } from '../hooks/useActivities.js';
 import { useLog, usePutLog } from '../hooks/useLogs.js';
@@ -96,12 +98,19 @@ function buildFormFromData(data, nutritionData) {
   };
 }
 
-// A collapsible section card: the title row is the expand/collapse tap target.
-function Group({ title, open, onToggle, children }) {
+// A collapsible section card: the title row is the expand/collapse tap
+// target. When a closed group already holds entries, a small accent dot
+// next to the title says so without opening it.
+function Group({ title, open, onToggle, hasData = false, children }) {
   return (
     <Card>
       <button type="button" className={styles.groupHeader} onClick={onToggle} aria-expanded={open}>
-        <SectionTitle>{title}</SectionTitle>
+        <span className={styles.groupTitleWrap}>
+          <SectionTitle>{title}</SectionTitle>
+          {!open && hasData && (
+            <span className={styles.groupDot} title="Already has entries" aria-hidden="true" />
+          )}
+        </span>
         <span className={styles.chevron} aria-hidden="true">
           {open ? '▾' : '▸'}
         </span>
@@ -121,6 +130,7 @@ export default function Log() {
   const putNutrition = usePutNutrition(date);
   const [form, setForm] = useState(null);
   const [searchParams] = useSearchParams();
+  const toast = useToast();
 
   // Which sections are expanded. Defaults re-evaluate when the date changes:
   // a section that already has data for that day starts open.
@@ -277,7 +287,7 @@ export default function Log() {
         swelling: c.swelling,
         canTrainTomorrow: c.canTrainTomorrow,
       })),
-    });
+    }, { onSuccess: () => toast.show('Saved') });
 
     putNutrition.mutate({
       calories: form.foodCalories === '' ? null : Number(form.foodCalories),
@@ -295,6 +305,14 @@ export default function Log() {
   }
 
   const saving = putLog.isPending || putNutrition.isPending;
+
+  // Dots for collapsed groups that already hold entries for this day.
+  const metricsHaveData = Boolean(form) && MORE_FIELDS.some(({ key }) => form[key] !== '');
+  const injuriesHaveData =
+    Boolean(form) &&
+    form.injuryCheckins.some(
+      (c) => c.painPre !== '' || c.painDuring !== '' || c.painPost !== '' || c.swelling
+    );
 
   return (
     <Screen>
@@ -442,6 +460,7 @@ export default function Log() {
           <Group
             title="More metrics"
             open={open.metrics}
+            hasData={metricsHaveData}
             onToggle={() => setOpen((o) => ({ ...o, metrics: !o.metrics }))}
           >
             <div className={styles.fieldGrid}>
@@ -536,6 +555,7 @@ export default function Log() {
             <Group
               title="Injury check-in"
               open={open.injuries}
+              hasData={injuriesHaveData}
               onToggle={() => setOpen((o) => ({ ...o, injuries: !o.injuries }))}
             >
               {form.injuryCheckins.map((c) => (
@@ -604,6 +624,8 @@ export default function Log() {
           </Group>
         </form>
       )}
+
+      <Toast message={toast.message} />
     </Screen>
   );
 }
