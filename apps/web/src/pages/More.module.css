@@ -57,7 +57,13 @@
 .connectRow {
   display: flex;
   gap: var(--space-2);
-  align-items: center;
+  /* The code box now carries a label above it, so the button lines up with
+     the bottom of the box rather than the middle of the whole group. */
+  align-items: flex-end;
+}
+
+.connectField {
+  flex: 1;
 }
 
 .grid {

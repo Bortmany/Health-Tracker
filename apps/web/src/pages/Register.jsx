@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, Card, ErrorText, Field, Input } from '../components/ui/index.js';
 import { useRegister } from '../hooks/useAuth.js';
+import { emailError } from '../lib/validation.js';
 import styles from './Auth.module.css';
 
 export default function Register() {
@@ -9,13 +10,20 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('consumer');
+  // The email message only appears once the field has been visited or the
+  // form submitted — nobody wants a red box before they've typed anything.
+  const [emailTouched, setEmailTouched] = useState(false);
   const register = useRegister();
   const navigate = useNavigate();
 
+  const emailMessage = emailTouched ? emailError(email) : '';
+
   function handleSubmit(e) {
     e.preventDefault();
+    setEmailTouched(true);
+    if (emailError(email)) return;
     register.mutate(
-      { displayName, email, password, role },
+      { displayName, email: email.trim(), password, role },
       { onSuccess: () => navigate(role === 'coach' ? '/clients' : '/onboarding') }
     );
   }
@@ -31,19 +39,23 @@ export default function Register() {
               <Input
                 id="displayName"
                 type="text"
+                placeholder="John Doe"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 autoComplete="name"
                 required
               />
             </Field>
-            <Field label="Email" error={register.isError}>
+            <Field label="Email" error={emailMessage || register.isError}>
               <Input
                 id="email"
                 type="email"
+                placeholder="JohnDoe@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => setEmailTouched(true)}
                 autoComplete="email"
+                aria-invalid={emailMessage ? 'true' : undefined}
                 required
               />
             </Field>
