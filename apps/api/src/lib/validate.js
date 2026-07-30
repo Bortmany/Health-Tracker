@@ -74,12 +74,17 @@ export function isoDate(value, name = 'date') {
   return value;
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// An address must have something before the @, a domain, and end in a real
+// dot-ending (2+ letters). Deliberately a shape check and NOT a list of
+// allowed providers — work addresses on any domain have to keep working.
+// The browser side checks the same shape in apps/web/src/lib/validation.js;
+// keep the two in step.
+export const EMAIL_RE = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[A-Za-z]{2,}$/;
 
 // A syntactically valid email address; returns it trimmed and lower-cased.
 export function email(value, name = 'email') {
   if (typeof value !== 'string' || !EMAIL_RE.test(value.trim())) {
-    throw new ValidationError(`${name} must be a valid email address`);
+    throw new ValidationError(`${name} must be a valid email address, like JohnDoe@gmail.com`);
   }
   return value.trim().toLowerCase();
 }

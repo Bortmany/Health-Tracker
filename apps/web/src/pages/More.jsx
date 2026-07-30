@@ -124,7 +124,20 @@ function CoachSection() {
         <form onSubmit={handleRedeem}>
           {success && <p className={styles.mutedLine}>Connected with {success}.</p>}
           <div className={styles.connectRow}>
-            <Input type="text" placeholder="Invite code" value={code} onChange={(e) => setCode(e.target.value)} />
+            {/* The label stays visible; the greyed example only shows the
+                shape of a code, and disappears as soon as one is typed. */}
+            <div className={styles.connectField}>
+              <Field label="Invite code">
+                <Input
+                  type="text"
+                  placeholder="K7xM2pQ9tR"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </Field>
+            </div>
             <Button type="submit" disabled={redeemCode.isPending}>
               {redeemCode.isPending ? 'Connecting...' : 'Connect'}
             </Button>
