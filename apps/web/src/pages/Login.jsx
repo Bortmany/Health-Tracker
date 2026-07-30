@@ -29,7 +29,7 @@ export default function Login() {
         <Card className={styles.card}>
           <h1 className={styles.wordmark}>Cut</h1>
           <p className={styles.subtitle}>Log in to your tracker</p>
-          <form className={styles.form} onSubmit={handleSubmit}>
+          <form className={styles.form} onSubmit={handleSubmit} noValidate>
             <Field label="Email" error={emailMessage || login.isError}>
               <Input
                 id="email"

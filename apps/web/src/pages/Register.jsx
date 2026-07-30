@@ -34,7 +34,7 @@ export default function Register() {
         <Card className={styles.card}>
           <h1 className={styles.wordmark}>Cut</h1>
           <p className={styles.subtitle}>Create your account</p>
-          <form className={styles.form} onSubmit={handleSubmit}>
+          <form className={styles.form} onSubmit={handleSubmit} noValidate>
             <Field label="Name">
               <Input
                 id="displayName"
