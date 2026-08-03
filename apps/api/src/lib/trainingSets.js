@@ -34,12 +34,19 @@ export function normalizeExercises(rawExercises) {
     result.push({
       name: validate.stringLength(ex.name, 'exercise name', { max: 200 }),
       sortOrder: validate.nonNegativeNumber(ex.sortOrder ?? index, 'exercise order', { integer: true, max: 10000 }),
-      sets: sets.map((set, setIndex) => ({
-        setNumber: validate.nonNegativeNumber(set.setNumber ?? setIndex + 1, 'set number', { integer: true, max: 1000 }),
-        weight: validate.nonNegativeNumber(set.weight, 'set weight', { optional: true, max: 10000 }),
-        reps: validate.nonNegativeNumber(set.reps, 'set reps', { optional: true, integer: true, max: 10000 }),
-        rpe: validate.nonNegativeNumber(set.rpe, 'set RPE', { optional: true, max: 10 }),
-      })),
+      sets: sets.map((set, setIndex) => {
+        // A null or non-object item in the sets list (e.g. [null] or ["x"])
+        // would otherwise crash when we read set.weight — reject it cleanly.
+        if (set == null || typeof set !== 'object') {
+          throw new validate.ValidationError('each set must be a set of numbers');
+        }
+        return {
+          setNumber: validate.nonNegativeNumber(set.setNumber ?? setIndex + 1, 'set number', { integer: true, max: 1000 }),
+          weight: validate.nonNegativeNumber(set.weight, 'set weight', { optional: true, max: 10000 }),
+          reps: validate.nonNegativeNumber(set.reps, 'set reps', { optional: true, integer: true, max: 10000 }),
+          rpe: validate.nonNegativeNumber(set.rpe, 'set RPE', { optional: true, max: 10 }),
+        };
+      }),
     });
   }
   return result;

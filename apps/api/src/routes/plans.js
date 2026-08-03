@@ -2,12 +2,19 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { rankTemplates, weekTargets } from '../lib/planGenerator.js';
+import * as validate from '../lib/validate.js';
 import { withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// A malformed :id would otherwise reach Postgres as an invalid UUID and throw a
+// 500 — this turns it into a clean "not found".
+function planNotFound(res) {
+  return res.status(404).json({ error: { message: 'Plan not found', code: 'NOT_FOUND' } });
+}
 
 function toPublicTemplate(row) {
   return {
@@ -78,21 +85,25 @@ router.get('/templates/recommended', asyncHandler(async (req, res) => {
 }));
 
 router.get('/templates/:id', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) return planNotFound(res);
+
   const { rows } = await pool.query('SELECT * FROM plan_templates WHERE id = $1', [req.params.id]);
   if (!rows[0]) {
-    return res.status(404).json({ error: { message: 'Plan not found', code: 'NOT_FOUND' } });
+    return planNotFound(res);
   }
   const days = await fetchTemplateDays(rows[0].id);
   res.json({ template: { ...toPublicTemplate(rows[0]), days } });
 }));
 
 router.post('/templates/:id/adopt', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) return planNotFound(res);
+
   const { rows: templateRows } = await pool.query('SELECT * FROM plan_templates WHERE id = $1', [
     req.params.id,
   ]);
   const template = templateRows[0];
   if (!template) {
-    return res.status(404).json({ error: { message: 'Plan not found', code: 'NOT_FOUND' } });
+    return planNotFound(res);
   }
 
   const { rows: userRows } = await pool.query('SELECT plan_tier FROM users WHERE id = $1', [req.userId]);

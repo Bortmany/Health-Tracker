@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import * as validate from '../lib/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -34,6 +35,19 @@ router.put('/', asyncHandler(async (req, res) => {
     experienceLevel, trainingGoal, equipment, daysPerWeek,
   } = req.body ?? {};
 
+  // Every stored number/date is optional, but if given it must be a real,
+  // sensible value. This rejects text, negatives, impossible dates (e.g.
+  // 2026-13-45) and absurd/huge numbers with a clean 400 instead of a server
+  // error or a silently-stored bad value — matching the daily-log endpoints.
+  const cleanStartWeight = validate.nonNegativeNumber(startWeight, 'start weight', { optional: true, max: 2000 });
+  const cleanTargetWeight = validate.nonNegativeNumber(targetWeight, 'target weight', { optional: true, max: 2000 });
+  const cleanTargetDate = targetDate == null || targetDate === '' ? null : validate.isoDate(targetDate, 'target date');
+  const cleanHeight = validate.nonNegativeNumber(height, 'height', { optional: true, max: 400 });
+  const cleanAge = validate.nonNegativeNumber(age, 'age', { optional: true, integer: true, max: 150 });
+  const cleanStepGoal = validate.nonNegativeNumber(stepGoal, 'step goal', { optional: true, integer: true, max: 1000000 });
+  const cleanSleepGoal = validate.nonNegativeNumber(sleepGoal, 'sleep goal', { optional: true, max: 24 });
+  const cleanDaysPerWeek = validate.nonNegativeNumber(daysPerWeek, 'days per week', { optional: true, integer: true, max: 7 });
+
   // The quiz fields keep their old values when a form doesn't send them,
   // so the plain settings form can't wipe out someone's quiz answers.
   const { rows } = await pool.query(
@@ -45,8 +59,8 @@ router.put('/', asyncHandler(async (req, res) => {
          days_per_week = COALESCE($12::integer, days_per_week)
      WHERE user_id = $1
      RETURNING *`,
-    [req.userId, startWeight, targetWeight, targetDate, height, age, stepGoal, sleepGoal,
-      experienceLevel ?? null, trainingGoal ?? null, equipment ?? null, daysPerWeek ?? null]
+    [req.userId, cleanStartWeight, cleanTargetWeight, cleanTargetDate, cleanHeight, cleanAge, cleanStepGoal, cleanSleepGoal,
+      experienceLevel ?? null, trainingGoal ?? null, equipment ?? null, cleanDaysPerWeek]
   );
 
   res.json({ settings: toPublicSettings(rows[0]) });

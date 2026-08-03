@@ -91,6 +91,18 @@ test('adopting a plan creates a program and tracks the plan', async () => {
   assert.equal(program.days[0].exercises[0].name, 'Incline push-up');
 });
 
+test('a malformed template id returns a clean 404, not a server error', async () => {
+  const getRes = await fetch(`${baseUrl}/plans/templates/not-a-real-id`, { headers: { Cookie: cookie } });
+  assert.equal(getRes.status, 404);
+
+  const adoptRes = await fetch(`${baseUrl}/plans/templates/not-a-real-id/adopt`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({}),
+  });
+  assert.equal(adoptRes.status, 404);
+});
+
 test('a free account cannot start the 52-week plan', async () => {
   const res = await fetch(`${baseUrl}/plans/templates/${templateId}/adopt`, {
     method: 'POST',

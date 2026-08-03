@@ -306,3 +306,9 @@ CREATE UNIQUE INDEX coach_clients_one_active_coach_idx ON coach_clients(client_i
 
 -- 015: billing
 ALTER TABLE users ADD COLUMN stripe_customer_id TEXT;
+
+-- 017: server-side session revocation — the account's token version. Every
+-- login token is stamped with this value; logging out or deleting the account
+-- bumps it, which invalidates any token signed with the old value.
+ALTER TABLE users
+  ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0;

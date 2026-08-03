@@ -105,6 +105,39 @@ test('POST /auth/login returns the same generic 401 for an unknown email', async
   assert.equal(body.error.code, 'INVALID_CREDENTIALS');
 });
 
+test('logging out invalidates the token server-side (a captured cookie stops working)', async () => {
+  const res = await register({
+    email: `auth-test-${stamp}-revoke@example.com`,
+    password: 'hunter2pass',
+    displayName: 'Revoke Me',
+  });
+  const cookie = res.headers.get('set-cookie').split(';')[0];
+
+  // The session works before logout.
+  const before = await fetch(`${baseUrl}/auth/me`, { headers: { Cookie: cookie } });
+  assert.equal(before.status, 200);
+
+  const logout = await fetch(`${baseUrl}/auth/logout`, { method: 'POST', headers: { Cookie: cookie } });
+  assert.equal(logout.status, 204);
+
+  // The SAME token (as if it had been copied before logout) no longer works.
+  const after = await fetch(`${baseUrl}/auth/me`, { headers: { Cookie: cookie } });
+  assert.equal(after.status, 401);
+});
+
+test('an oversized request body returns a clean 413, not a 500', async () => {
+  // A JSON string field just over the 1 MB limit.
+  const huge = 'x'.repeat(1_100_000);
+  const res = await fetch(`${baseUrl}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'a@b.com', password: huge }),
+  });
+  assert.equal(res.status, 413);
+  const body = await res.json();
+  assert.equal(body.error.code, 'PAYLOAD_TOO_LARGE');
+});
+
 test('POST /auth/register trims and lower-cases the stored address', async () => {
   const res = await register({
     email: `  AUTH-TEST-${stamp}-Mixed@Example.COM `,

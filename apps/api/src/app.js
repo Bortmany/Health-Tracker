@@ -77,7 +77,10 @@ app.use(compression());
 // Stripe's webhook signature is checked against the raw request bytes, so
 // that one path must skip JSON parsing. It's registered before express.json.
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
-app.use(express.json());
+// Cap the request body so a huge (or malicious) payload can't tie up memory.
+// 1 MB is far more than any real form here sends; going over it makes the JSON
+// parser throw, which the error handler below turns into a clean 413.
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }));
 
@@ -209,6 +212,14 @@ app.use((err, req, res, _next) => {
   if (err && err.status && err.body) {
     logger.warn('Request rejected', { method: req.method, path: req.path, code: err.code });
     return res.status(err.status).json(err.body);
+  }
+  // An oversized request body (past the 1 MB JSON limit) throws a body-parser
+  // error — return a clean 413 with a plain-English message instead of a 500.
+  if (err && (err.type === 'entity.too.large' || err.status === 413 || err.statusCode === 413)) {
+    logger.warn('Request body too large', { method: req.method, path: req.path });
+    return res.status(413).json({
+      error: { message: 'That request is too large. Please send less data at once.', code: 'PAYLOAD_TOO_LARGE' },
+    });
   }
   // Anything else is a real server error: log it (secrets redacted) and, if
   // Sentry is switched on, report it — then return the standard shape.

@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import * as validate from '../lib/validate.js';
 import { withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_ENTRIES = 90;
 
 router.use(requireAuth);
@@ -26,31 +26,24 @@ router.post('/', asyncHandler(async (req, res) => {
       error: { message: `You can only sync up to ${MAX_ENTRIES} days at a time`, code: 'INVALID_INPUT' },
     });
   }
-  for (const entry of entries) {
-    if (!DATE_RE.test(entry?.date)) {
-      return res.status(400).json({
-        error: { message: 'Every entry needs a date in YYYY-MM-DD format', code: 'INVALID_INPUT' },
-      });
-    }
-    // Reject bad readings with a clear message instead of a server error.
-    for (const field of ['weight', 'sleep']) {
-      if (entry[field] != null && !Number.isFinite(Number(entry[field]))) {
-        return res.status(400).json({
-          error: { message: `${field} must be a number (entry for ${entry.date})`, code: 'INVALID_INPUT' },
-        });
-      }
-    }
-    for (const field of ['steps', 'calories']) {
-      if (entry[field] != null && !Number.isInteger(Number(entry[field]))) {
-        return res.status(400).json({
-          error: { message: `${field} must be a whole number (entry for ${entry.date})`, code: 'INVALID_INPUT' },
-        });
-      }
-    }
-  }
+  // Clean every reading up front, the same way the manual daily-log form does:
+  // real dates only, and each number finite, non-negative and inside a sane
+  // range. The step/calorie caps also stop a huge value from overflowing the
+  // integer columns (which used to be a 500). A bad value fails cleanly here
+  // before anything is written.
+  const cleanEntries = entries.map((entry) => {
+    const date = validate.isoDate(entry?.date);
+    return {
+      date,
+      weight: validate.nonNegativeNumber(entry?.weight, `weight (entry for ${date})`, { optional: true, max: 2000 }),
+      sleep: validate.nonNegativeNumber(entry?.sleep, `sleep (entry for ${date})`, { optional: true, max: 48 }),
+      steps: validate.nonNegativeNumber(entry?.steps, `steps (entry for ${date})`, { optional: true, integer: true, max: 1000000 }),
+      calories: validate.nonNegativeNumber(entry?.calories, `calories (entry for ${date})`, { optional: true, integer: true, max: 100000 }),
+    };
+  });
 
   await withTransaction(async (client) => {
-    for (const entry of entries) {
+    for (const entry of cleanEntries) {
       const { date, weight, steps, calories, sleep } = entry;
       await client.query(
         `INSERT INTO daily_logs (user_id, date, weight, steps, calories, sleep)
