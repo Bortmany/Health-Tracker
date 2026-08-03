@@ -22,10 +22,17 @@ async function register(role, label) {
   const res = await fetch(`${baseUrl}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: 'hunter2pass', displayName: `${label} User`, role }),
+    body: JSON.stringify({ email, password: 'hunter2pass', displayName: `${label} User` }),
   });
   const cookie = res.headers.get('set-cookie').split(';')[0];
   const { user } = await res.json();
+  // The register route only ever creates regular accounts now (a client can no
+  // longer make itself a coach). Coaches are promoted through a verified path;
+  // the test stands in for that by flipping the role directly in the database.
+  if (role === 'coach') {
+    await pool.query("UPDATE users SET role = 'coach' WHERE id = $1", [user.id]);
+    user.role = 'coach';
+  }
   return { cookie, user };
 }
 

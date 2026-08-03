@@ -1,9 +1,11 @@
 import { request } from './client.js';
 
-export function register({ email, password, displayName, role }) {
+export function register({ email, password, displayName }) {
+  // Note: accounts are always created as regular ('consumer') accounts. Coach
+  // access is granted through a separate verified path, never at sign-up.
   return request('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password, displayName, role }),
+    body: JSON.stringify({ email, password, displayName }),
   });
 }
 

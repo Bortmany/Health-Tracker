@@ -67,6 +67,44 @@ test('POST /auth/register rejects a broken domain', async () => {
   }
 });
 
+test('POST /auth/register ignores a client-supplied coach role', async () => {
+  const res = await register({
+    email: `auth-test-${stamp}-sneaky-coach@example.com`,
+    password: 'hunter2pass',
+    displayName: 'Sneaky Coach',
+    role: 'coach',
+  });
+  assert.equal(res.status, 201);
+  const body = await res.json();
+  // A client can never make itself a coach at sign-up.
+  assert.equal(body.user.role, 'consumer');
+  const { rows } = await pool.query('SELECT role FROM users WHERE id = $1', [body.user.id]);
+  assert.equal(rows[0].role, 'consumer');
+});
+
+test('POST /auth/register does not reveal that an email is already taken', async () => {
+  const email = `auth-test-${stamp}-dup@example.com`;
+  const first = await register({ email, password: 'hunter2pass', displayName: 'First' });
+  assert.equal(first.status, 201);
+
+  const second = await register({ email, password: 'hunter2pass', displayName: 'Second' });
+  assert.equal(second.status, 400);
+  const body = await second.json();
+  // The message must not confirm the address exists (no "already registered").
+  assert.ok(!/already|taken|exists|registered/i.test(body.error.message), body.error.message);
+});
+
+test('POST /auth/login returns the same generic 401 for an unknown email', async () => {
+  const res = await fetch(`${baseUrl}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: `auth-test-${stamp}-nobody@example.com`, password: 'whatever123' }),
+  });
+  assert.equal(res.status, 401);
+  const body = await res.json();
+  assert.equal(body.error.code, 'INVALID_CREDENTIALS');
+});
+
 test('POST /auth/register trims and lower-cases the stored address', async () => {
   const res = await register({
     email: `  AUTH-TEST-${stamp}-Mixed@Example.COM `,

@@ -116,6 +116,52 @@ test('a second user cannot read another user\'s training log', async () => {
   assert.equal(getRes.status, 404);
 });
 
+test('POST /training-logs rejects negative reps and infinite weights', async () => {
+  // Raw bodies so "1e400" reaches the server as Infinity (JSON.stringify would
+  // flatten it to null). A negative rep count used to sneak in as a fake PR.
+  for (const body of [
+    '{"date":"2026-05-01","exercises":[{"name":"Curl","sets":[{"weight":10,"reps":-5}]}]}',
+    '{"date":"2026-05-01","exercises":[{"name":"Curl","sets":[{"weight":1e400,"reps":8}]}]}',
+    '{"date":"2026-05-01","exercises":[{"name":"Curl","sets":[{"weight":"heavy","reps":8}]}]}',
+  ]) {
+    const res = await fetch(`${baseUrl}/training-logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body,
+    });
+    assert.equal(res.status, 400, `expected ${body} to be rejected`);
+  }
+});
+
+test('POST /training-logs rejects an impossible date', async () => {
+  const res = await fetch(`${baseUrl}/training-logs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ date: '2026-02-30', exercises: [] }),
+  });
+  assert.equal(res.status, 400);
+});
+
+test('GET /training-logs/:id with a non-UUID id is a clean 404, never a 500', async () => {
+  const res = await fetch(`${baseUrl}/training-logs/not-a-real-id`, { headers: { Cookie: cookie } });
+  assert.equal(res.status, 404);
+});
+
+test('POST /training-logs twice for one day updates rather than duplicating', async () => {
+  const day = '2026-06-10';
+  for (const weight of [80, 85]) {
+    await fetch(`${baseUrl}/training-logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ date: day, exercises: [{ name: 'Squat', sets: [{ weight, reps: 5 }] }] }),
+    });
+  }
+  const listRes = await fetch(`${baseUrl}/training-logs?from=${day}&to=${day}`, { headers: { Cookie: cookie } });
+  const { trainingLogs } = await listRes.json();
+  // One session per day: the second save replaced the first, not appended.
+  assert.equal(trainingLogs.length, 1);
+});
+
 test('editing a program keeps past sessions linked to the matching day', async () => {
   const headers = { 'Content-Type': 'application/json', Cookie: cookie };
 

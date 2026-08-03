@@ -12,6 +12,12 @@ const router = Router();
 const BCRYPT_COST = 12;
 const COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+// A fixed throwaway hash used only so a login for an unknown email spends the
+// same time as one for a real account. Without this, only real emails trigger a
+// (slow) bcrypt check, and the faster response for unknown emails would reveal
+// which addresses have accounts (account enumeration).
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('cut-login-timing-equalizer', BCRYPT_COST);
+
 function baseCookieOptions() {
   return {
     httpOnly: true,
@@ -36,7 +42,9 @@ function toPublicUser(row) {
 }
 
 router.post('/register', asyncHandler(async (req, res) => {
-  const { email, password, displayName, role } = req.body ?? {};
+  // Note: `role` is deliberately NOT read from the request. New accounts are
+  // always regular ('consumer') accounts — see below.
+  const { email, password, displayName } = req.body ?? {};
   if (!email || !password || !displayName) {
     return res.status(400).json({
       error: { message: 'email, password, and displayName are required', code: 'INVALID_INPUT' },
@@ -44,34 +52,42 @@ router.post('/register', asyncHandler(async (req, res) => {
   }
   // Reject malformed addresses up front (returns it trimmed + lower-cased).
   const normalizedEmail = validate.email(email);
-  if (password.length < 8) {
+  if (typeof password !== 'string' || password.length < 8) {
     return res.status(400).json({
       error: { message: 'Password must be at least 8 characters long', code: 'WEAK_PASSWORD' },
     });
   }
-  if (role !== undefined && role !== 'consumer' && role !== 'coach') {
-    return res.status(400).json({
-      error: { message: "role must be 'consumer' or 'coach'", code: 'INVALID_INPUT' },
-    });
-  }
+  const cleanDisplayName = validate.stringLength(displayName, 'displayName', { max: 100 });
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
 
+  // Security: every new account is a regular ('consumer') account. The route no
+  // longer lets a client ask to be created as a 'coach' — that let anyone grant
+  // themselves coach access, which can read and edit other people's data.
+  // TODO(coach onboarding): add a verified promotion path (e.g. an admin action
+  // or redeeming a coach invite) so genuine coaches can be created safely.
   let user;
   try {
     user = await withTransaction(async (client) => {
       const { rows } = await client.query(
         `INSERT INTO users (email, password_hash, display_name, role)
-         VALUES ($1, $2, $3, $4)
+         VALUES ($1, $2, $3, 'consumer')
          RETURNING id, email, display_name, plan_tier, role, created_at`,
-        [normalizedEmail, passwordHash, displayName, role ?? 'consumer']
+        [normalizedEmail, passwordHash, cleanDisplayName]
       );
       await client.query('INSERT INTO user_settings (user_id) VALUES ($1)', [rows[0].id]);
       return rows[0];
     });
   } catch (err) {
     if (err.code === '23505') {
-      return res.status(400).json({ error: { message: 'Email already registered', code: 'EMAIL_TAKEN' } });
+      // Don't confirm whether an address already has an account — that lets an
+      // attacker discover who is registered. Return a generic error instead.
+      return res.status(400).json({
+        error: {
+          message: "We couldn't create your account. Please check your details and try again.",
+          code: 'REGISTRATION_FAILED',
+        },
+      });
     }
     throw err;
   }
@@ -87,11 +103,14 @@ router.post('/login', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: { message: 'email and password are required', code: 'INVALID_INPUT' } });
   }
 
-  const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
+  const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [String(email).toLowerCase()]);
   const user = rows[0];
-  const valid = user ? await bcrypt.compare(password, user.password_hash) : false;
+  // Always run a bcrypt comparison — against a throwaway hash when no account
+  // matches — so an unknown email takes the same time as a real one. This keeps
+  // response timing from revealing which addresses are registered.
+  const valid = await bcrypt.compare(String(password), user ? user.password_hash : DUMMY_PASSWORD_HASH);
 
-  if (!valid) {
+  if (!user || !valid) {
     return res.status(401).json({ error: { message: 'Invalid email or password', code: 'INVALID_CREDENTIALS' } });
   }
 

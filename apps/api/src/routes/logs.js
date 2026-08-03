@@ -2,12 +2,15 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { normalizeCheckins } from '../lib/injuryCheckins.js';
+import * as validate from '../lib/validate.js';
 import { withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Guard against a runaway form stuffing thousands of rows into one day.
+const MAX_ENTRIES = 100;
 
 function toPublicLog(row) {
   if (!row) return null;
@@ -88,10 +91,9 @@ router.get('/streak', asyncHandler(async (req, res) => {
 }));
 
 router.get('/:date', asyncHandler(async (req, res) => {
-  const { date } = req.params;
-  if (!DATE_RE.test(date)) {
-    return res.status(400).json({ error: { message: 'date must be YYYY-MM-DD', code: 'INVALID_INPUT' } });
-  }
+  // Rejects both wrong shapes and impossible-but-well-shaped dates (e.g.
+  // 2026-13-45) with a clean 400 instead of letting Postgres throw a 500.
+  const date = validate.isoDate(req.params.date);
 
   const { rows: logRows } = await pool.query('SELECT * FROM daily_logs WHERE user_id = $1 AND date = $2', [
     req.userId,
@@ -144,17 +146,61 @@ router.get('/:date', asyncHandler(async (req, res) => {
 }));
 
 router.put('/:date', asyncHandler(async (req, res) => {
-  const { date } = req.params;
-  if (!DATE_RE.test(date)) {
-    return res.status(400).json({ error: { message: 'date must be YYYY-MM-DD', code: 'INVALID_INPUT' } });
-  }
+  // Rejects impossible dates (e.g. 2026-13-45) with a 400 before any query runs.
+  const date = validate.isoDate(req.params.date);
 
   const {
     weight, waist, sleep, hrv, recovery, strain, steps, calories, notes,
     habits = [], activities = [], injuryCheckins = [],
   } = req.body ?? {};
 
+  // Every stored number is optional, but if given it must be a finite,
+  // non-negative value inside a sane range. This rejects text, NaN, Infinity
+  // (e.g. 1e400) and absurd values that would otherwise break the charts.
+  const cleanWeight = validate.nonNegativeNumber(weight, 'weight', { optional: true, max: 2000 });
+  const cleanWaist = validate.nonNegativeNumber(waist, 'waist', { optional: true, max: 500 });
+  const cleanSleep = validate.nonNegativeNumber(sleep, 'sleep', { optional: true, max: 48 });
+  const cleanHrv = validate.nonNegativeNumber(hrv, 'HRV', { optional: true, max: 1000 });
+  const cleanRecovery = validate.nonNegativeNumber(recovery, 'recovery', { optional: true, max: 100 });
+  const cleanStrain = validate.nonNegativeNumber(strain, 'strain', { optional: true, max: 100 });
+  const cleanSteps = validate.nonNegativeNumber(steps, 'steps', { optional: true, integer: true, max: 1000000 });
+  const cleanCalories = validate.nonNegativeNumber(calories, 'calories', { optional: true, integer: true, max: 100000 });
+  const cleanNotes = validate.stringLength(notes, 'notes', { optional: true, max: 2000 });
+
+  if (!Array.isArray(habits) || !Array.isArray(activities)) {
+    throw new validate.ValidationError('habits and activities must be lists');
+  }
+  if (habits.length > MAX_ENTRIES || activities.length > MAX_ENTRIES) {
+    throw new validate.ValidationError(`You can log at most ${MAX_ENTRIES} entries for one day`);
+  }
+
+  // Validate the nested rows up front so a bad value fails cleanly before we
+  // start writing to the database.
+  const cleanHabits = [];
+  for (const h of habits) {
+    if (!h?.habitId) continue;
+    cleanHabits.push({
+      habitId: validate.uuid(h.habitId, 'habit id'),
+      completed: Boolean(h.completed),
+    });
+  }
+
+  const cleanActivities = [];
+  for (const a of activities) {
+    if (!a?.activityId && !a?.name) continue;
+    cleanActivities.push({
+      activityId: validate.uuid(a.activityId, 'activity id', { optional: true }),
+      name: validate.stringLength(a.name, 'activity name', { optional: true, max: 200 }),
+      durationMinutes: validate.nonNegativeNumber(a.durationMinutes, 'activity duration', {
+        optional: true, integer: true, max: 100000,
+      }),
+    });
+  }
+
   const normalizedCheckins = normalizeCheckins(injuryCheckins);
+  for (const c of normalizedCheckins) {
+    validate.uuid(c.injuryId, 'injury id');
+  }
 
   const log = await withTransaction(async (client) => {
     const { rows } = await client.query(
@@ -165,26 +211,24 @@ router.put('/:date', asyncHandler(async (req, res) => {
          recovery = EXCLUDED.recovery, strain = EXCLUDED.strain, steps = EXCLUDED.steps,
          calories = EXCLUDED.calories, notes = EXCLUDED.notes
        RETURNING *`,
-      [req.userId, date, weight ?? null, waist ?? null, sleep ?? null, hrv ?? null, recovery ?? null,
-        strain ?? null, steps ?? null, calories ?? null, notes ?? null]
+      [req.userId, date, cleanWeight, cleanWaist, cleanSleep, cleanHrv, cleanRecovery,
+        cleanStrain, cleanSteps, cleanCalories, cleanNotes]
     );
     const log = rows[0];
 
     await client.query('DELETE FROM daily_log_habits WHERE daily_log_id = $1', [log.id]);
-    for (const h of habits) {
-      if (!h?.habitId) continue;
+    for (const h of cleanHabits) {
       await client.query(
         'INSERT INTO daily_log_habits (daily_log_id, habit_id, completed) VALUES ($1, $2, $3)',
-        [log.id, h.habitId, Boolean(h.completed)]
+        [log.id, h.habitId, h.completed]
       );
     }
 
     await client.query('DELETE FROM daily_log_activities WHERE daily_log_id = $1', [log.id]);
-    for (const a of activities) {
-      if (!a?.activityId && !a?.name) continue;
+    for (const a of cleanActivities) {
       await client.query(
         'INSERT INTO daily_log_activities (daily_log_id, activity_id, name, duration_minutes) VALUES ($1, $2, $3, $4)',
-        [log.id, a.activityId ?? null, a.name ?? null, a.durationMinutes ?? null]
+        [log.id, a.activityId, a.name, a.durationMinutes]
       );
     }
 

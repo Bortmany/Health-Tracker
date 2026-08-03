@@ -9,7 +9,6 @@ export default function Register() {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('consumer');
   // The email message only appears once the field has been visited or the
   // form submitted — nobody wants a red box before they've typed anything.
   const [emailTouched, setEmailTouched] = useState(false);
@@ -22,9 +21,10 @@ export default function Register() {
     e.preventDefault();
     setEmailTouched(true);
     if (emailError(email)) return;
+    // Everyone signs up as a regular account; coach access is granted separately.
     register.mutate(
-      { displayName, email: email.trim(), password, role },
-      { onSuccess: () => navigate(role === 'coach' ? '/clients' : '/onboarding') }
+      { displayName, email: email.trim(), password },
+      { onSuccess: () => navigate('/onboarding') }
     );
   }
 
@@ -70,23 +70,6 @@ export default function Register() {
                 required
               />
             </Field>
-            <span className={styles.roleLabel}>I'm training</span>
-            <div className={styles.roleToggle}>
-              <button
-                type="button"
-                className={`${styles.roleOption} ${role === 'consumer' ? styles.roleOptionActive : ''}`}
-                onClick={() => setRole('consumer')}
-              >
-                I'm training myself
-              </button>
-              <button
-                type="button"
-                className={`${styles.roleOption} ${role === 'coach' ? styles.roleOptionActive : ''}`}
-                onClick={() => setRole('coach')}
-              >
-                I'm a coach
-              </button>
-            </div>
             {register.isError && <ErrorText>{register.error.message}</ErrorText>}
             <Button type="submit" block disabled={register.isPending}>
               {register.isPending ? 'Creating account...' : 'Create account'}

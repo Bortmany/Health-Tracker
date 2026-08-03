@@ -119,6 +119,36 @@ test('registering with a short password is rejected', async () => {
   assert.equal(body.error.code, 'WEAK_PASSWORD');
 });
 
+test('PUT /logs/:date rejects an impossible date instead of crashing', async () => {
+  const res = await fetch(`${baseUrl}/logs/2026-13-45`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ weight: 90 }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.error.code, 'INVALID_INPUT');
+});
+
+test('PUT /logs/:date rejects out-of-range and infinite numbers', async () => {
+  // Raw bodies (not JSON.stringify, which turns Infinity into null): the "1e400"
+  // token parses to Infinity server-side, the exact value that used to be stored
+  // and break the chart. Each of these must be rejected with a 400.
+  for (const body of ['{"weight":"heavy"}', '{"weight":-5}', '{"steps":1e400}', '{"weight":999999}']) {
+    const res = await fetch(`${baseUrl}/logs/2026-01-20`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body,
+    });
+    assert.equal(res.status, 400, `expected ${body} to be rejected`);
+  }
+});
+
+test('GET /logs/:date with a non-date is a clean 400, never a 500', async () => {
+  const res = await fetch(`${baseUrl}/logs/not-a-date`, { headers: { Cookie: cookie } });
+  assert.equal(res.status, 400);
+});
+
 test('a second user cannot read another user\'s log for the same date', async () => {
   const email = `logs-test-other-${Date.now()}@example.com`;
   const registerRes = await fetch(`${baseUrl}/auth/register`, {

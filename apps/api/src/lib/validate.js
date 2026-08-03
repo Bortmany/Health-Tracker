@@ -74,6 +74,28 @@ export function isoDate(value, name = 'date') {
   return value;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// A quick shape check for an id. Used to turn a malformed :id in the URL into a
+// clean "not found" instead of letting Postgres throw a cast error (a 500).
+export function isUuid(value) {
+  return typeof value === 'string' && UUID_RE.test(value);
+}
+
+// An id supplied in a request body (e.g. which program a session belongs to).
+// Pass { optional: true } to allow null/undefined/'' — returns null in that case.
+// A wrongly-shaped id is rejected with a clean 400 instead of a database error.
+export function uuid(value, name = 'id', { optional = false } = {}) {
+  if (value == null || value === '') {
+    if (optional) return null;
+    throw new ValidationError(`${name} is required`);
+  }
+  if (!isUuid(value)) {
+    throw new ValidationError(`${name} must be a valid id`);
+  }
+  return value;
+}
+
 // An address must have something before the @, a domain, and end in a real
 // dot-ending (2+ letters). Deliberately a shape check and NOT a list of
 // allowed providers — work addresses on any domain have to keep working.

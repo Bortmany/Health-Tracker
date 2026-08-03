@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import * as validate from '../lib/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -41,6 +42,10 @@ router.post('/', asyncHandler(async (req, res) => {
 }));
 
 router.patch('/:id', asyncHandler(async (req, res) => {
+  // A mis-shaped id would otherwise throw a Postgres cast error (a 500).
+  if (!validate.isUuid(req.params.id)) {
+    return res.status(404).json({ error: { message: 'Injury not found', code: 'NOT_FOUND' } });
+  }
   const { region, note, archived } = req.body ?? {};
 
   const { rows } = await pool.query(
