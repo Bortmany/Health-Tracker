@@ -28,11 +28,26 @@ import programsRouter from './routes/programs.js';
 import settingsRouter from './routes/settings.js';
 import trainingLogsRouter from './routes/trainingLogs.js';
 
+// Fail fast on a missing or weak JWT secret: a short/absent secret would make
+// login tokens trivially forgeable, so refuse to start rather than run insecure.
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  throw new Error('JWT_SECRET must be set and at least 32 characters long — refusing to start.');
+}
+
 export const app = express();
 
-// Railway (like most hosts) puts a proxy in front of the app. Trusting it means
-// the rate limiter sees each visitor's real address instead of the proxy's.
-app.set('trust proxy', 1);
+// Only trust the X-Forwarded-For header from a proxy we've explicitly configured
+// as trusted. Railway (like most hosts) puts a proxy in front of the app; set
+// TRUSTED_PROXY to the number of proxy hops (e.g. "1") so the rate limiter sees
+// each visitor's real address. Without it we trust nothing and use the direct
+// socket address — otherwise a visitor could spoof X-Forwarded-For to dodge the
+// per-IP rate limits.
+const trustedProxy = process.env.TRUSTED_PROXY;
+if (trustedProxy) {
+  app.set('trust proxy', /^\d+$/.test(trustedProxy) ? Number(trustedProxy) : trustedProxy);
+} else {
+  app.set('trust proxy', false);
+}
 
 // Content-Security-Policy: tells the browser exactly which sources it may load
 // from, which blocks most injected-script attacks. These values are scoped to
@@ -66,14 +81,18 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }));
 
+// Rate limits run in every environment (dev, staging, production). Only the
+// automated test runner turns them off, by setting DISABLE_RATE_LIMIT=true, so
+// the suite isn't throttled — normal dev and staging stay protected.
+const rateLimitDisabled = () => process.env.DISABLE_RATE_LIMIT === 'true';
+
 // Slow down password-guessing: 20 login/register attempts per 15 minutes per IP.
-// Off outside production so local dev and the test suite aren't throttled.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => process.env.NODE_ENV !== 'production',
+  skip: rateLimitDisabled,
   message: { error: { message: 'Too many attempts. Please wait 15 minutes and try again.', code: 'RATE_LIMITED' } },
 });
 app.use('/api/auth', authLimiter);
@@ -83,6 +102,27 @@ app.use('/api/coach-link/redeem', authLimiter);
 // guessing protection as the login screen.
 app.use('/api/account', authLimiter);
 
+// A second login guard keyed on the EMAIL being tried, not just the IP. The
+// per-IP limit above can be dodged by rotating X-Forwarded-For / IP addresses;
+// this one caps attempts against any single account (10 per 15 minutes) so one
+// account can't be brute-forced by an attacker spreading tries across many IPs.
+// `validate: false` turns off the library's IP-format checks so the custom key
+// is safe across versions; the limit still applies.
+const loginEmailLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: (req) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    return email ? `email:${email}` : `ip:${req.ip}`;
+  },
+  skip: rateLimitDisabled,
+  message: { error: { message: 'Too many attempts for this account. Please wait 15 minutes and try again.', code: 'RATE_LIMITED' } },
+});
+app.use('/api/auth/login', loginEmailLimiter);
+
 // Start Sentry error tracking if (and only if) SENTRY_DSN is configured.
 // With no DSN this returns immediately and nothing is imported or sent.
 initSentry();
@@ -90,8 +130,8 @@ initSentry();
 // A second, gentler limiter for the everyday data-writing routes. It keys by the
 // signed-in user when we can read their session cookie (so one user's activity
 // can't use up another's budget), and falls back to the visitor's IP otherwise.
-// Read-only GETs are skipped, and — like the auth limiter — the whole thing is
-// off outside production so local dev and the test suite aren't throttled.
+// Read-only GETs are skipped; otherwise it runs in every environment (only the
+// test runner turns it off via DISABLE_RATE_LIMIT).
 // `validate: false` turns off express-rate-limit's own IP-format checks so the
 // custom key function is safe across library versions; the limits still apply.
 function writeLimiterKey(req) {
@@ -113,7 +153,7 @@ const writeLimiter = rateLimit({
   legacyHeaders: false,
   validate: false,
   keyGenerator: writeLimiterKey,
-  skip: (req) => process.env.NODE_ENV !== 'production' || req.method === 'GET',
+  skip: (req) => rateLimitDisabled() || req.method === 'GET',
   message: { error: { message: 'You are saving changes too quickly. Please slow down and try again shortly.', code: 'RATE_LIMITED' } },
 });
 for (const path of ['/api/logs', '/api/nutrition', '/api/training-logs', '/api/programs', '/api/health-sync']) {

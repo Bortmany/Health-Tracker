@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import * as validate from '../lib/validate.js';
 import { Rollback, withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -39,6 +40,10 @@ router.post('/', asyncHandler(async (req, res) => {
 }));
 
 router.put('/:id', asyncHandler(async (req, res) => {
+  // A mis-shaped id would otherwise throw a Postgres cast error (a 500).
+  if (!validate.isUuid(req.params.id)) {
+    return res.status(404).json({ error: { message: 'Activity not found', code: 'NOT_FOUND' } });
+  }
   const { name, category, defaultDurationMinutes, icon } = req.body ?? {};
 
   const { rows } = await pool.query(
@@ -59,6 +64,9 @@ router.put('/:id', asyncHandler(async (req, res) => {
 }));
 
 router.delete('/:id', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) {
+    return res.status(404).json({ error: { message: 'Activity not found', code: 'NOT_FOUND' } });
+  }
   const found = await withTransaction(async (client) => {
     const { rows: ownedRows } = await client.query(
       'SELECT id FROM activities WHERE id = $1 AND user_id = $2',

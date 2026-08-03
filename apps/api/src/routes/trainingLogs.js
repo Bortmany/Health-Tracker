@@ -2,12 +2,19 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { normalizeExercises } from '../lib/trainingSets.js';
+import * as validate from '../lib/validate.js';
 import { Rollback, withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// A malformed :id in the URL would otherwise reach Postgres as an invalid UUID
+// and throw a 500 — this turns it into a clean "not found".
+function notFound(res) {
+  return res.status(404).json({ error: { message: 'Training log not found', code: 'NOT_FOUND' } });
+}
 
 function toPublicLog(row) {
   return {
@@ -153,12 +160,14 @@ router.get('/personal-records', asyncHandler(async (req, res) => {
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) return notFound(res);
+
   const { rows } = await pool.query('SELECT * FROM training_logs WHERE id = $1 AND user_id = $2', [
     req.params.id,
     req.userId,
   ]);
   if (!rows[0]) {
-    return res.status(404).json({ error: { message: 'Training log not found', code: 'NOT_FOUND' } });
+    return notFound(res);
   }
   const exercises = await fetchNestedExercises(pool, rows[0].id);
   res.json({ trainingLog: { ...toPublicLog(rows[0]), exercises } });
@@ -166,16 +175,24 @@ router.get('/:id', asyncHandler(async (req, res) => {
 
 router.post('/', asyncHandler(async (req, res) => {
   const { date, programId, programDayId, notes, exercises = [] } = req.body ?? {};
-  if (!DATE_RE.test(date ?? '')) {
-    return res.status(400).json({ error: { message: 'date must be YYYY-MM-DD', code: 'INVALID_INPUT' } });
-  }
+  // Reject wrong/impossible dates and mis-shaped program ids before any query.
+  const cleanDate = validate.isoDate(date);
+  const cleanProgramId = validate.uuid(programId, 'program id', { optional: true });
+  const cleanProgramDayId = validate.uuid(programDayId, 'program day id', { optional: true });
+  const cleanNotes = validate.stringLength(notes, 'notes', { optional: true, max: 2000 });
 
   const trainingLog = await withTransaction(async (client) => {
+    // ON CONFLICT keeps a double-tap on "Save" (or two devices saving the same
+    // session at once) from storing duplicate rows: one session per user per day.
     const { rows } = await client.query(
       `INSERT INTO training_logs (user_id, date, program_id, program_day_id, notes)
        VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (user_id, date) DO UPDATE SET
+         program_id = EXCLUDED.program_id,
+         program_day_id = EXCLUDED.program_day_id,
+         notes = EXCLUDED.notes
        RETURNING *`,
-      [req.userId, date, programId ?? null, programDayId ?? null, notes ?? null]
+      [req.userId, cleanDate, cleanProgramId, cleanProgramDayId, cleanNotes]
     );
     await replaceExercises(client, rows[0].id, exercises);
     return rows[0];
@@ -186,10 +203,13 @@ router.post('/', asyncHandler(async (req, res) => {
 }));
 
 router.put('/:id', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) return notFound(res);
+
   const { date, programId, programDayId, notes, exercises } = req.body ?? {};
-  if (date !== undefined && !DATE_RE.test(date)) {
-    return res.status(400).json({ error: { message: 'date must be YYYY-MM-DD', code: 'INVALID_INPUT' } });
-  }
+  const cleanDate = date === undefined ? null : validate.isoDate(date);
+  const cleanProgramId = validate.uuid(programId, 'program id', { optional: true });
+  const cleanProgramDayId = validate.uuid(programDayId, 'program day id', { optional: true });
+  const cleanNotes = validate.stringLength(notes, 'notes', { optional: true, max: 2000 });
 
   const trainingLog = await withTransaction(async (client) => {
     const { rows: ownedRows } = await client.query(
@@ -206,7 +226,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
            notes = COALESCE($5, notes)
        WHERE id = $1
        RETURNING *`,
-      [req.params.id, date ?? null, programId ?? null, programDayId ?? null, notes ?? null]
+      [req.params.id, cleanDate, cleanProgramId, cleanProgramDayId, cleanNotes]
     );
 
     if (exercises) {
@@ -217,19 +237,21 @@ router.put('/:id', asyncHandler(async (req, res) => {
   });
 
   if (!trainingLog) {
-    return res.status(404).json({ error: { message: 'Training log not found', code: 'NOT_FOUND' } });
+    return notFound(res);
   }
   const fullExercises = await fetchNestedExercises(pool, trainingLog.id);
   res.json({ trainingLog: { ...toPublicLog(trainingLog), exercises: fullExercises } });
 }));
 
 router.delete('/:id', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) return notFound(res);
+
   const { rowCount } = await pool.query('DELETE FROM training_logs WHERE id = $1 AND user_id = $2', [
     req.params.id,
     req.userId,
   ]);
   if (!rowCount) {
-    return res.status(404).json({ error: { message: 'Training log not found', code: 'NOT_FOUND' } });
+    return notFound(res);
   }
   res.status(204).end();
 }));

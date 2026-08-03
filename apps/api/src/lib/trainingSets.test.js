@@ -16,11 +16,20 @@ test('normalizeExercises defaults set numbers from array position', () => {
   assert.equal(result[0].sets[1].setNumber, 2);
 });
 
-test('normalizeExercises coerces blank/invalid numeric fields to null', () => {
+test('normalizeExercises treats blank numeric fields as null and parses valid ones', () => {
   const result = normalizeExercises([
-    { name: 'Deadlift', sets: [{ setNumber: 1, weight: '', reps: 'nope', rpe: '8.5' }] },
+    { name: 'Deadlift', sets: [{ setNumber: 1, weight: '', reps: 5, rpe: '8.5' }] },
   ]);
   assert.equal(result[0].sets[0].weight, null);
-  assert.equal(result[0].sets[0].reps, null);
+  assert.equal(result[0].sets[0].reps, 5);
   assert.equal(result[0].sets[0].rpe, 8.5);
+});
+
+test('normalizeExercises rejects text, negative and infinite numbers', () => {
+  // Non-numeric text is no longer silently dropped — it is rejected outright.
+  assert.throws(() => normalizeExercises([{ name: 'Deadlift', sets: [{ reps: 'nope' }] }]), /reps/);
+  // A negative rep count used to sneak in as a fake personal record.
+  assert.throws(() => normalizeExercises([{ name: 'Deadlift', sets: [{ reps: -5 }] }]), /reps/);
+  // 1e400 parses to Infinity, which broke the Progress chart with NaN.
+  assert.throws(() => normalizeExercises([{ name: 'Deadlift', sets: [{ weight: 1e400 }] }]), /weight/);
 });

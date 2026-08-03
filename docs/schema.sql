@@ -145,7 +145,10 @@ CREATE TABLE training_logs (
   program_id UUID REFERENCES programs(id) ON DELETE SET NULL,
   program_day_id UUID REFERENCES program_days(id) ON DELETE SET NULL,
   notes TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- One training session per user per day (added in 016). Lets the save upsert
+  -- instead of storing a duplicate when "Save" is tapped twice.
+  CONSTRAINT training_logs_user_id_date_key UNIQUE (user_id, date)
 );
 
 CREATE INDEX training_logs_user_id_date_idx ON training_logs(user_id, date);
