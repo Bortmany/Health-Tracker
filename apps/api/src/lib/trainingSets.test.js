@@ -33,3 +33,11 @@ test('normalizeExercises rejects text, negative and infinite numbers', () => {
   // 1e400 parses to Infinity, which broke the Progress chart with NaN.
   assert.throws(() => normalizeExercises([{ name: 'Deadlift', sets: [{ weight: 1e400 }] }]), /weight/);
 });
+
+test('normalizeExercises rejects a null or non-object set instead of crashing', () => {
+  // A null (or a bare string/number) inside the sets list used to throw a
+  // TypeError reading set.weight, which surfaced as a 500. It is now a clean 400.
+  assert.throws(() => normalizeExercises([{ name: 'Squat', sets: [null] }]), /set/);
+  assert.throws(() => normalizeExercises([{ name: 'Squat', sets: ['100kg'] }]), /set/);
+  assert.throws(() => normalizeExercises([{ name: 'Squat', sets: [{ weight: 60 }, null] }]), /set/);
+});

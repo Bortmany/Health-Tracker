@@ -73,6 +73,40 @@ test('device data fills empty fields but never overwrites a manual entry', async
   assert.equal(body.log.steps, 5000, 'device data should fill an empty field');
 });
 
+test('POST /health-sync rejects negative readings with a clean 400', async () => {
+  for (const bad of [{ weight: -5 }, { sleep: -2 }, { steps: -100 }, { calories: -50 }]) {
+    const res = await fetch(`${baseUrl}/health-sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ entries: [{ date: '2026-04-10', ...bad }] }),
+    });
+    assert.equal(res.status, 400, `${JSON.stringify(bad)} should be rejected`);
+    const body = await res.json();
+    assert.equal(body.error.code, 'INVALID_INPUT');
+  }
+});
+
+test('POST /health-sync rejects a huge step/calorie count instead of overflowing', async () => {
+  // Values past the integer column limit used to throw a 500; now a clean 400.
+  const res = await fetch(`${baseUrl}/health-sync`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ entries: [{ date: '2026-04-11', steps: 9999999999 }] }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.error.code, 'INVALID_INPUT');
+});
+
+test('POST /health-sync rejects an impossible date', async () => {
+  const res = await fetch(`${baseUrl}/health-sync`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ entries: [{ date: '2026-13-45', steps: 100 }] }),
+  });
+  assert.equal(res.status, 400);
+});
+
 test('POST /health-sync rejects a batch of more than 90 entries', async () => {
   const entries = Array.from({ length: 91 }, (_, i) => ({
     date: `2026-01-${String((i % 28) + 1).padStart(2, '0')}`,

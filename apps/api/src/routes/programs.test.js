@@ -64,6 +64,40 @@ test('PUT /programs/:id replaces days and exercises rather than appending', asyn
   assert.equal(body.program.days[0].exercises[0].name, 'Squat');
 });
 
+test('a malformed program id returns a clean 404, not a server error', async () => {
+  const headers = { 'Content-Type': 'application/json', Cookie: cookie };
+  for (const method of ['GET', 'PUT', 'DELETE']) {
+    const res = await fetch(`${baseUrl}/programs/not-a-real-id`, {
+      method,
+      headers,
+      ...(method === 'PUT' ? { body: JSON.stringify({ name: 'x' }) } : {}),
+    });
+    assert.equal(res.status, 404, `${method} on a bad id should be 404`);
+  }
+});
+
+test('POST /programs rejects a non-list days field with a clean 400', async () => {
+  const res = await fetch(`${baseUrl}/programs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ name: 'Bad Days', days: 'not a list' }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.error.code, 'INVALID_INPUT');
+});
+
+test("POST /programs rejects a day whose exercises isn't a list", async () => {
+  const res = await fetch(`${baseUrl}/programs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ name: 'Bad Exercises', days: [{ name: 'Push', exercises: 'nope' }] }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.error.code, 'INVALID_INPUT');
+});
+
 test('a second user cannot update another user\'s program', async () => {
   const createRes = await fetch(`${baseUrl}/programs`, {
     method: 'POST',

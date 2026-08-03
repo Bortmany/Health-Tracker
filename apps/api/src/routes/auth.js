@@ -2,7 +2,7 @@ import bcrypt from 'bcrypt';
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
-import { signToken } from '../lib/jwt.js';
+import { signToken, verifyTokenPayload } from '../lib/jwt.js';
 import * as validate from '../lib/validate.js';
 import { withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -72,7 +72,7 @@ router.post('/register', asyncHandler(async (req, res) => {
       const { rows } = await client.query(
         `INSERT INTO users (email, password_hash, display_name, role)
          VALUES ($1, $2, $3, 'consumer')
-         RETURNING id, email, display_name, plan_tier, role, created_at`,
+         RETURNING id, email, display_name, plan_tier, role, created_at, token_version`,
         [normalizedEmail, passwordHash, cleanDisplayName]
       );
       await client.query('INSERT INTO user_settings (user_id) VALUES ($1)', [rows[0].id]);
@@ -92,7 +92,7 @@ router.post('/register', asyncHandler(async (req, res) => {
     throw err;
   }
 
-  const token = signToken(user.id);
+  const token = signToken(user.id, user.token_version ?? 0);
   res.cookie('token', token, cookieOptions());
   res.status(201).json({ user: toPublicUser(user) });
 }));
@@ -114,15 +114,27 @@ router.post('/login', asyncHandler(async (req, res) => {
     return res.status(401).json({ error: { message: 'Invalid email or password', code: 'INVALID_CREDENTIALS' } });
   }
 
-  const token = signToken(user.id);
+  const token = signToken(user.id, user.token_version ?? 0);
   res.cookie('token', token, cookieOptions());
   res.json({ user: toPublicUser(user) });
 }));
 
-router.post('/logout', (_req, res) => {
+router.post('/logout', asyncHandler(async (req, res) => {
+  // Server-side revocation: bump this account's token version so the cookie
+  // we're clearing (and any other copy of it that was captured) stops working
+  // immediately, instead of staying valid until its 7-day clock runs out.
+  const token = req.cookies?.token;
+  if (token) {
+    try {
+      const { sub } = verifyTokenPayload(token);
+      await pool.query('UPDATE users SET token_version = token_version + 1 WHERE id = $1', [sub]);
+    } catch {
+      // A missing or already-invalid token has nothing to revoke.
+    }
+  }
   res.clearCookie('token', baseCookieOptions());
   res.status(204).end();
-});
+}));
 
 router.get('/me', requireAuth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);

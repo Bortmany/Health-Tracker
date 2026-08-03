@@ -1,10 +1,17 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import * as validate from '../lib/validate.js';
 import { Rollback, withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
+
+// A malformed :id in the URL would otherwise reach Postgres as an invalid UUID
+// and throw a 500 — this turns it into a clean "not found".
+function notFound(res) {
+  return res.status(404).json({ error: { message: 'Program not found', code: 'NOT_FOUND' } });
+}
 
 function toPublicProgram(row, days) {
   return {
@@ -58,6 +65,12 @@ export async function fetchNestedDays(client, programId) {
 }
 
 export async function replaceDays(client, programId, days) {
+  // A non-list `days` (or a list holding null/garbage) would otherwise crash the
+  // route when we try to iterate it — reject it with a clean 400 instead.
+  if (!Array.isArray(days)) {
+    throw new validate.ValidationError('days must be a list');
+  }
+
   // Deleting the days would silently unlink every past session logged against
   // them (the foreign key sets them to null). Remember the old days and which
   // sessions point at each one, so the links can be moved to the new days.
@@ -82,7 +95,11 @@ export async function replaceDays(client, programId, days) {
     );
     const dayId = rows[0].id;
     newDays.push({ id: dayId, name: day.name });
-    for (const [exIndex, ex] of (day.exercises ?? []).entries()) {
+    const exercises = day.exercises ?? [];
+    if (!Array.isArray(exercises)) {
+      throw new validate.ValidationError('a day\'s exercises must be a list');
+    }
+    for (const [exIndex, ex] of exercises.entries()) {
       if (!ex?.name) continue;
       await client.query(
         `INSERT INTO program_exercises (program_day_id, name, target_sets, target_reps, sort_order)
@@ -138,17 +155,21 @@ router.post('/', asyncHandler(async (req, res) => {
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) return notFound(res);
+
   const { rows } = await pool.query('SELECT * FROM programs WHERE id = $1 AND user_id = $2', [
     req.params.id,
     req.userId,
   ]);
   if (!rows[0]) {
-    return res.status(404).json({ error: { message: 'Program not found', code: 'NOT_FOUND' } });
+    return notFound(res);
   }
   res.json({ program: toPublicProgram(rows[0], await fetchNestedDays(pool, rows[0].id)) });
 }));
 
 router.put('/:id', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) return notFound(res);
+
   const { name, description, archived, days } = req.body ?? {};
 
   const program = await withTransaction(async (client) => {
@@ -178,18 +199,20 @@ router.put('/:id', asyncHandler(async (req, res) => {
   });
 
   if (!program) {
-    return res.status(404).json({ error: { message: 'Program not found', code: 'NOT_FOUND' } });
+    return notFound(res);
   }
   res.json({ program: toPublicProgram(program, await fetchNestedDays(pool, program.id)) });
 }));
 
 router.delete('/:id', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) return notFound(res);
+
   const { rowCount } = await pool.query('DELETE FROM programs WHERE id = $1 AND user_id = $2', [
     req.params.id,
     req.userId,
   ]);
   if (!rowCount) {
-    return res.status(404).json({ error: { message: 'Program not found', code: 'NOT_FOUND' } });
+    return notFound(res);
   }
   res.status(204).end();
 }));
