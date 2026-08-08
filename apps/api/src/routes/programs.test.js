@@ -98,6 +98,17 @@ test("POST /programs rejects a day whose exercises isn't a list", async () => {
   assert.equal(body.error.code, 'INVALID_INPUT');
 });
 
+test('POST /programs rejects an over-length name instead of storing it unbounded', async () => {
+  const res = await fetch(`${baseUrl}/programs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ name: 'x'.repeat(100000) }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.error.code, 'INVALID_INPUT');
+});
+
 test('a second user cannot update another user\'s program', async () => {
   const createRes = await fetch(`${baseUrl}/programs`, {
     method: 'POST',

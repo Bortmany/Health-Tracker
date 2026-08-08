@@ -65,6 +65,24 @@ test('PUT /nutrition/:date on an existing date replaces meals rather than append
   assert.equal(body.meals[0].name, 'Yogurt');
 });
 
+test('GET /nutrition/:date rejects an impossible date with a clean 400, not a 500', async () => {
+  const res = await fetch(`${baseUrl}/nutrition/2026-02-30`, { headers: { Cookie: cookie } });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.match(body.error.message, /real date/);
+});
+
+test('PUT /nutrition/:date rejects an impossible date with a clean 400, not a 500', async () => {
+  const res = await fetch(`${baseUrl}/nutrition/9999-99-99`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ calories: 2000 }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.match(body.error.message, /real date|YYYY-MM-DD/);
+});
+
 test('a second user cannot read another user\'s nutrition log for the same date', async () => {
   const email = `nutrition-test-other-${Date.now()}@example.com`;
   const registerRes = await fetch(`${baseUrl}/auth/register`, {

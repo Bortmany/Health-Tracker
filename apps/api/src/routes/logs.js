@@ -202,6 +202,49 @@ router.put('/:date', asyncHandler(async (req, res) => {
     validate.uuid(c.injuryId, 'injury id');
   }
 
+  // A valid-shaped but non-existent (or someone else's) habit/injury/activity id
+  // would otherwise reach the INSERT below and throw an uncaught foreign key
+  // violation (a 500). Check ownership up front so a bad id gets a clean 400.
+  if (cleanHabits.length) {
+    const { rows: ownedHabits } = await pool.query(
+      'SELECT id FROM habits WHERE user_id = $1 AND id = ANY($2::uuid[])',
+      [req.userId, cleanHabits.map((h) => h.habitId)]
+    );
+    const ownedHabitIds = new Set(ownedHabits.map((r) => r.id));
+    for (const h of cleanHabits) {
+      if (!ownedHabitIds.has(h.habitId)) {
+        throw new validate.ValidationError('habit id must belong to your account');
+      }
+    }
+  }
+
+  const cleanActivityIds = cleanActivities.map((a) => a.activityId).filter(Boolean);
+  if (cleanActivityIds.length) {
+    const { rows: ownedActivities } = await pool.query(
+      'SELECT id FROM activities WHERE user_id = $1 AND id = ANY($2::uuid[])',
+      [req.userId, cleanActivityIds]
+    );
+    const ownedActivityIds = new Set(ownedActivities.map((r) => r.id));
+    for (const id of cleanActivityIds) {
+      if (!ownedActivityIds.has(id)) {
+        throw new validate.ValidationError('activity id must belong to your account');
+      }
+    }
+  }
+
+  if (normalizedCheckins.length) {
+    const { rows: ownedInjuries } = await pool.query(
+      'SELECT id FROM injuries WHERE user_id = $1 AND id = ANY($2::uuid[])',
+      [req.userId, normalizedCheckins.map((c) => c.injuryId)]
+    );
+    const ownedInjuryIds = new Set(ownedInjuries.map((r) => r.id));
+    for (const c of normalizedCheckins) {
+      if (!ownedInjuryIds.has(c.injuryId)) {
+        throw new validate.ValidationError('injury id must belong to your account');
+      }
+    }
+  }
+
   const log = await withTransaction(async (client) => {
     const { rows } = await client.query(
       `INSERT INTO daily_logs (user_id, date, weight, waist, sleep, hrv, recovery, strain, steps, calories, notes)
