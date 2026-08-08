@@ -149,6 +149,51 @@ test('GET /logs/:date with a non-date is a clean 400, never a 500', async () => 
   assert.equal(res.status, 400);
 });
 
+test('PUT /logs/:date rejects a valid-shaped but non-existent habitId with a clean 4xx, not a 500', async () => {
+  const unknownHabitId = '11111111-2222-3333-4444-555555555555';
+  const res = await fetch(`${baseUrl}/logs/2026-01-21`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ habits: [{ habitId: unknownHabitId, completed: true }] }),
+  });
+  assert.ok(res.status >= 400 && res.status < 500, `expected a clean 4xx, got ${res.status}`);
+  const body = await res.json();
+  assert.ok(body.error);
+});
+
+test('PUT /logs/:date rejects an out-of-range pain score instead of silently discarding it', async () => {
+  const res = await fetch(`${baseUrl}/logs/2026-01-22`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ injuryCheckins: [{ injuryId, painPre: 999 }] }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.match(body.error.message, /between 0 and 10/);
+});
+
+test('PUT /logs/:date rejects a wrong-type swelling value instead of silently coercing it', async () => {
+  const res = await fetch(`${baseUrl}/logs/2026-01-23`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ injuryCheckins: [{ injuryId, swelling: 'yes' }] }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.match(body.error.message, /true or false/);
+});
+
+test('a malformed JSON body returns the standard error envelope, not a raw echoed string', async () => {
+  const res = await fetch(`${baseUrl}/logs/2026-01-24`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: '{not valid json',
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.error.code, 'INVALID_JSON');
+});
+
 test('a second user cannot read another user\'s log for the same date', async () => {
   const email = `logs-test-other-${Date.now()}@example.com`;
   const registerRes = await fetch(`${baseUrl}/auth/register`, {

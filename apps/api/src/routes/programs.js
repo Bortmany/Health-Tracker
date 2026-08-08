@@ -139,14 +139,15 @@ router.get('/', asyncHandler(async (req, res) => {
 
 router.post('/', asyncHandler(async (req, res) => {
   const { name, description, days = [] } = req.body ?? {};
-  if (!name) {
-    return res.status(400).json({ error: { message: 'name is required', code: 'INVALID_INPUT' } });
-  }
+  // Caps the name/description like every other text field in the app, so a
+  // runaway request can't stuff an unbounded string into the database.
+  const cleanName = validate.stringLength(name, 'name', { max: 200 });
+  const cleanDescription = validate.stringLength(description, 'description', { optional: true, max: 2000 });
 
   const program = await withTransaction(async (client) => {
     const { rows } = await client.query(
       'INSERT INTO programs (user_id, name, description) VALUES ($1, $2, $3) RETURNING *',
-      [req.userId, name, description ?? null]
+      [req.userId, cleanName, cleanDescription]
     );
     await replaceDays(client, rows[0].id, days);
     return rows[0];
@@ -171,6 +172,9 @@ router.put('/:id', asyncHandler(async (req, res) => {
   if (!validate.isUuid(req.params.id)) return notFound(res);
 
   const { name, description, archived, days } = req.body ?? {};
+  // Same caps as creating a program, so an edit can't stuff in an unbounded string.
+  const cleanName = validate.stringLength(name, 'name', { optional: true, max: 200 });
+  const cleanDescription = validate.stringLength(description, 'description', { optional: true, max: 2000 });
 
   const program = await withTransaction(async (client) => {
     const { rows: ownedRows } = await client.query(
@@ -188,7 +192,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
                                ELSE NULL END
        WHERE id = $1
        RETURNING *`,
-      [req.params.id, name ?? null, description ?? null, archived ?? null]
+      [req.params.id, cleanName, cleanDescription, archived ?? null]
     );
 
     if (days) {

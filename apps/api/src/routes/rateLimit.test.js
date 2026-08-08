@@ -54,3 +54,30 @@ test('a different account is not blocked by another account being rate-limited',
   const res = await login(`ratelimit-other-${Date.now()}@example.com`);
   assert.equal(res.status, 401);
 });
+
+test('flooding login does not use up register\'s budget (separate per-IP buckets)', async () => {
+  // The per-IP login limit is 20 in 15 minutes. Use 21 different emails so the
+  // per-account guard (10/account) never kicks in — only the per-IP login
+  // limiter should trip, and only for /login.
+  let blocked = null;
+  for (let i = 0; i < 21; i += 1) {
+    const res = await login(`ratelimit-ip-flood-${Date.now()}-${i}@example.com`);
+    if (res.status === 429) {
+      blocked = res;
+      break;
+    }
+  }
+  assert.ok(blocked, 'login should eventually be blocked by the per-IP limiter');
+
+  // Registration from the same IP should be unaffected — it has its own budget.
+  const registerRes = await fetch(`${baseUrl}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: `ratelimit-register-still-works-${Date.now()}@example.com`,
+      password: 'a-decent-password',
+      displayName: 'Rate Limit Test',
+    }),
+  });
+  assert.equal(registerRes.status, 201);
+});

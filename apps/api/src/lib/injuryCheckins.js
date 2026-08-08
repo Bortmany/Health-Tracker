@@ -1,23 +1,38 @@
-function clampPain(value) {
+import { ValidationError } from './validate.js';
+
+// A pain score is optional, but if given it must be a real 0-10 number — not
+// silently clamped into range, since a clamped value can hide a client bug
+// (e.g. a stray "13") behind a plausible-looking 10.
+function cleanPainScore(value, name) {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
-  if (Number.isNaN(n)) return null;
-  return Math.min(10, Math.max(0, Math.round(n)));
+  if (!Number.isFinite(n)) {
+    throw new ValidationError(`${name} must be a number between 0 and 10`);
+  }
+  if (n < 0 || n > 10) {
+    throw new ValidationError(`${name} must be between 0 and 10`);
+  }
+  return Math.round(n);
 }
 
-function toNullableBoolean(value) {
-  if (value === null || value === undefined) return null;
-  return Boolean(value);
+// A tri-state flag: null/undefined/'' means "not answered"; anything else
+// must be an actual boolean, not a string or number standing in for one.
+function cleanFlag(value, name) {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'boolean') {
+    throw new ValidationError(`${name} must be true or false`);
+  }
+  return value;
 }
 
 export function normalizeCheckin(raw) {
   return {
     injuryId: raw.injuryId,
-    painPre: clampPain(raw.painPre),
-    painDuring: clampPain(raw.painDuring),
-    painPost: clampPain(raw.painPost),
-    swelling: toNullableBoolean(raw.swelling),
-    canTrainTomorrow: toNullableBoolean(raw.canTrainTomorrow),
+    painPre: cleanPainScore(raw.painPre, 'pain pre'),
+    painDuring: cleanPainScore(raw.painDuring, 'pain during'),
+    painPost: cleanPainScore(raw.painPost, 'pain post'),
+    swelling: cleanFlag(raw.swelling, 'swelling'),
+    canTrainTomorrow: cleanFlag(raw.canTrainTomorrow, 'can train tomorrow'),
   };
 }
 

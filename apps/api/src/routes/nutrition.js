@@ -48,10 +48,9 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 router.get('/:date', asyncHandler(async (req, res) => {
-  const { date } = req.params;
-  if (!DATE_RE.test(date)) {
-    return res.status(400).json({ error: { message: 'date must be YYYY-MM-DD', code: 'INVALID_INPUT' } });
-  }
+  // Rejects both wrong shapes and impossible-but-well-shaped dates (e.g.
+  // 2026-02-30) with a clean 400 instead of letting Postgres throw a 500.
+  const date = validate.isoDate(req.params.date);
 
   const { rows: logRows } = await pool.query(
     'SELECT * FROM nutrition_logs WHERE user_id = $1 AND date = $2',
@@ -67,10 +66,8 @@ router.get('/:date', asyncHandler(async (req, res) => {
 }));
 
 router.put('/:date', asyncHandler(async (req, res) => {
-  const { date } = req.params;
-  if (!DATE_RE.test(date)) {
-    return res.status(400).json({ error: { message: 'date must be YYYY-MM-DD', code: 'INVALID_INPUT' } });
-  }
+  // Rejects impossible dates (e.g. 2026-02-30) with a 400 before any query runs.
+  const date = validate.isoDate(req.params.date);
 
   const { calories, protein, carbs, fat, notes, meals = [] } = req.body ?? {};
 

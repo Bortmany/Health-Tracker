@@ -89,16 +89,34 @@ app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', crede
 // the suite isn't throttled — normal dev and staging stay protected.
 const rateLimitDisabled = () => process.env.DISABLE_RATE_LIMIT === 'true';
 
-// Slow down password-guessing: 20 login/register attempts per 15 minutes per IP.
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: rateLimitDisabled,
-  message: { error: { message: 'Too many attempts. Please wait 15 minutes and try again.', code: 'RATE_LIMITED' } },
-});
-app.use('/api/auth', authLimiter);
+// Slow down password-guessing: 20 attempts per 15 minutes per IP. Login and
+// register each get their OWN budget (separate limiter instances, so separate
+// counters) — sharing one bucket meant flooding /login could exhaust the
+// budget for /register too (and vice versa), denying both to everyone else
+// behind the same IP (e.g. shared office wifi or CGNAT). The per-account
+// login lock below still caps guesses against any one email regardless of IP.
+function makeAuthLimiter(message) {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: rateLimitDisabled,
+    message: { error: { message, code: 'RATE_LIMITED' } },
+  });
+}
+const loginIpLimiter = makeAuthLimiter('Too many login attempts. Please wait 15 minutes and try again.');
+const registerLimiter = makeAuthLimiter('Too many attempts. Please wait 15 minutes and try again.');
+// The other password/code-guessing surfaces (logout, me, invite-code redeem,
+// account deletion) share their own separate bucket.
+const authLimiter = makeAuthLimiter('Too many attempts. Please wait 15 minutes and try again.');
+// Registered as exact/literal paths (not the whole '/api/auth' prefix) so a
+// login or register request only ever counts against its own limiter, never
+// falling through into the shared authLimiter below as well.
+app.use('/api/auth/login', loginIpLimiter);
+app.use('/api/auth/register', registerLimiter);
+app.use('/api/auth/logout', authLimiter);
+app.use('/api/auth/me', authLimiter);
 // Invite codes get the same guessing protection as passwords.
 app.use('/api/coach-link/redeem', authLimiter);
 // Deleting an account asks for your password first, so it gets the same
@@ -207,6 +225,17 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 app.use((err, req, res, _next) => {
+  // Malformed JSON (bad syntax the client sent) throws a body-parser SyntaxError
+  // — checked first because body-parser also sets `.status` and `.body` on it
+  // (the raw offending text, for debugging), which would otherwise match the
+  // "already has a clean body" check just below and echo that raw text back to
+  // the client as if it were the response body.
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    logger.warn('Malformed JSON body', { method: req.method, path: req.path });
+    return res.status(400).json({
+      error: { message: 'That request could not be read. Please try again.', code: 'INVALID_JSON' },
+    });
+  }
   // Validation helpers throw an error that already carries a 400 and a
   // plain-English body — surface that to the client instead of a generic 500.
   if (err && err.status && err.body) {
