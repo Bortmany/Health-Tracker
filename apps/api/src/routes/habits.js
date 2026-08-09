@@ -28,15 +28,20 @@ router.get('/', asyncHandler(async (req, res) => {
 
 router.post('/', asyncHandler(async (req, res) => {
   const { label, description, sortOrder } = req.body ?? {};
-  if (!label) {
-    return res.status(400).json({ error: { message: 'label is required', code: 'INVALID_INPUT' } });
-  }
+  // Cap the free-text fields and make sure sortOrder is a real whole number, so
+  // a non-numeric or overflow value fails with a clean 400 instead of reaching
+  // the INTEGER column and throwing a Postgres error (a 500).
+  const cleanLabel = validate.stringLength(label, 'label', { max: 200 });
+  const cleanDescription = validate.stringLength(description, 'description', { optional: true, max: 2000 });
+  const cleanSortOrder = validate.nonNegativeNumber(sortOrder, 'sortOrder', {
+    optional: true, integer: true, max: 100000,
+  });
 
   const { rows } = await pool.query(
     `INSERT INTO habits (user_id, label, description, sort_order)
      VALUES ($1, $2, $3, $4)
      RETURNING *`,
-    [req.userId, label, description ?? null, sortOrder ?? 0]
+    [req.userId, cleanLabel, cleanDescription, cleanSortOrder ?? 0]
   );
   res.status(201).json({ habit: toPublicHabit(rows[0]) });
 }));
@@ -47,6 +52,15 @@ router.put('/:id', asyncHandler(async (req, res) => {
     return res.status(404).json({ error: { message: 'Habit not found', code: 'NOT_FOUND' } });
   }
   const { label, description, sortOrder, archived } = req.body ?? {};
+  // Validate every field before it reaches the typed columns: text stays inside
+  // sane length caps, sortOrder must be a whole number, and archived must be a
+  // real boolean (a string/number here would blow up the `$6::boolean` cast).
+  const cleanLabel = validate.stringLength(label, 'label', { optional: true, max: 200 });
+  const cleanDescription = validate.stringLength(description, 'description', { optional: true, max: 2000 });
+  const cleanSortOrder = validate.nonNegativeNumber(sortOrder, 'sortOrder', {
+    optional: true, integer: true, max: 100000,
+  });
+  const cleanArchived = validate.boolean(archived, 'archived', { optional: true });
 
   const { rows } = await pool.query(
     `UPDATE habits
@@ -58,7 +72,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
                              ELSE NULL END
      WHERE id = $1 AND user_id = $2
      RETURNING *`,
-    [req.params.id, req.userId, label ?? null, description ?? null, sortOrder ?? null, archived ?? null]
+    [req.params.id, req.userId, cleanLabel, cleanDescription, cleanSortOrder, cleanArchived]
   );
 
   if (!rows[0]) {

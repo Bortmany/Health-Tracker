@@ -8,8 +8,6 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
 // A malformed :id would otherwise reach Postgres as an invalid UUID and throw a
 // 500 — this turns it into a clean "not found".
 function planNotFound(res) {
@@ -120,9 +118,13 @@ router.post('/templates/:id/adopt', asyncHandler(async (req, res) => {
   }
   const durationWeeks = requestedWeeks > 4 ? 52 : 4;
 
-  const startDate = DATE_RE.test(req.body?.startDate ?? '')
-    ? req.body.startDate
-    : new Date().toISOString().slice(0, 10);
+  // If no start date is given, default to today. If one IS given, run it through
+  // the real-calendar validator so an impossible-but-well-shaped date (e.g.
+  // 2026-13-45) fails with a clean 400 instead of a Postgres date error (a 500).
+  const rawStartDate = req.body?.startDate;
+  const startDate = rawStartDate == null || rawStartDate === ''
+    ? new Date().toISOString().slice(0, 10)
+    : validate.isoDate(rawStartDate, 'startDate');
 
   const days = await fetchTemplateDays(template.id);
 

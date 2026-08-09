@@ -89,22 +89,42 @@ export async function replaceDays(client, programId, days) {
   const newDays = [];
   for (const [dayIndex, day] of days.entries()) {
     if (!day?.name) continue;
+    // Cap the day name and make sure its order is a whole number before either
+    // reaches its column.
+    const dayName = validate.stringLength(day.name, 'day name', { max: 200 });
+    const daySortOrder = validate.nonNegativeNumber(day.sortOrder ?? dayIndex, 'day order', {
+      integer: true, max: 10000,
+    });
     const { rows } = await client.query(
       'INSERT INTO program_days (program_id, name, sort_order) VALUES ($1, $2, $3) RETURNING id',
-      [programId, day.name, day.sortOrder ?? dayIndex]
+      [programId, dayName, daySortOrder]
     );
     const dayId = rows[0].id;
-    newDays.push({ id: dayId, name: day.name });
+    newDays.push({ id: dayId, name: dayName });
     const exercises = day.exercises ?? [];
     if (!Array.isArray(exercises)) {
       throw new validate.ValidationError('a day\'s exercises must be a list');
     }
     for (const [exIndex, ex] of exercises.entries()) {
       if (!ex?.name) continue;
+      // target sets/reps go into INTEGER columns: a non-numeric or overflow
+      // value here (from POST/PUT or the coach "assign program" route that
+      // reuses this) would otherwise throw a Postgres error (a 500). Validate
+      // them, along with the exercise name cap and its sort order.
+      const exName = validate.stringLength(ex.name, 'exercise name', { max: 200 });
+      const targetSets = validate.nonNegativeNumber(ex.targetSets, 'target sets', {
+        optional: true, integer: true, max: 1000,
+      });
+      const targetReps = validate.nonNegativeNumber(ex.targetReps, 'target reps', {
+        optional: true, integer: true, max: 10000,
+      });
+      const exSortOrder = validate.nonNegativeNumber(ex.sortOrder ?? exIndex, 'exercise order', {
+        integer: true, max: 10000,
+      });
       await client.query(
         `INSERT INTO program_exercises (program_day_id, name, target_sets, target_reps, sort_order)
          VALUES ($1, $2, $3, $4, $5)`,
-        [dayId, ex.name, ex.targetSets ?? null, ex.targetReps ?? null, ex.sortOrder ?? exIndex]
+        [dayId, exName, targetSets, targetReps, exSortOrder]
       );
     }
   }

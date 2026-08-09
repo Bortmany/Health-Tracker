@@ -61,6 +61,32 @@ async function fetchNestedExercises(client, trainingLogId) {
   );
 }
 
+// A well-shaped but foreign/non-existent program or day id would otherwise reach
+// the INSERT and throw a foreign-key violation (a 500). Check ownership up front
+// so a bad id gets a clean 400 — mirrors how logs.js guards habit/activity ids.
+async function assertOwnedProgramRefs(userId, programId, programDayId) {
+  if (programId) {
+    const { rows } = await pool.query(
+      'SELECT id FROM programs WHERE id = $1 AND user_id = $2',
+      [programId, userId]
+    );
+    if (!rows[0]) {
+      throw new validate.ValidationError('program id must belong to your account');
+    }
+  }
+  if (programDayId) {
+    const { rows } = await pool.query(
+      `SELECT pd.id FROM program_days pd
+       JOIN programs p ON p.id = pd.program_id
+       WHERE pd.id = $1 AND p.user_id = $2`,
+      [programDayId, userId]
+    );
+    if (!rows[0]) {
+      throw new validate.ValidationError('program day id must belong to your account');
+    }
+  }
+}
+
 async function replaceExercises(client, trainingLogId, exercises) {
   await client.query('DELETE FROM training_log_exercises WHERE training_log_id = $1', [trainingLogId]);
   for (const ex of normalizeExercises(exercises)) {
@@ -180,6 +206,7 @@ router.post('/', asyncHandler(async (req, res) => {
   const cleanProgramId = validate.uuid(programId, 'program id', { optional: true });
   const cleanProgramDayId = validate.uuid(programDayId, 'program day id', { optional: true });
   const cleanNotes = validate.stringLength(notes, 'notes', { optional: true, max: 2000 });
+  await assertOwnedProgramRefs(req.userId, cleanProgramId, cleanProgramDayId);
 
   const trainingLog = await withTransaction(async (client) => {
     // ON CONFLICT keeps a double-tap on "Save" (or two devices saving the same
@@ -210,6 +237,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
   const cleanProgramId = validate.uuid(programId, 'program id', { optional: true });
   const cleanProgramDayId = validate.uuid(programDayId, 'program day id', { optional: true });
   const cleanNotes = validate.stringLength(notes, 'notes', { optional: true, max: 2000 });
+  await assertOwnedProgramRefs(req.userId, cleanProgramId, cleanProgramDayId);
 
   const trainingLog = await withTransaction(async (client) => {
     const { rows: ownedRows } = await client.query(

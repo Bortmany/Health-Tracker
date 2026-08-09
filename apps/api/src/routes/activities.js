@@ -26,15 +26,21 @@ router.get('/', asyncHandler(async (req, res) => {
 
 router.post('/', asyncHandler(async (req, res) => {
   const { name, category, defaultDurationMinutes, icon } = req.body ?? {};
-  if (!name) {
-    return res.status(400).json({ error: { message: 'name is required', code: 'INVALID_INPUT' } });
-  }
+  // Cap the free-text fields and make sure the duration is a real whole number,
+  // so a non-numeric or overflow value fails with a clean 400 instead of
+  // reaching the INTEGER column and throwing a Postgres error (a 500).
+  const cleanName = validate.stringLength(name, 'name', { max: 200 });
+  const cleanCategory = validate.stringLength(category, 'category', { optional: true, max: 100 });
+  const cleanIcon = validate.stringLength(icon, 'icon', { optional: true, max: 100 });
+  const cleanDuration = validate.nonNegativeNumber(defaultDurationMinutes, 'defaultDurationMinutes', {
+    optional: true, integer: true, max: 100000,
+  });
 
   const { rows } = await pool.query(
     `INSERT INTO activities (user_id, name, category, default_duration_minutes, icon)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING *`,
-    [req.userId, name, category ?? null, defaultDurationMinutes ?? null, icon ?? null]
+    [req.userId, cleanName, cleanCategory, cleanDuration, cleanIcon]
   );
   res.status(201).json({ activity: toPublicActivity(rows[0]) });
 }));
@@ -45,6 +51,14 @@ router.put('/:id', asyncHandler(async (req, res) => {
     return res.status(404).json({ error: { message: 'Activity not found', code: 'NOT_FOUND' } });
   }
   const { name, category, defaultDurationMinutes, icon } = req.body ?? {};
+  // Same caps and numeric guard as creating an activity, so an edit can't stuff
+  // in an unbounded string or a non-numeric duration.
+  const cleanName = validate.stringLength(name, 'name', { optional: true, max: 200 });
+  const cleanCategory = validate.stringLength(category, 'category', { optional: true, max: 100 });
+  const cleanIcon = validate.stringLength(icon, 'icon', { optional: true, max: 100 });
+  const cleanDuration = validate.nonNegativeNumber(defaultDurationMinutes, 'defaultDurationMinutes', {
+    optional: true, integer: true, max: 100000,
+  });
 
   const { rows } = await pool.query(
     `UPDATE activities
@@ -54,7 +68,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
          icon = COALESCE($6, icon)
      WHERE id = $1 AND user_id = $2
      RETURNING *`,
-    [req.params.id, req.userId, name ?? null, category ?? null, defaultDurationMinutes ?? null, icon ?? null]
+    [req.params.id, req.userId, cleanName, cleanCategory, cleanDuration, cleanIcon]
   );
 
   if (!rows[0]) {

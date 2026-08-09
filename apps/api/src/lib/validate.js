@@ -60,6 +60,21 @@ export function stringLength(value, name, { min = 1, max = 255, optional = false
   return trimmed;
 }
 
+// A real boolean. Passing a string ('true'), a number (1) or anything else is
+// rejected with a clean 400 instead of reaching a Postgres `$n::boolean` cast
+// that would throw a runtime error (a 500).
+// Pass { optional: true } to allow null/undefined/'' — returns null in that case.
+export function boolean(value, name, { optional = false } = {}) {
+  if (value == null || value === '') {
+    if (optional) return null;
+    throw new ValidationError(`${name} is required`);
+  }
+  if (typeof value !== 'boolean') {
+    throw new ValidationError(`${name} must be true or false`);
+  }
+  return value;
+}
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // A real calendar date in YYYY-MM-DD form (rejects e.g. 2026-13-40).
