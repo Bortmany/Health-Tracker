@@ -37,5 +37,12 @@ export function normalizeCheckin(raw) {
 }
 
 export function normalizeCheckins(rawList) {
-  return (rawList ?? []).filter((c) => c?.injuryId).map(normalizeCheckin);
+  // A non-array `injuryCheckins` (e.g. a string or object) would otherwise crash
+  // the moment we call .filter on it — reject it with a clean 400 instead, the
+  // same way habits/activities are guarded in the daily-log route.
+  const list = rawList ?? [];
+  if (!Array.isArray(list)) {
+    throw new ValidationError('injury check-ins must be a list');
+  }
+  return list.filter((c) => c?.injuryId).map(normalizeCheckin);
 }

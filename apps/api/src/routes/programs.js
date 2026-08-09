@@ -195,6 +195,8 @@ router.put('/:id', asyncHandler(async (req, res) => {
   // Same caps as creating a program, so an edit can't stuff in an unbounded string.
   const cleanName = validate.stringLength(name, 'name', { optional: true, max: 200 });
   const cleanDescription = validate.stringLength(description, 'description', { optional: true, max: 2000 });
+  // A string/number here would blow up the `$4::boolean` cast into a 500 — require a real boolean.
+  const cleanArchived = validate.boolean(archived, 'archived', { optional: true });
 
   const program = await withTransaction(async (client) => {
     const { rows: ownedRows } = await client.query(
@@ -212,7 +214,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
                                ELSE NULL END
        WHERE id = $1
        RETURNING *`,
-      [req.params.id, cleanName, cleanDescription, archived ?? null]
+      [req.params.id, cleanName, cleanDescription, cleanArchived]
     );
 
     if (days) {

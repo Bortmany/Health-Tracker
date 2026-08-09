@@ -8,8 +8,6 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
 // A malformed :id in the URL would otherwise reach Postgres as an invalid UUID
 // and throw a 500 — this turns it into a clean "not found".
 function notFound(res) {
@@ -108,8 +106,8 @@ async function replaceExercises(client, trainingLogId, exercises) {
 router.use(requireAuth);
 
 router.get('/', asyncHandler(async (req, res) => {
-  const from = DATE_RE.test(req.query.from) ? req.query.from : '1970-01-01';
-  const to = DATE_RE.test(req.query.to) ? req.query.to : '9999-12-31';
+  const from = validate.queryDate(req.query.from, 'from', '1970-01-01');
+  const to = validate.queryDate(req.query.to, 'to', '9999-12-31');
 
   // Includes how many exercises each session holds, so the list can show
   // "5 exercises" without loading every session's full detail.
@@ -129,9 +127,11 @@ router.get('/', asyncHandler(async (req, res) => {
 // time" weight/reps before the user enters today's sets.
 router.get('/exercise-history', asyncHandler(async (req, res) => {
   const { name, before } = req.query;
-  if (!name) {
-    return res.status(400).json({ error: { message: 'name is required', code: 'INVALID_INPUT' } });
-  }
+  // name must be real text (an array/object here would break the `te.name = $2`
+  // text comparison), and `before` must be a well-shaped id or the `$3::uuid`
+  // cast throws a 500 — validate both before the query runs.
+  const cleanName = validate.stringLength(name, 'name', { max: 200 });
+  const cleanBefore = validate.uuid(before, 'before', { optional: true });
 
   const { rows } = await pool.query(
     `SELECT tl.id AS training_log_id, tl.date, te.id AS exercise_id, te.name
@@ -140,7 +140,7 @@ router.get('/exercise-history', asyncHandler(async (req, res) => {
      WHERE tl.user_id = $1 AND te.name = $2 AND tl.id != COALESCE($3::uuid, '00000000-0000-0000-0000-000000000000')
      ORDER BY tl.date DESC, tl.created_at DESC
      LIMIT 1`,
-    [req.userId, name, before ?? null]
+    [req.userId, cleanName, cleanBefore]
   );
 
   const entry = rows[0];

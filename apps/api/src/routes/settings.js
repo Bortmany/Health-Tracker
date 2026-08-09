@@ -48,6 +48,13 @@ router.put('/', asyncHandler(async (req, res) => {
   const cleanSleepGoal = validate.nonNegativeNumber(sleepGoal, 'sleep goal', { optional: true, max: 24 });
   const cleanDaysPerWeek = validate.nonNegativeNumber(daysPerWeek, 'days per week', { optional: true, integer: true, max: 7 });
 
+  // These three columns each carry a Postgres CHECK constraint. An unknown value
+  // would otherwise reach the column and throw a CHECK violation (a 500) — reject
+  // anything outside the allowed set with a clean 400. Lists mirror docs/schema.sql.
+  const cleanExperienceLevel = validate.oneOf(experienceLevel, ['beginner', 'intermediate', 'advanced'], 'experience level', { optional: true });
+  const cleanTrainingGoal = validate.oneOf(trainingGoal, ['calisthenics', 'powerlifting', 'cardio', 'hypertrophy', 'general'], 'training goal', { optional: true });
+  const cleanEquipment = validate.oneOf(equipment, ['none', 'minimal', 'full_gym'], 'equipment', { optional: true });
+
   // The quiz fields keep their old values when a form doesn't send them,
   // so the plain settings form can't wipe out someone's quiz answers.
   const { rows } = await pool.query(
@@ -60,7 +67,7 @@ router.put('/', asyncHandler(async (req, res) => {
      WHERE user_id = $1
      RETURNING *`,
     [req.userId, cleanStartWeight, cleanTargetWeight, cleanTargetDate, cleanHeight, cleanAge, cleanStepGoal, cleanSleepGoal,
-      experienceLevel ?? null, trainingGoal ?? null, equipment ?? null, cleanDaysPerWeek]
+      cleanExperienceLevel, cleanTrainingGoal, cleanEquipment, cleanDaysPerWeek]
   );
 
   res.json({ settings: toPublicSettings(rows[0]) });

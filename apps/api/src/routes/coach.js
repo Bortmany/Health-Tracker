@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import * as validate from '../lib/validate.js';
 import { Rollback, withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireCoach } from '../middleware/requireCoach.js';
@@ -19,6 +20,12 @@ function toPublicProgram(row, days) {
     fromCoach: row.created_by_coach_id != null,
     days,
   };
+}
+
+// A malformed id in the URL would otherwise reach Postgres as an invalid UUID
+// and throw a 500 — this turns it into a clean "not found".
+function clientNotFound(res) {
+  return res.status(404).json({ error: { message: 'Client not found', code: 'NOT_FOUND' } });
 }
 
 function generateInviteCode() {
@@ -77,6 +84,9 @@ router.post('/invites', asyncHandler(async (req, res) => {
 }));
 
 router.delete('/clients/:linkId', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.linkId)) {
+    return res.status(404).json({ error: { message: 'Client link not found', code: 'NOT_FOUND' } });
+  }
   const { rowCount } = await pool.query(
     'DELETE FROM coach_clients WHERE id = $1 AND coach_id = $2',
     [req.params.linkId, req.userId]
@@ -88,9 +98,10 @@ router.delete('/clients/:linkId', asyncHandler(async (req, res) => {
 }));
 
 router.get('/clients/:clientId/summary', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.clientId)) return clientNotFound(res);
   const link = await findActiveLink(req.userId, req.params.clientId);
   if (!link) {
-    return res.status(404).json({ error: { message: 'Client not found', code: 'NOT_FOUND' } });
+    return clientNotFound(res);
   }
 
   const { rows: userRows } = await pool.query('SELECT display_name FROM users WHERE id = $1', [
@@ -134,21 +145,23 @@ router.get('/clients/:clientId/summary', asyncHandler(async (req, res) => {
 }));
 
 router.post('/clients/:clientId/programs', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.clientId)) return clientNotFound(res);
   const link = await findActiveLink(req.userId, req.params.clientId);
   if (!link) {
-    return res.status(404).json({ error: { message: 'Client not found', code: 'NOT_FOUND' } });
+    return clientNotFound(res);
   }
 
   const { name, description, days = [] } = req.body ?? {};
-  if (!name) {
-    return res.status(400).json({ error: { message: 'name is required', code: 'INVALID_INPUT' } });
-  }
+  // Cap the free-text fields (and reject a non-string name) before they reach
+  // the text columns, the same way the consumer program route does.
+  const cleanName = validate.stringLength(name, 'name', { max: 200 });
+  const cleanDescription = validate.stringLength(description, 'description', { optional: true, max: 2000 });
 
   const program = await withTransaction(async (client) => {
     const { rows } = await client.query(
       `INSERT INTO programs (user_id, name, description, created_by_coach_id)
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      [req.params.clientId, name, description ?? null, req.userId]
+      [req.params.clientId, cleanName, cleanDescription, req.userId]
     );
     await replaceDays(client, rows[0].id, days);
     return rows[0];
@@ -157,12 +170,21 @@ router.post('/clients/:clientId/programs', asyncHandler(async (req, res) => {
 }));
 
 router.put('/clients/:clientId/programs/:programId', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.clientId)) return clientNotFound(res);
+  if (!validate.isUuid(req.params.programId)) {
+    return res.status(404).json({ error: { message: 'Program not found', code: 'NOT_FOUND' } });
+  }
   const link = await findActiveLink(req.userId, req.params.clientId);
   if (!link) {
-    return res.status(404).json({ error: { message: 'Client not found', code: 'NOT_FOUND' } });
+    return clientNotFound(res);
   }
 
   const { name, description, archived, days } = req.body ?? {};
+  // Cap the text fields and require a real boolean for archived — a string/number
+  // here would blow up the `$4::boolean` cast into a 500 (same fix as programs.js).
+  const cleanName = validate.stringLength(name, 'name', { optional: true, max: 200 });
+  const cleanDescription = validate.stringLength(description, 'description', { optional: true, max: 2000 });
+  const cleanArchived = validate.boolean(archived, 'archived', { optional: true });
 
   const program = await withTransaction(async (client) => {
     const { rows: ownedRows } = await client.query(
@@ -181,7 +203,7 @@ router.put('/clients/:clientId/programs/:programId', asyncHandler(async (req, re
                                ELSE NULL END
        WHERE id = $1
        RETURNING *`,
-      [req.params.programId, name ?? null, description ?? null, archived ?? null]
+      [req.params.programId, cleanName, cleanDescription, cleanArchived]
     );
 
     if (days) {
