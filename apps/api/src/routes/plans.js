@@ -65,7 +65,10 @@ router.get('/templates', asyncHandler(async (req, res) => {
   const filters = [];
   const params = [];
   for (const key of ['goal', 'experience', 'equipment']) {
-    if (req.query[key]) {
+    // Only accept a plain string. A repeated param (?goal=a&goal=b) arrives as an
+    // array, which would bind as text[] and break the `key = $n` text comparison
+    // (a 500) — ignore anything that isn't a single string value.
+    if (typeof req.query[key] === 'string' && req.query[key]) {
       params.push(req.query[key]);
       filters.push(`${key} = $${params.length}`);
     }

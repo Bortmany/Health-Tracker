@@ -7,7 +7,6 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // Guard against a runaway request stuffing thousands of rows into one day.
 const MAX_MEALS = 50;
 
@@ -37,8 +36,8 @@ function toPublicMeal(row) {
 router.use(requireAuth);
 
 router.get('/', asyncHandler(async (req, res) => {
-  const from = DATE_RE.test(req.query.from) ? req.query.from : '1970-01-01';
-  const to = DATE_RE.test(req.query.to) ? req.query.to : '9999-12-31';
+  const from = validate.queryDate(req.query.from, 'from', '1970-01-01');
+  const to = validate.queryDate(req.query.to, 'to', '9999-12-31');
 
   const { rows } = await pool.query(
     'SELECT * FROM nutrition_logs WHERE user_id = $1 AND date BETWEEN $2 AND $3 ORDER BY date',

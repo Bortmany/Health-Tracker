@@ -10,8 +10,14 @@ router.use(requireAuth);
 
 router.post('/redeem', asyncHandler(async (req, res) => {
   const { code } = req.body ?? {};
-  if (!code) {
+  // Must be plain text: an array/object here would bind as a non-text value and
+  // break the `invite_code = $1` comparison (a 500). A cap also keeps a runaway
+  // value from reaching the query. Codes are short, so 100 chars is generous.
+  if (typeof code !== 'string' || code.trim() === '') {
     return res.status(400).json({ error: { message: 'code is required', code: 'INVALID_INPUT' } });
+  }
+  if (code.length > 100) {
+    return res.status(400).json({ error: { message: 'That invite code is not valid', code: 'INVALID_INPUT' } });
   }
 
   // Everything runs in one transaction with the invite row locked, so two

@@ -62,6 +62,9 @@ function patch(path, body) {
     body: JSON.stringify(body),
   });
 }
+function get(path) {
+  return fetch(`${baseUrl}${path}`, { headers: { Cookie: cookie } });
+}
 
 // A well-formed UUID that belongs to no one — the shape check passes, so it
 // reaches the ownership/FK guards we're testing.
@@ -138,6 +141,79 @@ test('POST /training-logs rejects a foreign/nonexistent programId with 400, not 
 
 test('POST /training-logs rejects a foreign/nonexistent programDayId with 400, not a FK 500', async () => {
   const res = await post('/training-logs', { date: '2026-03-02', programDayId: FOREIGN_UUID });
+  assert.equal(res.status, 400);
+});
+
+// --- round 3: daily-log injury check-ins ------------------------------------
+
+test('PUT /logs/:date rejects a non-array injuryCheckins with 400, not 500', async () => {
+  const res = await put('/logs/2026-03-05', { injuryCheckins: 'nope' });
+  assert.equal(res.status, 400);
+});
+
+// --- round 3: program archived boolean --------------------------------------
+
+test('PUT /programs/:id rejects a non-boolean archived with 400, not 500', async () => {
+  const created = await (await post('/programs', { name: 'Archive me' })).json();
+  const res = await put(`/programs/${created.program.id}`, { archived: 'yes' });
+  assert.equal(res.status, 400);
+});
+
+// --- round 3: calendar-impossible QUERY dates -------------------------------
+
+test('GET /logs rejects a calendar-impossible from date with 400, not 500', async () => {
+  const res = await get('/logs?from=2026-99-99');
+  assert.equal(res.status, 400);
+});
+
+test('GET /logs/habit-summary rejects a calendar-impossible to date with 400, not 500', async () => {
+  const res = await get('/logs/habit-summary?to=2026-02-30');
+  assert.equal(res.status, 400);
+});
+
+test('GET /nutrition rejects a calendar-impossible from date with 400, not 500', async () => {
+  const res = await get('/nutrition?from=2026-13-01');
+  assert.equal(res.status, 400);
+});
+
+test('GET /training-logs rejects a calendar-impossible from date with 400, not 500', async () => {
+  const res = await get('/training-logs?from=2026-00-10');
+  assert.equal(res.status, 400);
+});
+
+// --- round 3: exercise-history before= uuid ---------------------------------
+
+test('GET /training-logs/exercise-history rejects a non-uuid before with 400, not 500', async () => {
+  const res = await get('/training-logs/exercise-history?name=Bench&before=not-a-uuid');
+  assert.equal(res.status, 400);
+});
+
+// --- round 3: settings enum fields ------------------------------------------
+
+test('PUT /settings rejects an off-list experienceLevel with 400, not 500', async () => {
+  const res = await put('/settings', { experienceLevel: 'wizard' });
+  assert.equal(res.status, 400);
+});
+
+test('PUT /settings rejects an off-list equipment with 400, not 500', async () => {
+  const res = await put('/settings', { equipment: 'spaceship' });
+  assert.equal(res.status, 400);
+});
+
+// --- round 3 sweep: array-valued query params & bad coach code ---------------
+
+test('GET /exercises survives a repeated (array) search param — not a 500', async () => {
+  const res = await get('/exercises?search=a&search=b');
+  assert.notEqual(res.status, 500);
+});
+
+test('GET /plans/templates survives a repeated (array) goal param — not a 500', async () => {
+  const res = await get('/plans/templates?goal=a&goal=b');
+  assert.notEqual(res.status, 500);
+});
+
+test('POST /coach-link/redeem rejects a non-string code with 400, not 500', async () => {
+  const res = await post('/coach-link/redeem', { code: ['abc', 'def'] });
   assert.equal(res.status, 400);
 });
 
