@@ -105,15 +105,60 @@ function makeAuthLimiter(message) {
     message: { error: { message, code: 'RATE_LIMITED' } },
   });
 }
-const loginIpLimiter = makeAuthLimiter('Too many login attempts. Please wait 15 minutes and try again.');
 const registerLimiter = makeAuthLimiter('Too many attempts. Please wait 15 minutes and try again.');
 // The other password/code-guessing surfaces (logout, me, invite-code redeem,
 // account deletion) share their own separate bucket.
 const authLimiter = makeAuthLimiter('Too many attempts. Please wait 15 minutes and try again.');
+
+// Per-IP login throttle that only counts FAILED logins — and, crucially, lets a
+// correct-credential login through even when the bucket is full. A plain
+// per-IP limiter counts every attempt, so many people on one shared IP (office
+// wifi, CGNAT) logging in normally would exhaust the budget and lock each other
+// out. Here we let the password be checked first: a correct login always
+// succeeds and clears the IP's failure streak; only wrong guesses accumulate,
+// and once an IP is over its budget, further WRONG guesses get a 429. The
+// per-account limiter below still hard-caps guesses against any single email.
+const LOGIN_IP_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_IP_MAX_FAILURES = 20;
+const loginFailuresByIp = new Map();
+
+function loginIpFailureThrottle(req, res, next) {
+  if (rateLimitDisabled()) return next();
+
+  const key = req.ip;
+  const now = Date.now();
+  const originalJson = res.json.bind(res);
+
+  res.json = (body) => {
+    const status = res.statusCode;
+    if (status === 200) {
+      // A correct login clears this IP's failure streak.
+      loginFailuresByIp.delete(key);
+    } else if (status === 401) {
+      // A failed login counts against this IP's budget.
+      const existing = loginFailuresByIp.get(key);
+      const entry = existing && existing.resetAt > now
+        ? existing
+        : { count: 0, resetAt: now + LOGIN_IP_WINDOW_MS };
+      entry.count += 1;
+      loginFailuresByIp.set(key, entry);
+      if (entry.count > LOGIN_IP_MAX_FAILURES) {
+        res.status(429);
+        return originalJson({
+          error: { message: 'Too many login attempts. Please wait 15 minutes and try again.', code: 'RATE_LIMITED' },
+        });
+      }
+    }
+    return originalJson(body);
+  };
+
+  next();
+}
+
 // Registered as exact/literal paths (not the whole '/api/auth' prefix) so a
 // login or register request only ever counts against its own limiter, never
 // falling through into the shared authLimiter below as well.
-app.use('/api/auth/login', loginIpLimiter);
+app.use('/api/auth/login', loginIpFailureThrottle);
 app.use('/api/auth/register', registerLimiter);
 app.use('/api/auth/logout', authLimiter);
 app.use('/api/auth/me', authLimiter);

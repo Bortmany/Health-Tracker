@@ -55,6 +55,35 @@ test('a different account is not blocked by another account being rate-limited',
   assert.equal(res.status, 401);
 });
 
+test('a real account\'s correct login still works while another account on the same IP is flooded with failed logins', async () => {
+  // Register a legitimate account BEFORE the flood (register has its own bucket).
+  const email = `ratelimit-legit-${Date.now()}@example.com`;
+  const password = 'a-decent-password';
+  const registerRes = await fetch(`${baseUrl}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, displayName: 'Legit User' }),
+  });
+  assert.equal(registerRes.status, 201);
+
+  // Flood the SAME IP with wrong-password guesses against many OTHER accounts,
+  // well past the per-IP failure budget of 20. Distinct emails keep the
+  // per-account limiter from tripping, so only the per-IP failure bucket fills.
+  for (let i = 0; i < 25; i += 1) {
+    await login(`ratelimit-flood-${Date.now()}-${i}@example.com`);
+  }
+
+  // Despite the IP being far over its FAILED-login budget, the legitimate
+  // account's CORRECT password still logs in: failed guesses from other accounts
+  // must not lock a real user out on a shared IP.
+  const goodLogin = await fetch(`${baseUrl}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  assert.equal(goodLogin.status, 200);
+});
+
 test('flooding login does not use up register\'s budget (separate per-IP buckets)', async () => {
   // The per-IP login limit is 20 in 15 minutes. Use 21 different emails so the
   // per-account guard (10/account) never kicks in — only the per-IP login

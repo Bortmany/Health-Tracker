@@ -28,15 +28,16 @@ router.get('/', asyncHandler(async (req, res) => {
 
 router.post('/', asyncHandler(async (req, res) => {
   const { region, note } = req.body ?? {};
-  if (!region) {
-    return res.status(400).json({ error: { message: 'region is required', code: 'INVALID_INPUT' } });
-  }
+  // Cap the free-text fields so a runaway request can't stuff an unbounded
+  // string into the database; an empty region still fails with a clean 400.
+  const cleanRegion = validate.stringLength(region, 'region', { max: 100 });
+  const cleanNote = validate.stringLength(note, 'note', { optional: true, max: 2000 });
 
   const { rows } = await pool.query(
     `INSERT INTO injuries (user_id, region, note)
      VALUES ($1, $2, $3)
      RETURNING *`,
-    [req.userId, region, note ?? null]
+    [req.userId, cleanRegion, cleanNote]
   );
   res.status(201).json({ injury: toPublicInjury(rows[0]) });
 }));
@@ -47,6 +48,11 @@ router.patch('/:id', asyncHandler(async (req, res) => {
     return res.status(404).json({ error: { message: 'Injury not found', code: 'NOT_FOUND' } });
   }
   const { region, note, archived } = req.body ?? {};
+  // Cap the free-text fields and require a real boolean for archived (a string
+  // or number here would blow up the `$5::boolean` cast into a 500).
+  const cleanRegion = validate.stringLength(region, 'region', { optional: true, max: 100 });
+  const cleanNote = validate.stringLength(note, 'note', { optional: true, max: 2000 });
+  const cleanArchived = validate.boolean(archived, 'archived', { optional: true });
 
   const { rows } = await pool.query(
     `UPDATE injuries
@@ -57,7 +63,7 @@ router.patch('/:id', asyncHandler(async (req, res) => {
                              ELSE NULL END
      WHERE id = $1 AND user_id = $2
      RETURNING *`,
-    [req.params.id, req.userId, region ?? null, note ?? null, archived ?? null]
+    [req.params.id, req.userId, cleanRegion, cleanNote, cleanArchived]
   );
 
   if (!rows[0]) {
