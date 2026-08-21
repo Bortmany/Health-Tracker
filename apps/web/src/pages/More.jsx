@@ -13,11 +13,12 @@ import {
   Toast,
   useToast,
 } from '../components/ui/index.js';
+import UpgradePanel from '../components/UpgradePanel.jsx';
 import { useDeleteAccount, useExportData } from '../hooks/useAccount.js';
 import { useMe, useLogout } from '../hooks/useAuth.js';
-import { useBillingStatus, useCheckout } from '../hooks/useBilling.js';
 import { useMyCoach, useRedeemCoachCode, useRemoveMyCoach } from '../hooks/useCoach.js';
 import { useSettings, useUpdateSettings } from '../hooks/useSettings.js';
+import { THEME_OPTIONS, useTheme } from '../lib/useTheme.js';
 import styles from './More.module.css';
 
 const FIELDS = [
@@ -43,28 +44,46 @@ function buildForm(settings) {
 }
 
 function PlanTierLine({ planTier }) {
-  const { data: billing } = useBillingStatus();
-  const checkout = useCheckout();
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   if (planTier === 'premium') {
     return <div className={styles.mutedLine}>Premium plan</div>;
   }
-  if (!billing?.enabled) {
-    return <div className={styles.mutedLine}>Free plan — upgrades coming soon</div>;
-  }
   return (
     <div className={styles.mutedLine}>
       Free plan{' — '}
-      <button
-        type="button"
-        className={styles.inlineLinkButton}
-        onClick={() => checkout.mutate()}
-        disabled={checkout.isPending}
-      >
-        {checkout.isPending ? 'Opening checkout...' : 'Upgrade to Premium'}
+      <button type="button" className={styles.inlineLinkButton} onClick={() => setShowUpgrade(true)}>
+        see what Premium adds
       </button>
-      {checkout.isError && <span> ({checkout.error.message})</span>}
+      <UpgradePanel open={showUpgrade} onClose={() => setShowUpgrade(false)} />
     </div>
+  );
+}
+
+// Light, dark, or follow the phone. Saved on this device only — it isn't
+// part of the Save button's settings, so there's nothing to submit.
+function AppearanceSection() {
+  const { setting, setTheme } = useTheme();
+
+  return (
+    <Card className={styles.stackCard} title="Appearance">
+      <p className={styles.appearanceNote}>
+        How Cut looks on this device. &quot;System&quot; follows your phone or computer.
+      </p>
+      <div className={styles.segmented} role="group" aria-label="Appearance">
+        {THEME_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={`${styles.segment} ${setting === option.value ? styles.segmentActive : ''}`.trim()}
+            aria-pressed={setting === option.value}
+            onClick={() => setTheme(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </Card>
   );
 }
 
@@ -296,6 +315,8 @@ export default function More() {
           </Button>
         </div>
       </Card>
+
+      <AppearanceSection />
 
       {user?.role !== 'coach' && <CoachSection />}
 

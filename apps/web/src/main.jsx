@@ -2,7 +2,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
+import { initTheme } from './lib/useTheme.js';
 import './index.css';
+
+// Make sure the browser-bar colour matches the saved light/dark choice.
+initTheme();
 
 const queryClient = new QueryClient({
   defaultOptions: {

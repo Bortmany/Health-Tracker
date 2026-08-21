@@ -8,6 +8,11 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
+// How much of a plan each account gets. Sent out with every template so the
+// app can say plainly what's free and what needs Premium.
+const FREE_WEEKS = 4;
+const PREMIUM_WEEKS = 52;
+
 // A malformed :id would otherwise reach Postgres as an invalid UUID and throw a
 // 500 — this turns it into a clean "not found".
 function planNotFound(res) {
@@ -23,6 +28,8 @@ function toPublicTemplate(row) {
     experience: row.experience,
     equipment: row.equipment,
     daysPerWeek: row.days_per_week,
+    freeWeeks: FREE_WEEKS,
+    premiumWeeks: PREMIUM_WEEKS,
   };
 }
 
@@ -110,16 +117,16 @@ router.post('/templates/:id/adopt', asyncHandler(async (req, res) => {
   const { rows: userRows } = await pool.query('SELECT plan_tier FROM users WHERE id = $1', [req.userId]);
   const tier = userRows[0].plan_tier;
 
-  const requestedWeeks = req.body?.durationWeeks ?? (tier === 'premium' ? 52 : 4);
-  if (requestedWeeks > 4 && tier !== 'premium') {
+  const requestedWeeks = req.body?.durationWeeks ?? (tier === 'premium' ? PREMIUM_WEEKS : FREE_WEEKS);
+  if (requestedWeeks > FREE_WEEKS && tier !== 'premium') {
     return res.status(402).json({
       error: {
-        message: 'The full-year plan is part of Premium. Your free plan covers the first 4 weeks.',
+        message: `The full-year plan is part of Premium. Your free plan covers the first ${FREE_WEEKS} weeks.`,
         code: 'PREMIUM_REQUIRED',
       },
     });
   }
-  const durationWeeks = requestedWeeks > 4 ? 52 : 4;
+  const durationWeeks = requestedWeeks > FREE_WEEKS ? PREMIUM_WEEKS : FREE_WEEKS;
 
   // If no start date is given, default to today. If one IS given, run it through
   // the real-calendar validator so an impossible-but-well-shaped date (e.g.
@@ -131,18 +138,21 @@ router.post('/templates/:id/adopt', asyncHandler(async (req, res) => {
 
   const days = await fetchTemplateDays(template.id);
 
-  const programId = await withTransaction(async (client) => {
+  const { programId, firstDayId } = await withTransaction(async (client) => {
     const { rows: programRows } = await client.query(
       'INSERT INTO programs (user_id, name, description) VALUES ($1, $2, $3) RETURNING id',
       [req.userId, template.name, template.description]
     );
     const programId = programRows[0].id;
+    // The day the app should open first — day 1 of the new program.
+    let firstDayId = null;
 
     for (const [dayIndex, day] of days.entries()) {
       const { rows: dayRows } = await client.query(
         'INSERT INTO program_days (program_id, name, sort_order) VALUES ($1, $2, $3) RETURNING id',
         [programId, day.name, dayIndex]
       );
+      if (dayIndex === 0) firstDayId = dayRows[0].id;
       for (const [exIndex, ex] of day.exercises.entries()) {
         await client.query(
           `INSERT INTO program_exercises (program_day_id, name, target_sets, target_reps, sort_order)
@@ -160,10 +170,10 @@ router.post('/templates/:id/adopt', asyncHandler(async (req, res) => {
       [req.userId, template.id, programId, startDate, durationWeeks]
     );
 
-    return programId;
+    return { programId, firstDayId };
   });
 
-  res.status(201).json({ programId, durationWeeks, startDate });
+  res.status(201).json({ programId, firstDayId, durationWeeks, startDate });
 }));
 
 router.get('/my-plan', asyncHandler(async (req, res) => {

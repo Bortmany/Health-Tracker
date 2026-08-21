@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import UpgradePanel, { PlanLengthBadge } from '../components/UpgradePanel.jsx';
 import { Button, Card, Chip, EmptyState, ErrorText, Field, Input, Skeleton } from '../components/ui/index.js';
+import { useMe } from '../hooks/useAuth.js';
 import { useAdoptTemplate, useRecommendedTemplates } from '../hooks/usePlans.js';
 import { useSettings, useUpdateSettings } from '../hooks/useSettings.js';
 import styles from './Onboarding.module.css';
@@ -57,20 +59,30 @@ const STEPS = [
   },
 ];
 
-// The payoff after the quiz: show the top-matched plan, offer to start it,
-// and optionally log a starting weight — all with existing mutations.
+// The payoff after the quiz: show the top-matched plan, start it, and land
+// straight in day 1 — with an optional starting weight on the way.
 function RevealStep() {
   const navigate = useNavigate();
   const { data: settings } = useSettings();
+  const { data: user } = useMe();
   const { data: recommended = [], isLoading } = useRecommendedTemplates();
   const adopt = useAdoptTemplate();
   const updateSettings = useUpdateSettings();
   const [weight, setWeight] = useState('');
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const top = recommended[0];
 
-  function saveWeightThenGoHome() {
+  // Straight into the first workout of the new program, with it already
+  // picked in the session logger.
+  function goToDayOne(adopted) {
+    const params = new URLSearchParams({ program: adopted.programId });
+    if (adopted.firstDayId) params.set('day', adopted.firstDayId);
+    navigate(`/train?${params.toString()}`);
+  }
+
+  function saveWeightThenStart(adopted) {
     if (weight === '') {
-      navigate('/');
+      goToDayOne(adopted);
       return;
     }
     updateSettings.mutate(
@@ -84,7 +96,7 @@ function RevealStep() {
         stepGoal: settings?.stepGoal ?? null,
         sleepGoal: settings?.sleepGoal ?? null,
       },
-      { onSettled: () => navigate('/') }
+      { onSettled: () => goToDayOne(adopted) }
     );
   }
 
@@ -92,7 +104,13 @@ function RevealStep() {
     if (!top) return;
     adopt.mutate(
       { id: top.id, startDate: new Date().toLocaleDateString('en-CA') },
-      { onSuccess: saveWeightThenGoHome }
+      {
+        onSuccess: saveWeightThenStart,
+        // The full-year plan needs Premium — explain rather than just fail.
+        onError: (error) => {
+          if (error.code === 'PREMIUM_REQUIRED') setShowUpgrade(true);
+        },
+      }
     );
   }
 
@@ -119,6 +137,12 @@ function RevealStep() {
               <Chip>{top.experience}</Chip>
               <Chip>{top.daysPerWeek} days/week</Chip>
             </div>
+            <PlanLengthBadge
+              freeWeeks={top.freeWeeks}
+              premiumWeeks={top.premiumWeeks}
+              planTier={user?.planTier}
+              onSeePremium={() => setShowUpgrade(true)}
+            />
           </Card>
 
           <div className={styles.weightField}>
@@ -138,19 +162,29 @@ function RevealStep() {
 
           {adopt.isError && <ErrorText>{adopt.error.message}</ErrorText>}
 
+          {/* One obvious next step; the other two ways out stay available
+              as quiet text links underneath. */}
           <div className={styles.revealActions}>
             <Button block onClick={handleStart} disabled={adopt.isPending || updateSettings.isPending}>
-              {adopt.isPending || updateSettings.isPending ? 'Setting up...' : 'Start this plan'}
+              {adopt.isPending || updateSettings.isPending ? 'Setting up...' : 'Start day 1'}
             </Button>
-            <Button variant="secondary" block onClick={() => navigate('/train')}>
-              See other plans
-            </Button>
-            <Button variant="ghost" block onClick={() => navigate('/')}>
-              Skip for now
-            </Button>
+            <div className={styles.secondaryLinks}>
+              <button type="button" className={styles.textLink} onClick={() => navigate('/train')}>
+                See other plans
+              </button>
+              <button type="button" className={styles.textLink} onClick={() => navigate('/')}>
+                Skip for now
+              </button>
+            </div>
           </div>
         </>
       )}
+
+      <UpgradePanel
+        open={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        message="This plan runs for a full year with Premium. Your free account starts with the first 4 weeks."
+      />
     </div>
   );
 }

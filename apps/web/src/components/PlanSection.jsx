@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import UpgradePanel, { PlanLengthBadge } from './UpgradePanel.jsx';
 import { Button, Card, Chip, ConfirmDialog, EmptyState, ErrorText, SectionTitle, Skeleton } from './ui/index.js';
+import { useMe } from '../hooks/useAuth.js';
 import { useAdoptTemplate, useDeleteMyPlan, useMyPlan, useRecommendedTemplates, useTemplates } from '../hooks/usePlans.js';
 import styles from './PlanSection.module.css';
 
-function TemplateCard({ template, onAdopt, adopting }) {
+function TemplateCard({ template, onAdopt, adopting, planTier, onSeePremium }) {
   return (
     <div className={styles.templateCard}>
       <div className={styles.templateName}>{template.name}</div>
@@ -13,6 +15,12 @@ function TemplateCard({ template, onAdopt, adopting }) {
         <Chip>{template.experience}</Chip>
         <Chip>{template.daysPerWeek} days/week</Chip>
       </div>
+      <PlanLengthBadge
+        freeWeeks={template.freeWeeks}
+        premiumWeeks={template.premiumWeeks}
+        planTier={planTier}
+        onSeePremium={onSeePremium}
+      />
       <Button variant="primary" size="sm" onClick={onAdopt} disabled={adopting}>
         {adopting ? 'Setting up...' : 'Use this plan'}
       </Button>
@@ -22,12 +30,14 @@ function TemplateCard({ template, onAdopt, adopting }) {
 
 export default function PlanSection() {
   const { data: plan, isLoading } = useMyPlan();
+  const { data: user } = useMe();
   const { data: recommended = [] } = useRecommendedTemplates();
   const { data: allTemplates = [] } = useTemplates();
   const adopt = useAdoptTemplate();
   const stopPlan = useDeleteMyPlan();
   const [browsing, setBrowsing] = useState(false);
   const [confirmingStop, setConfirmingStop] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   if (isLoading) return <Skeleton height={120} style={{ marginBottom: 'var(--space-4)' }} />;
 
@@ -91,8 +101,21 @@ export default function PlanSection() {
             <TemplateCard
               key={t.id}
               template={t}
+              planTier={user?.planTier}
+              onSeePremium={() => setShowUpgrade(true)}
               adopting={adopt.isPending && adopt.variables?.id === t.id}
-              onAdopt={() => adopt.mutate({ id: t.id, startDate: new Date().toLocaleDateString('en-CA') })}
+              onAdopt={() =>
+                adopt.mutate(
+                  { id: t.id, startDate: new Date().toLocaleDateString('en-CA') },
+                  {
+                    // The full-year plan needs Premium — explain rather than
+                    // just show an error.
+                    onError: (error) => {
+                      if (error.code === 'PREMIUM_REQUIRED') setShowUpgrade(true);
+                    },
+                  }
+                )
+              }
             />
           ))}
         </div>
@@ -102,6 +125,12 @@ export default function PlanSection() {
           {browsing ? 'Show recommendations' : 'Browse all plans'}
         </Button>
       </div>
+
+      <UpgradePanel
+        open={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        message="Plans run for a full year with Premium. Your free account starts with the first 4 weeks."
+      />
     </Card>
   );
 }

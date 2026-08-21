@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import LineChart from '../components/LineChart.jsx';
 import { Card, EmptyState, Screen, Skeleton } from '../components/ui/index.js';
-import { useLogsRange } from '../hooks/useLogs.js';
+import { useHabitSummary, useLogsRange, useStreak } from '../hooks/useLogs.js';
 import { useNutritionRange } from '../hooks/useNutrition.js';
 import { usePersonalRecords, useTrainingLogs } from '../hooks/useTrainingLogs.js';
 import { smoothSeries, trendCaption } from '../lib/trend.js';
@@ -29,6 +29,76 @@ function shiftMonth(monthISO, delta) {
 }
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+// The last seven days at a glance, with the current streak on top. Uses the
+// same colours as the consistency calendar below, so the two read as one.
+function WeekStrip() {
+  const today = todayISO();
+  const from = dateNDaysAgo(6);
+  const { data: streak, isLoading: streakLoading } = useStreak();
+  const { data: weekLogs = [], isLoading: logsLoading } = useLogsRange({ from, to: today });
+  const { data: weekSessions = [], isLoading: sessionsLoading } = useTrainingLogs({ from, to: today });
+  // Habit counts only exist for days that have habits ticked off, so an
+  // absent day here just means "no habit detail", not "nothing logged".
+  const { data: habitDays = [] } = useHabitSummary({ from, to: today });
+
+  const loggedDates = new Set(weekLogs.map((l) => l.date.slice(0, 10)));
+  const trainedDates = new Set(weekSessions.map((s) => s.date.slice(0, 10)));
+  const habitsByDate = new Map(habitDays.map((d) => [d.date.slice(0, 10), d]));
+  const loading = logsLoading || sessionsLoading;
+
+  // Oldest first, ending on today.
+  const days = Array.from({ length: 7 }, (_, i) => dateNDaysAgo(6 - i));
+
+  function describe(dateISO) {
+    const date = new Date(`${dateISO}T00:00:00`);
+    const label = date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' });
+    const parts = [];
+    parts.push(loggedDates.has(dateISO) ? 'logged' : 'nothing logged');
+    if (trainedDates.has(dateISO)) parts.push('trained');
+    const habits = habitsByDate.get(dateISO);
+    if (habits?.possible) parts.push(`${habits.completed} of ${habits.possible} habits done`);
+    return `${label} — ${parts.join(', ')}`;
+  }
+
+  function cellClass(dateISO) {
+    const logged = loggedDates.has(dateISO);
+    const trained = trainedDates.has(dateISO);
+    if (logged && trained) return `${styles.dayCell} ${styles.dayFull}`;
+    if (logged) return `${styles.dayCell} ${styles.dayLogged}`;
+    return `${styles.dayCell} ${styles.dayEmpty}`;
+  }
+
+  return (
+    <Card title="This week">
+      {streakLoading ? (
+        <Skeleton height="2rem" />
+      ) : (
+        <p className={styles.streakLine}>
+          <span className={styles.streakNumber}>{streak ?? 0}</span>
+          {(streak ?? 0) === 1 ? ' day logged in a row' : ' days logged in a row'}
+        </p>
+      )}
+
+      <div className={styles.weekStrip}>
+        {days.map((dateISO) => (
+          <div className={styles.weekDay} key={dateISO}>
+            <span className={styles.calWeekday}>
+              {new Date(`${dateISO}T00:00:00`).toLocaleDateString(undefined, { weekday: 'narrow' })}
+            </span>
+            {loading ? (
+              <Skeleton height="auto" style={{ aspectRatio: '1' }} />
+            ) : (
+              <span className={cellClass(dateISO)} title={describe(dateISO)}>
+                {Number(dateISO.slice(8, 10))}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
 function ConsistencyCalendar() {
   const [monthStart, setMonthStart] = useState(() => firstOfMonthISO());
@@ -150,6 +220,8 @@ export default function Progress() {
   return (
     <Screen title="Progress">
       <div className={styles.stack}>
+        <WeekStrip />
+
         <Card title="Weight — last 60 days">
           {logsLoading ? (
             <Skeleton height={160} />

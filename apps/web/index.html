@@ -8,6 +8,22 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Cut</title>
+    <script>
+      // Apply the saved light/dark choice before anything is drawn, so the
+      // app never flashes the wrong colours. Nothing saved = dark, as always.
+      (function () {
+        try {
+          var saved = localStorage.getItem('cut-theme') || 'dark';
+          var light =
+            saved === 'light' ||
+            (saved === 'system' && !window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (light) document.documentElement.dataset.theme = 'light';
+          else delete document.documentElement.dataset.theme;
+        } catch (e) {
+          // Storage blocked (private browsing) — stay on the dark default.
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

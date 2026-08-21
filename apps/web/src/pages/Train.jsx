@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import PlanSection from '../components/PlanSection.jsx';
 import RestTimer from '../components/RestTimer.jsx';
+import WorkoutSummary from '../components/WorkoutSummary.jsx';
 import {
   Button,
   Card,
@@ -293,9 +295,13 @@ export default function Train() {
   // never saved — ticking one auto-starts the rest timer.
   const [doneSets, setDoneSets] = useState({});
   const [showSaveChoice, setShowSaveChoice] = useState(false);
+  // Set when a brand-new session is saved: what to show on the wrap-up card.
+  const [summary, setSummary] = useState(null);
   const toast = useToast();
   const restTimerRef = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Deep links from the Today screen: ?edit=<sessionId> opens that session,
   // ?program=<id>&day=<id> pre-selects the next program day.
@@ -408,18 +414,32 @@ export default function Train() {
     };
   }
 
+  // The day after this one in the same program — what to train next time.
+  function nextDayName() {
+    if (!selectedProgram || !selectedDay) return null;
+    const days = selectedProgram.days;
+    if (days.length < 2) return null;
+    const index = days.findIndex((d) => d.id === selectedDay.id);
+    return days[(index + 1) % days.length].name;
+  }
+
   function saveSession() {
     const payload = buildPayload();
     if (editingId) {
+      // Editing an old session is a correction, not a workout — a quiet
+      // confirmation is all it needs.
       updateTrainingLog.mutate(
         { id: editingId, ...payload },
         { onSuccess: () => toast.show('Session saved') }
       );
     } else {
+      // Remember the bests as they stand before the save, so the wrap-up
+      // card can tell which ones this session just beat.
+      const previousRecords = queryClient.getQueryData(['personalRecords']) ?? [];
+      const nextName = nextDayName();
       createTrainingLog.mutate(payload, {
         onSuccess: () => {
-          // Confirm first, so the form clearing reads as success, not loss.
-          toast.show('Session saved');
+          setSummary({ session: payload, previousRecords, nextDayName: nextName });
           setForm(blankForm());
           setDoneSets({});
         },
@@ -673,6 +693,18 @@ export default function Train() {
           ))
         )}
       </Card>
+
+      {summary && (
+        <WorkoutSummary
+          session={summary.session}
+          previousRecords={summary.previousRecords}
+          nextDayName={summary.nextDayName}
+          onDone={() => {
+            setSummary(null);
+            navigate('/');
+          }}
+        />
+      )}
 
       <Toast message={toast.message} />
     </Screen>
