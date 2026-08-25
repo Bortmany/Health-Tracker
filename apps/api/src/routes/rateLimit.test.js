@@ -6,20 +6,20 @@
 process.env.DISABLE_RATE_LIMIT = 'false';
 
 import assert from 'node:assert/strict';
-import { after, before, test } from 'node:test';
+import { afterAll, beforeAll, test } from 'vitest';
 import { app } from '../app.js';
 import { pool } from '../db/pool.js';
 
 let server;
 let baseUrl;
 
-before(() => {
+beforeAll(() => {
   server = app.listen(0);
   const { port } = server.address();
   baseUrl = `http://localhost:${port}/api`;
 });
 
-after(async () => {
+afterAll(async () => {
   await new Promise((resolve) => server.close(resolve));
   await pool.end();
 });

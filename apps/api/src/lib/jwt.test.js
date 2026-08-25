@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { before, test } from 'node:test';
+import { beforeAll, test } from 'vitest';
 import { signToken, verifyToken } from './jwt.js';
 
-before(() => {
+beforeAll(() => {
   process.env.JWT_SECRET = 'test-secret';
 });
 

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import { normalizeCheckin, normalizeCheckins } from './injuryCheckins.js';
 
 test('accepts whole pain scores in 0-10', () => {

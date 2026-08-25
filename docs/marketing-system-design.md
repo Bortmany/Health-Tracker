@@ -2,13 +2,15 @@
 
 *A reusable publishing, advertising, marketing and sales system, run by Claude agents, that works for Cut today and any future project (TradeOS next) by adding one config file.*
 
+> **Where the system actually lives now (August 2026):** this is the original design document, kept here for history. The marketing system was built and now lives in its **own repo, `marketing-OS`** — it is no longer a folder inside Health-Tracker. Anything below that describes files or folders is describing the marketing-OS repo. The live details (agents, playbooks, hard rules) are in that repo's `CLAUDE.md` and in the central `Agents` repo; where this document and those disagree, they win.
+
 **Status: design for review — nothing has been built yet.** Once you approve (or adjust) this, the build starts.
 
 ---
 
 ## 1. The idea in one paragraph
 
-A separate repo called **`marketing-os`** holds a team of marketing agents and one "brand profile" per project. On a schedule, the agents plan content, write posts, design graphics in Canva, and drop everything as draft cards into a **Notion board**. Nothing goes public until **you** drag a card to "Approved" — then the system publishes it to Instagram and X through a scheduler tool, watches how it performs, and sends you a **plain-English report every Friday**. Adding a new project later (TradeOS, or anything else) means writing one new brand profile file — the whole machine is shared.
+A separate repo called **`marketing-OS`** holds a team of marketing agents and one "brand profile" per project. On a schedule, the agents plan content, write posts, design graphics in Canva, and drop everything as draft cards into a **Notion board**. Nothing goes public until **you** drag a card to "Approved" — then the system publishes it to Instagram and X through a scheduler tool, watches how it performs, and sends you a **plain-English report every Friday**. Adding a new project later (TradeOS, or anything else) means writing one new brand profile file — the whole machine is shared.
 
 ```
  Agents plan & draft  →  Notion board (YOU approve)  →  Scheduler posts it  →  Analyst reports Fridays
@@ -37,7 +39,7 @@ Same pattern as the six agents that built Cut — each has one job and a written
 
 ## 3. Brand profiles — the reusable part
 
-One folder per project inside `marketing-os/brands/`. Everything project-specific lives here; the agents and playbooks are shared.
+One folder per project inside the marketing-OS repo's `brands/` folder. Everything project-specific lives here; the agents and playbooks are shared.
 
 **`brands/cut/`** (ready to fill in from day one)
 - **What it is:** fat-loss & training tracker for people who don't know what to train, plus their coaches

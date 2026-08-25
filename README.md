@@ -1,6 +1,8 @@
 # Cut
 
-A fat-loss and training tracker for people who aren't sure what to train — and for the coaches who train them. React + Vite frontend, Express + Postgres backend, npm workspaces monorepo. Installable on phones as a PWA.
+A fat-loss and training tracker for people who aren't sure what to train — and for the coaches who train them.
+
+**Stack:** Express + raw `pg` (no ORM — hand-written SQL, numbered migration files) on the backend, React + Vite (PWA, installable on phones) on the frontend, npm workspaces monorepo, deployed on Railway. Tests run on Vitest against a real local Postgres database (no mocking of the DB).
 
 ## What it does
 
@@ -21,16 +23,21 @@ A fat-loss and training tracker for people who aren't sure what to train — and
 
 ## Local development
 
-1. Copy `.env.example` to `.env`, set `DATABASE_URL` and `JWT_SECRET`.
-2. `npm install`
-3. `npm run migrate`
-4. `npm run dev` (API on :3001, web on :5173)
+1. Make sure Postgres is running (`service postgresql start` in a sandbox; on a normal machine, whatever starts your local Postgres) and create a database for the app — the connection string below assumes a database named `cut`.
+2. Copy `.env.example` to `.env`, set `DATABASE_URL` (point it at the database from step 1) and `JWT_SECRET` (32+ characters — the app refuses to start otherwise).
+3. `npm install` — installs both workspaces (`apps/api`, `apps/web`) from the root.
+4. `npm run migrate` (equivalent to `npm run migrate -w apps/api`) — applies every SQL file in `apps/api/src/db/migrations/` in order, tracked in a `schema_migrations` table so it's safe to re-run.
+5. `npm run dev` — runs the API (`:3001`) and the web app (`:5173`) together.
 
-Tests: `npm test` (integration tests against the local Postgres). Build check: `npm run build`.
+### Tests
+
+`npm test` runs the backend integration test suite (`apps/api`) with [Vitest](https://vitest.dev), against the real local Postgres database — nothing is mocked. Each test file creates and cleans up its own timestamped user(s), and files run one at a time (not in parallel) because they share one database. The npm script sets `DISABLE_RATE_LIMIT=true` so the suite isn't throttled by the login rate limiter — never set that variable in dev, staging, or production. 19 test files, 123 tests, all currently green.
+
+Build check: `npm run build` (builds the web app with Vite).
 
 ## Deploying (Railway)
 
-`railway.json` is the deploy config: create a Railway project from this repo, attach a Postgres plugin (sets `DATABASE_URL`), and set the environment variables below. Railway builds with NIXPACKS, runs the database migrations before each deploy (`preDeployCommand`), starts the API, and health-checks `/api/health`. Deploys happen automatically on push to `main`.
+`railway.json` is the deploy config: create a Railway project from this repo, attach a Postgres plugin (sets `DATABASE_URL`), and set the environment variables below. Railway builds with NIXPACKS (`npm install --include=dev && npm run build`), runs the database migrations before each deploy (`preDeployCommand: npm run migrate -w apps/api`), starts the API (`npm start -w apps/api`, which also serves the already-built web app when `NODE_ENV=production`), and health-checks `GET /api/health`. Deploys happen automatically on push to `main`.
 
 ## Environment variables
 
@@ -48,12 +55,13 @@ Tests: `npm test` (integration tests against the local Postgres). Build check: `
 
 ```
 /apps
-  /api    Express app (routes, db/migrations, middleware, lib)
+  /api    Express app (routes, db/migrations, middleware, lib, *.test.js)
   /web    React app (pages, components, api wrappers, hooks)
 /docs
   schema.sql   always-current full schema dump
   mobile.md    how to publish native iPhone/Android apps
-(project helper agents — code review, verification, builders — live in the central Agents repo)
+railway.json   Railway deploy config (build, pre-deploy migrate, start, health check)
+.env.example   every environment variable the app reads, with comments
 ```
 
 ## Migrations

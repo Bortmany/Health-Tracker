@@ -26,7 +26,7 @@ All planned phases are built, tested, reviewed, and merged to `main`. 48/48 back
 - **Nested writes:** transaction — BEGIN, upsert parent, DELETE children, re-INSERT, COMMIT; ROLLBACK in catch; `client.release()` in finally (see `routes/programs.js` `replaceDays`).
 - **Postgres trap:** placeholders in `COALESCE($n, …)` or typed comparisons need explicit casts (`::uuid`, `::boolean`, `::integer`) or you get runtime 42883 errors.
 - **Frontend:** thin wrappers in `src/api/`, TanStack Query hooks in `src/hooks/` (mutations invalidate BOTH list and detail keys), CSS Modules with the custom props from `index.css`, skeleton divs for loading (never spinners), forms keep `''` and convert with `x === '' ? null : Number(x)` on submit. Reuse `components/LineChart.jsx` for charts.
-- **Tests:** Node test runner, `app.listen(0)` + fetch, fresh timestamped user per file, cover happy path + replace-not-append + cross-user isolation. Dates come back as ISO timestamps — compare with `.slice(0, 10)`.
+- **Tests:** Vitest (`npm test`; files run sequentially in forked processes — they share one DB), `app.listen(0)` + fetch, fresh timestamped user per file, cover happy path + replace-not-append + cross-user isolation. Dates come back as ISO timestamps — compare with `.slice(0, 10)`.
 
 ## Workflow (established with the owner)
 

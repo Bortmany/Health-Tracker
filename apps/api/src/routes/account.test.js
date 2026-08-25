@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { after, before, test } from 'node:test';
+import { afterAll, beforeAll, test } from 'vitest';
 import { app } from '../app.js';
 import { pool } from '../db/pool.js';
 
@@ -8,13 +8,13 @@ let baseUrl;
 
 const PASSWORD = 'hunter2pass';
 
-before(async () => {
+beforeAll(async () => {
   server = app.listen(0);
   const { port } = server.address();
   baseUrl = `http://localhost:${port}/api`;
 });
 
-after(async () => {
+afterAll(async () => {
   await new Promise((resolve) => server.close(resolve));
   await pool.end();
 });
