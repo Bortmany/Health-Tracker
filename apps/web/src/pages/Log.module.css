@@ -131,9 +131,14 @@
   cursor: pointer;
 }
 
-.removeButton:hover {
+.removeButton:hover:not([disabled]) {
   color: var(--color-text);
   border-color: var(--color-text-faint);
+}
+
+.removeButton[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* Habits */
@@ -141,16 +146,44 @@
 .habitRow {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--color-border);
   font-size: var(--text-base);
   min-height: 2.75rem;
-  cursor: pointer;
 }
 
 .habitRow:last-child {
   border-bottom: none;
+}
+
+/* The tick and its wording are one tap target; the ✕ sits beside them. */
+.habitLabel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.habitRemove {
+  flex: none;
+  width: 2.75rem;
+}
+
+/* "Add a habit": the box takes the width that's left, the button lines up
+   with the bottom of the box because the box carries a label above it. */
+.addHabitRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.addHabitField {
+  flex: 1;
+  min-width: 0;
 }
 
 .checkbox {
