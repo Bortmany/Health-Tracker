@@ -312,3 +312,9 @@ ALTER TABLE users ADD COLUMN stripe_customer_id TEXT;
 -- bumps it, which invalidates any token signed with the old value.
 ALTER TABLE users
   ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0;
+
+-- 018: Paddle replaces Stripe as the payment provider. Nobody has paid yet —
+-- the Stripe column was always empty — so it is dropped rather than copied
+-- across, and the Paddle customer reference takes its place.
+ALTER TABLE users DROP COLUMN IF EXISTS stripe_customer_id;
+ALTER TABLE users ADD COLUMN paddle_customer_id TEXT;

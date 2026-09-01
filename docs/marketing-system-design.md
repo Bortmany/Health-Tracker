@@ -1,6 +1,6 @@
 # Marketing OS — System Design
 
-*A reusable publishing, advertising, marketing and sales system, run by Claude agents, that works for Cut today and any future project (TradeOS next) by adding one config file.*
+*A reusable publishing, advertising, marketing and sales system, run by Claude agents, that works for Cut today and any future project (the owner's trading app next) by adding one config file.*
 
 **Status: design for review — nothing has been built yet.** Once you approve (or adjust) this, the build starts.
 
@@ -8,7 +8,7 @@
 
 ## 1. The idea in one paragraph
 
-A separate repo called **`marketing-os`** holds a team of marketing agents and one "brand profile" per project. On a schedule, the agents plan content, write posts, design graphics in Canva, and drop everything as draft cards into a **Notion board**. Nothing goes public until **you** drag a card to "Approved" — then the system publishes it to Instagram and X through a scheduler tool, watches how it performs, and sends you a **plain-English report every Friday**. Adding a new project later (TradeOS, or anything else) means writing one new brand profile file — the whole machine is shared.
+A separate repo called **`marketing-os`** holds a team of marketing agents and one "brand profile" per project. On a schedule, the agents plan content, write posts, design graphics in Canva, and drop everything as draft cards into a **Notion board**. Nothing goes public until **you** drag a card to "Approved" — then the system publishes it to Instagram and X through a scheduler tool, watches how it performs, and sends you a **plain-English report every Friday**. Adding a new project later (the trading app, or anything else) means writing one new brand profile file — the whole machine is shared.
 
 ```
  Agents plan & draft  →  Notion board (YOU approve)  →  Scheduler posts it  →  Analyst reports Fridays
@@ -26,9 +26,9 @@ Same pattern as the six agents that built Cut — each has one job and a written
 | **Copywriter** | Writes the actual captions, tweets and threads in each project's voice | Daily batch |
 | **Designer** | Creates the graphics in Canva (quote cards, tip carousels, feature screenshots) and attaches them to the draft cards | Daily batch, after Copywriter |
 | **Publisher** | Takes cards you've approved in Notion and loads them into the scheduler with the right date/time | Daily check |
-| **Reddit scout** | Watches the communities where your future users hang out (r/loseit, r/Fitness, r/xxfitness, coach subs for Cut; trading subs for TradeOS) for threads asking for what your product does, or mentioning it. Drafts a genuinely helpful, human-sounding reply for each opportunity — advice first, app mentioned with honest disclosure ("I built this") — into the same approval queue | Daily scan |
+| **Reddit scout** | Watches the communities where your future users hang out (r/loseit, r/Fitness, r/xxfitness, coach subs for Cut; trading subs for the trading app) for threads asking for what your product does, or mentioning it. Drafts a genuinely helpful, human-sounding reply for each opportunity — advice first, app mentioned with honest disclosure ("I built this") — into the same approval queue | Daily scan |
 | **Email marketer** | Drafts the welcome email for new Cut signups, plus a periodic newsletter — also drafts-first, into the same board | Weekly |
-| **Ads manager** | Designs ad campaigns (audience, budget, creative) as *proposals only* — dormant until you give it an ad account and budget, exactly like the Stripe/AI switches in Cut | On request |
+| **Ads manager** | Designs ad campaigns (audience, budget, creative) as *proposals only* — dormant until you give it an ad account and budget, exactly like the Paddle/AI switches in Cut | On request |
 | **Analyst** | Pulls the numbers — reach, likes, follower growth, link clicks, and Cut signups — and writes the Friday report in plain English with 2–3 suggestions | Fridays |
 
 **How they wake up:** scheduled routines (the same mechanism as a calendar reminder, but it starts a Claude session in the marketing repo). You can also poke the system any time by just asking, e.g. *"draft a post about the new streaks feature."*
@@ -47,9 +47,9 @@ One folder per project inside `marketing-os/brands/`. Everything project-specifi
 - **Content pillars:** training tips · nutrition simplified · app features · streaks & habit science · coach corner
 - **Goal:** app signups (link in bio → the Render URL)
 
-**`brands/tradeos/`** (starts lean — the repo is currently empty, so there's no product to screenshot yet)
+**`brands/<trading-app>/`** (starts lean — the repo is currently empty, so there's no product to screenshot yet)
 - **Strategy while pre-product:** "build-in-public" on X — progress updates, lessons, audience-building, collecting a waitlist — plus Reddit monitoring of trading communities to learn what people complain about and want (pure listening at first; that feedback shapes the product itself). Instagram waits until there's something visual to show.
-- **Needs from you:** one paragraph on what TradeOS actually is and who it's for. That's the only blocker for this profile.
+- **Needs from you:** one paragraph on what the trading app actually is and who it's for. That's the only blocker for this profile.
 
 ---
 
@@ -57,7 +57,7 @@ One folder per project inside `marketing-os/brands/`. Everything project-specifi
 
 One Notion board called **Marketing Queue**, shared across projects, filtered by project tag. Each card is one piece of content:
 
-> **Card:** the finished graphic · the caption/text · platform (IG, X or Reddit) · project (Cut/TradeOS) · proposed date & time · a one-line "why this post"
+> **Card:** the finished graphic · the caption/text · platform (IG, X or Reddit) · project (Cut / the trading app) · proposed date & time · a one-line "why this post"
 
 Reddit cards look slightly different: they show the thread being replied to, the drafted reply, and why the Scout flagged it — approve and the reply goes up.
 
@@ -78,7 +78,7 @@ Columns: **Drafted → Awaiting your approval → Approved → Scheduled → Pub
 
 **Total: roughly $12–24/month** — well inside the $30–100 you set. Paid ads stay at $0 until you flip that switch.
 
-One-time setup on your side (15–30 min, I'll give click-by-click steps): create the Publer account and connect **Cut's Instagram** (needs to be a free Business/Creator account), **Cut's X account**, and **TradeOS's X account**, then hand me the API key.
+One-time setup on your side (15–30 min, I'll give click-by-click steps): create the Publer account and connect **Cut's Instagram** (needs to be a free Business/Creator account), **Cut's X account**, and **the trading app's X account**, then hand me the API key.
 
 ---
 
@@ -108,7 +108,7 @@ Posting pace to start: ~4–5/week on Cut's Instagram, ~5–7/week on each X acc
 
 - **Paid ads:** Meta + Google campaigns, starting ~$5–10/day test budgets — needs ad accounts + budget green-light
 - **TikTok:** scripts and shot-lists drafted for you to film — when you want video
-- **Sales funnel for Cut Premium:** free-trial email sequence, once Stripe is live
+- **Sales funnel for Cut Premium:** free-trial email sequence, once Paddle is live
 - **App-store pages:** copy + screenshots, once the native apps happen (`docs/mobile.md`)
 
 ---
@@ -121,11 +121,11 @@ Same pattern (agents + schedules + your approval where it matters), pointed at r
 |---|---|---|
 | 1 | **Ops watchdog** | Checks the live Cut site every few hours — is it up, can a test account log in, did the last deploy work? You get a message only when something breaks, ideally before users notice. |
 | 2 | **Support inbox** | A support email address the system triages: drafts a plain-English reply for you to approve, answers FAQs, and flags real bugs straight into the dev backlog. |
-| 3 | **Weekly business report** | One Friday email combining everything: signups, active users, streak/retention numbers, revenue (once Stripe is on), and the marketing stats — the whole business on one page. |
+| 3 | **Weekly business report** | One Friday email combining everything: signups, active users, streak/retention numbers, revenue (once Paddle is on), and the marketing stats — the whole business on one page. |
 | 4 | **Feedback loop** | Collects user feedback (in-app form, emails, app-store reviews later, and what the Reddit Scout overhears) into a digest, spots patterns ("5 people asked for barcode scanning"), and files them as ranked feature ideas. |
 | 5 | **Maintenance PRs** | Monthly: update dependencies, run security checks, run the full test suite, and prepare the fix as a ready-to-merge change. Keeps the app healthy with zero effort from you. |
-| 6 | **Competitor watch** | Monthly digest: what MyFitnessPal/MacroFactor-type apps (and TradeOS's competitors) shipped and charge, and what users complain about — free product research. |
-| 7 | **Billing ops** *(once Stripe is live)* | Failed-payment recovery emails, cancellation exit-question, monthly revenue summary. |
+| 6 | **Competitor watch** | Monthly digest: what MyFitnessPal/MacroFactor-type apps (and the trading app's competitors) shipped and charge, and what users complain about — free product research. |
+| 7 | **Billing ops** *(once Paddle is live)* | Failed-payment recovery emails, cancellation exit-question, monthly revenue summary. |
 | 8 | **Blog/SEO engine** *(later)* | Drafts helpful articles ("beginner cutting guide") published on the site so Google sends free traffic long-term — the slowest but most compounding channel. |
 
 Suggested rollout: **1–3 alongside the marketing build** (the watchdog matters the moment real users arrive), 4–5 shortly after, 6–8 when live and stable.
@@ -135,7 +135,7 @@ Suggested rollout: **1–3 alongside the marketing build** (the watchdog matters
 ## 10. What I need from you to start building
 
 1. **A green light on this design** (or your edits) — including which of the section-9 automations to include in round one
-2. **A one-paragraph description of TradeOS** — what it is, who it's for
+2. **A one-paragraph description of the trading app** — what it is, who it's for
 3. During the build, ~25 minutes for account setup: Publer signup, connecting the IG/X accounts, one Reddit account per project, and confirming the Notion board looks right
 
 Then the build order is: repo + brand profiles + playbooks → Notion board → first batch of 10 draft posts and Reddit replies for your approval (before any scheduler is even connected, so you can judge quality risk-free) → scheduler + Reddit hookup → routines + Friday report → the ops automations you picked from section 9.

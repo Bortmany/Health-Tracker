@@ -6,7 +6,7 @@ Cut is a fat-loss and training tracker for people who aren't sure what to train,
 
 ## Current state (roadmap complete)
 
-All planned phases are built, tested, reviewed, and merged to `main`. 48/48 backend tests passing. Features live:
+All planned phases are built, tested, reviewed, and merged to `main`. 136/136 backend tests passing (the old "48/48" count was long out of date). Features live:
 
 - Auth (JWT httpOnly cookie), consumer/coach roles, rate-limited login, 8+ char passwords
 - Onboarding quiz → matched against 14 seeded workout plans (progression rules + 52-week phases); free tier = 4-week plans, premium = 52-week; `plan_tier` on users
@@ -17,11 +17,11 @@ All planned phases are built, tested, reviewed, and merged to `main`. 48/48 back
 
 **Dormant switches** (code shipped, asleep until env vars are set on Railway):
 - `ANTHROPIC_API_KEY` → AI plan writer (`apps/api/src/lib/aiPlanGenerator.js`)
-- `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` + `STRIPE_PRICE_ID` + `APP_URL` → paid Premium upgrades (`apps/api/src/routes/billing.js`; webhook uses raw body, wired in `app.js` before `express.json`)
+- `PADDLE_API_KEY` + `PADDLE_WEBHOOK_SECRET` + `PADDLE_PRICE_ID` + `PADDLE_ENV` + `APP_URL` → paid Premium upgrades through Paddle (`apps/api/src/lib/billing.js` is the only file that knows the provider; `apps/api/src/routes/billing.js` uses it; the webhook signature is checked against the raw body, wired in `app.js` before `express.json`)
 
 ## Conventions (non-negotiable)
 
-- **Migrations:** numbered SQL files in `apps/api/src/db/migrations/` (next is 016). Always append the same DDL to `docs/schema.sql`.
+- **Migrations:** numbered SQL files in `apps/api/src/db/migrations/` (next is 019). Always append the same DDL to `docs/schema.sql`.
 - **Routes:** `router.use(requireAuth)` first; every query parameterized (`$1…`); user-scoped queries filter `user_id = req.userId`; `asyncHandler` wrapper; snake_case → camelCase via `toPublicX(row)` mappers; errors `{ error: { message, code } }` in plain English; literal paths registered before `/:id`.
 - **Nested writes:** transaction — BEGIN, upsert parent, DELETE children, re-INSERT, COMMIT; ROLLBACK in catch; `client.release()` in finally (see `routes/programs.js` `replaceDays`).
 - **Postgres trap:** placeholders in `COALESCE($n, …)` or typed comparisons need explicit casts (`::uuid`, `::boolean`, `::integer`) or you get runtime 42883 errors.
@@ -36,19 +36,19 @@ All planned phases are built, tested, reviewed, and merged to `main`. 48/48 back
 4. Commit with a short plain-English message, push to the work branch, merge `--no-ff` to `main`, push — Railway auto-deploys `main`.
 5. Report to the owner in plain English; pause for review between major phases unless told to batch.
 
-**Environment notes:** local Postgres stops when the sandbox idles — `service postgresql status || service postgresql start` before anything DB-related. Historical work branch: `claude/loving-clarke-eep2es` (a fresh session may get its own designated branch — follow the session's instructions). Token-lean habits the owner asked for: don't re-read unchanged files, lean verification (tests + build), short commits.
+**Environment notes:** local Postgres stops when the sandbox idles — `service postgresql status || service postgresql start` before anything DB-related. Each session may get its own designated work branch — follow the session's instructions. Token-lean habits the owner asked for: don't re-read unchanged files, lean verification (tests + build), short commits.
 
 ## Backlog (needs the owner)
 
 | Item | What's needed |
 |---|---|
 | Confirm Railway deploy is green | railway.app dashboard; open the app's public URL |
-| Real payments | Stripe account, one subscription Price, set the 4 env vars, point a webhook at `/api/billing/webhook` |
+| Real payments | Paddle account (they approve the app only once it's live, and expect a refund/cancellation page that doesn't exist yet), one subscription price, set the 5 env vars, point a Paddle notification at `/api/billing/webhook` — full sequence in `GO-LIVE.md` |
 | AI-written plans | Set `ANTHROPIC_API_KEY` on Railway |
 | Native iPhone/Android apps | Apple Developer $99/yr, Google Play $25, a Mac — follow `docs/mobile.md` |
 | Premium meanwhile | `UPDATE users SET plan_tier = 'premium' WHERE email = '...';` in Railway's DB shell |
 
-Possible future work: Stripe customer portal (manage/cancel), password reset via email, progress photos (needs file storage), coach chat/notes, push notification reminders.
+Possible future work: Paddle customer portal (manage/cancel), password reset via email, progress photos (needs file storage), coach chat/notes, push notification reminders.
 
 ## Key files
 
@@ -59,4 +59,4 @@ Possible future work: Stripe customer portal (manage/cancel), password reset via
 | `docs/mobile.md` | Step-by-step for App Store / Play Store |
 | `railway.json` | Railway deploy config (build, migrate, start, health check) |
 | `Agents` repo, `.claude/agents/` | The generic dev crew (builder, researcher, content-curator in `development/`; verifier, code-reviewer in `quality/` — full roster in that repo's CLAUDE.md) — works on any repo by reading this file's conventions; include the Agents repo in the session |
-| `apps/api/src/db/migrations/` | 15 migrations so far; runner is `src/db/migrate.js` |
+| `apps/api/src/db/migrations/` | 18 migrations so far; runner is `src/db/migrate.js` |

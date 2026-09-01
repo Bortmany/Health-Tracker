@@ -8,12 +8,12 @@ once the repo exists.
 ## The one step only you can do
 
 Create an empty repository on GitHub: go to github.com → New repository →
-name it exactly **marketing-os** under your account (bortmany), set it **Private**,
+name it exactly **marketing-os** under your account (`<your-github-account>`), set it **Private**,
 and do NOT initialize it with a README. Two clicks, done.
 
 ## Then tell any Claude session (with the Agents repo loaded):
 
-"Add the repo bortmany/marketing-os and finish the marketing-os move per the runbook."
+"Add the repo `<your-github-account>`/marketing-os and finish the marketing-os move per the runbook."
 
 The session will then:
 1. Add + clone the new repo into the session.
