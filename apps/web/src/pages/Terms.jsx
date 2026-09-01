@@ -62,7 +62,9 @@ export default function Terms() {
             The free tier includes 4-week training plans; Premium unlocks
             year-long plans. When paid upgrades are switched on, payment is
             handled by Paddle and the price is shown before you pay. Premium is
-            a subscription; cancelling stops future charges.
+            a subscription; cancelling stops future charges. How cancelling and
+            refunds work is set out in full in the{' '}
+            <Link to="/refunds">Refund &amp; Cancellation Policy</Link>.
           </p>
 
           <h2>Fair use</h2>
@@ -106,7 +108,9 @@ export default function Terms() {
         </div>
 
         <p className={styles.footerLinks}>
-          <Link to="/privacy">Privacy Policy</Link> · <Link to="/login">Back to Cut</Link>
+          <Link to="/privacy">Privacy Policy</Link> ·{' '}
+          <Link to="/refunds">Refund &amp; Cancellation Policy</Link> ·{' '}
+          <Link to="/login">Back to Cut</Link>
         </p>
       </div>
     </div>

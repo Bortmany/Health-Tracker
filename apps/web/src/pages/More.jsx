@@ -333,7 +333,8 @@ export default function More() {
       <DataSection />
 
       <p className={styles.legalLinks}>
-        <Link to="/privacy">Privacy Policy</Link> · <Link to="/terms">Terms of Use</Link>
+        <Link to="/privacy">Privacy Policy</Link> · <Link to="/terms">Terms of Use</Link> ·{' '}
+        <Link to="/refunds">Refunds</Link>
       </p>
 
       <Toast message={toast.message} />

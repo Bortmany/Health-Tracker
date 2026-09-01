@@ -49,19 +49,28 @@ Until the variables are set the upgrade button says "coming soon" and nothing
 is charged. Premium can always be granted by hand:
 `UPDATE users SET plan_tier = 'premium' WHERE email = '...';`
 
-**Blocker for Paddle approval — pages the app doesn't have yet.** Paddle
-reviews the live site and expects to find, linked from it: terms of service, a
-privacy policy, **and a refund / cancellation policy**, plus clear pricing and
-a way to contact whoever runs the app.
+**For Paddle approval — the pages Paddle looks for.** Paddle reviews the live
+site and expects to find, linked from it: terms of service, a privacy policy,
+**and a refund / cancellation policy**, plus clear pricing and a way to contact
+whoever runs the app.
 
 - Terms — **exists** at `/terms`.
 - Privacy — **exists** at `/privacy`.
-- Refund / cancellation policy — **missing.** There is no such page, and the
-  terms page only says that cancelling stops future charges. This needs to be
-  written (by the owner, or by a lawyer — it is a legal document, not a coding
-  task) and published as its own page before applying to Paddle, or the
-  application is likely to be turned down.
-- A contact address for support also needs to be visible somewhere on the site.
+- Refund / cancellation policy — **exists** at `/refunds`. It covers
+  cancelling (stops future charges, access runs to the end of the paid period,
+  no data is deleted), the three cases where we refund, how to ask, and names
+  Paddle as the merchant of record that appears on card statements. It is
+  linked from the More page and from the bottom of the terms and privacy pages.
+
+**Two things still to do on these pages before applying:**
+
+1. **Add your contact email.** Three pages carry the placeholder
+   `[owner — add your contact email here before launch]` — `/terms`,
+   `/privacy` and `/refunds` (twice on the refunds page). Paddle needs a real
+   support address visible on the site, so replace all of them.
+2. **Have a lawyer read them.** All three pages are plain-language templates
+   and each shows a visible "not yet reviewed by a lawyer" notice. Get them
+   reviewed, then remove that notice — it looks weak to a reviewer.
 
 ## Optional
 - [ ] `ANTHROPIC_API_KEY` — wakes the AI plan writer (personalized plans by Claude instead of picked from the 14-plan library).

@@ -166,7 +166,9 @@ export default function Privacy() {
         </div>
 
         <p className={styles.footerLinks}>
-          <Link to="/terms">Terms of Use</Link> · <Link to="/login">Back to Cut</Link>
+          <Link to="/terms">Terms of Use</Link> ·{' '}
+          <Link to="/refunds">Refund &amp; Cancellation Policy</Link> ·{' '}
+          <Link to="/login">Back to Cut</Link>
         </p>
       </div>
     </div>
