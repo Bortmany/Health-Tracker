@@ -52,7 +52,7 @@ if (trustedProxy) {
 // Content-Security-Policy: tells the browser exactly which sources it may load
 // from, which blocks most injected-script attacks. These values are scoped to
 // what the Cut frontend actually uses: its own scripts/styles (same origin),
-// Google Fonts, and same-origin API calls. Stripe checkout is a full-page
+// Google Fonts, and same-origin API calls. Paddle checkout is a full-page
 // redirect (no embedded script), so it needs nothing extra here.
 app.use(helmet({
   contentSecurityPolicy: {
@@ -74,7 +74,7 @@ app.use(helmet({
   },
 }));
 app.use(compression());
-// Stripe's webhook signature is checked against the raw request bytes, so
+// Paddle's webhook signature is checked against the raw request bytes, so
 // that one path must skip JSON parsing. It's registered before express.json.
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 // Cap the request body so a huge (or malicious) payload can't tie up memory.

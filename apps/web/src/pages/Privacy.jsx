@@ -67,8 +67,8 @@ export default function Privacy() {
             <li>
               <strong>Plan and billing status:</strong> whether your account is
               free or Premium. If paid upgrades are switched on and you upgrade,
-              our payment provider Stripe gives us a customer reference — your
-              card details go to Stripe directly and never touch our servers.
+              our payment provider Paddle gives us a customer reference — your
+              card details go to Paddle directly and never touch our servers.
             </li>
             <li>
               <strong>Device health data:</strong> only if you later connect a
@@ -115,7 +115,7 @@ export default function Privacy() {
               Railway, a cloud hosting provider.
             </li>
             <li>
-              <strong>Payments:</strong> Stripe, only if you buy a Premium
+              <strong>Payments:</strong> Paddle, only if you buy a Premium
               upgrade.
             </li>
             <li>

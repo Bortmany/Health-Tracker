@@ -10,7 +10,7 @@
 | `feedback-curator` (#4) | **25 total signups** OR the first piece of unsolicited user feedback, whichever first | Below that, "patterns" are noise — one person is an anecdote | ~5 min/month reading the ranked list |
 | `maintenance` (#5) | Any app live and stable for **two weeks** | Updating dependencies during launch churn multiplies risk; on a stable app it's pure health | ~10 min/month reading + merging the prepared update |
 | `competitor-watch` (#6) | Marketing has run **4 full weeks** (4 Thursday reports exist) | Needs our own baseline first, or the digest has no "so what for us" | ~10 min/month reading the digest |
-| `billing-ops` (#7) | Stripe env vars set on Render (Premium is actually purchasable) | Nothing to recover before real payments | ~5 min/week approving recovery drafts |
+| `billing-ops` (#7) | Paddle env vars set on Railway (Premium is actually purchasable) | Nothing to recover before real payments | ~5 min/week approving recovery drafts |
 | `seo-writer` (#8) | **100 total signups** AND 4 consecutive weeks without a product-breaking bug | SEO pays off in months — pointless before product-market signal; also needs a blog section built (small dev task, flagged then) | ~20 min per article to review |
 | `ads-manager` | First row exists in `ads/accounts.md` with an owner-set monthly cap | Money never moves on inference — the registry row IS the owner's written permission | Per-campaign approval: approve the card AND press the platform buttons |
 | `ad-creative-producer` | Higgsfield tools connected OR first row in `ads/accounts.md` | Ad media before there's anywhere to run it (or tools to make it) is wasted work; joins `marketing-director`'s crew at wake | ~0 extra — its output rides the normal card approvals |

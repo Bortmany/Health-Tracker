@@ -11,10 +11,57 @@ Plain-English list of what to set up before launch. Full context: `Agents/docs/g
 - [ ] **`NODE_ENV=production`** — makes Express serve the built frontend.
 - [ ] **`DATABASE_SSL=true`** — needed for essentially all hosted Postgres.
 
-## Payments — Stripe (built, asleep until keys are set)
-- [ ] `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `APP_URL`
-- [ ] Point a Stripe webhook at `/api/billing/webhook`.
-- Until set, the upgrade button shows "coming soon". You can grant Premium by hand: `UPDATE users SET plan_tier = 'premium' WHERE email = '...';`
+## Payments — Paddle (built, asleep until keys are set)
+
+The code is finished and switched off. Paddle sells the subscription as the
+merchant of record (they handle tax), which means **Paddle has to approve the
+app before it can take money** — and they only review a site that is already
+live. So the order matters:
+
+1. **Deploy Cut first, still dormant.** Nothing below can start until the app
+   is on a real web address.
+2. **Add the pages Paddle's review asks for** — see the blocker note below.
+3. **Apply to Paddle** at paddle.com with that live address, and wait for their
+   approval (usually a few days; they may come back with questions).
+4. **Create the product and its price** in the Paddle dashboard: one product
+   ("Cut Premium"), one recurring price. Copy the price id — it looks like
+   `pri_...`.
+5. **Create a server API key** (Paddle dashboard → Developer tools →
+   Authentication) and copy it. It is shown once.
+6. **Create a notification destination** (Developer tools → Notifications)
+   pointing at `https://YOUR-APP-ADDRESS/api/billing/webhook`, subscribed to
+   `subscription.activated`, `subscription.updated`, `subscription.canceled`,
+   `subscription.paused` and `subscription.expired`. Copy its secret key.
+7. **Set the five variables on Railway** and redeploy:
+   - [ ] `PADDLE_API_KEY` — the server API key from step 5
+   - [ ] `PADDLE_WEBHOOK_SECRET` — the notification secret from step 6
+   - [ ] `PADDLE_PRICE_ID` — the `pri_...` id from step 4
+   - [ ] `PADDLE_ENV` — `sandbox` while testing, `production` for real money
+     (anything else, including leaving it out, means sandbox)
+   - [ ] `APP_URL` — the app's own public address, e.g.
+     `https://cut.up.railway.app`
+8. **Test in the sandbox first.** Sign up at sandbox.paddle.com, repeat steps
+   4–6 there, set `PADDLE_ENV=sandbox`, and buy the plan with one of Paddle's
+   test cards. The account should flip to Premium within seconds of paying.
+   Then swap in the live keys and set `PADDLE_ENV=production`.
+
+Until the variables are set the upgrade button says "coming soon" and nothing
+is charged. Premium can always be granted by hand:
+`UPDATE users SET plan_tier = 'premium' WHERE email = '...';`
+
+**Blocker for Paddle approval — pages the app doesn't have yet.** Paddle
+reviews the live site and expects to find, linked from it: terms of service, a
+privacy policy, **and a refund / cancellation policy**, plus clear pricing and
+a way to contact whoever runs the app.
+
+- Terms — **exists** at `/terms`.
+- Privacy — **exists** at `/privacy`.
+- Refund / cancellation policy — **missing.** There is no such page, and the
+  terms page only says that cancelling stops future charges. This needs to be
+  written (by the owner, or by a lawyer — it is a legal document, not a coding
+  task) and published as its own page before applying to Paddle, or the
+  application is likely to be turned down.
+- A contact address for support also needs to be visible somewhere on the site.
 
 ## Optional
 - [ ] `ANTHROPIC_API_KEY` — wakes the AI plan writer (personalized plans by Claude instead of picked from the 14-plan library).

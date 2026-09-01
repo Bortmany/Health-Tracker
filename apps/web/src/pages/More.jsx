@@ -238,7 +238,7 @@ export default function More() {
   const queryClient = useQueryClient();
   const toast = useToast();
 
-  // Coming back from a successful Stripe checkout: refresh the account so
+  // Coming back from a successful Paddle checkout: refresh the account so
   // the Premium label shows up without a manual reload.
   useEffect(() => {
     if (searchParams.get('upgraded')) {

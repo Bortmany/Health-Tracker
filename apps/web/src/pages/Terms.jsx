@@ -61,7 +61,7 @@ export default function Terms() {
           <p>
             The free tier includes 4-week training plans; Premium unlocks
             year-long plans. When paid upgrades are switched on, payment is
-            handled by Stripe and the price is shown before you pay. Premium is
+            handled by Paddle and the price is shown before you pay. Premium is
             a subscription; cancelling stops future charges.
           </p>
 
