@@ -36,3 +36,10 @@
 .fieldError .input {
   border-color: var(--color-danger);
 }
+
+/* Multi-line boxes grow downward only, never sideways out of the card. */
+.textarea {
+  resize: vertical;
+  line-height: 1.5;
+  min-height: 5rem;
+}

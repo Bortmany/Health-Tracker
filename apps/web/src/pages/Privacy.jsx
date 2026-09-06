@@ -102,6 +102,14 @@ export default function Privacy() {
             You can disconnect your coach at any time from the More page, which
             immediately ends their access.
           </p>
+          <p>
+            If you apply to become a coach, we also store what you tell us in
+            the application — the name you want clients to see, your
+            credentials and experience, how you train people, and any link you
+            give us. The app owner reads these to decide on your application,
+            and they stay on file with the decision. Withdrawing a pending
+            application deletes it.
+          </p>
 
           <h2>Cookies</h2>
           <p>

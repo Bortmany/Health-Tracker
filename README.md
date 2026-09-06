@@ -50,6 +50,7 @@ Tests: `npm test` (integration tests against the local Postgres). Build check: `
 | `ANTHROPIC_API_KEY` | Optional switch | Wakes the AI plan writer (personalized plans written by Claude instead of picked from the library) |
 | `PADDLE_API_KEY` + `PADDLE_WEBHOOK_SECRET` + `PADDLE_PRICE_ID` + `APP_URL` | Optional switch | Wakes paid Premium upgrades (Paddle checkout + webhook). Until all of them are set, the upgrade button shows "coming soon" and Premium can be granted manually: `UPDATE users SET plan_tier = 'premium' WHERE email = '...';` |
 | `PADDLE_ENV` | Optional | `sandbox` (the default, and what anything unrecognised falls back to) or `production` for real money. Decides which Paddle address the server talks to. |
+| `ADMIN_EMAIL` | Optional switch | The one account allowed to review coach applications at `/admin/coaches`. The first time that email signs in while no admin exists yet, it becomes the admin — once, ever. `/api/health` reports it as `admin`. |
 | `PRIVACY_CONTACT_EMAIL` | Optional | The contact address shown as a mailto link on the `/terms`, `/privacy` and `/refunds` pages (served by the public `GET /api/legal/contact`). Defaults to the owner's address, `naeljam@hotmail.com`. |
 
 ## Repo structure
