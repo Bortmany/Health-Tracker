@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { signToken, verifyTokenPayload } from '../lib/jwt.js';
+import { getSignupMode, isValidInviteCode } from '../lib/signupMode.js';
 import * as validate from '../lib/validate.js';
 import { withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -41,10 +42,34 @@ function toPublicUser(row) {
   };
 }
 
+// Public: tells the sign-up screen whether anyone can join ("open"), a signup
+// invite code is needed ("invite"), or sign-up is switched off ("closed").
+// Never returns the codes themselves. (Unrelated to coach invite codes.)
+router.get('/signup-mode', (_req, res) => {
+  res.json({ mode: getSignupMode() });
+});
+
 router.post('/register', asyncHandler(async (req, res) => {
   // Note: `role` is deliberately NOT read from the request. New accounts are
   // always regular ('consumer') accounts — see below.
-  const { email, password, displayName } = req.body ?? {};
+  const { email, password, displayName, inviteCode } = req.body ?? {};
+
+  // Signup gate (see lib/signupMode.js). Checked before anything else so a
+  // closed or invite-only app does no work — and leaks nothing — for
+  // strangers. The 403 here is what the register failure throttle in app.js
+  // counts, so guessing codes is rate-limited per IP.
+  const signupMode = getSignupMode();
+  if (signupMode === 'closed') {
+    return res.status(403).json({
+      error: { message: 'Sign-up is closed for now.', code: 'SIGNUPS_CLOSED' },
+    });
+  }
+  if (signupMode === 'invite' && !isValidInviteCode(inviteCode)) {
+    return res.status(403).json({
+      error: { message: 'Sign-up is by invitation. Enter a valid invite code.', code: 'INVITE_REQUIRED' },
+    });
+  }
+
   if (!email || !password || !displayName) {
     return res.status(400).json({
       error: { message: 'email, password, and displayName are required', code: 'INVALID_INPUT' },

@@ -42,6 +42,8 @@ Tests: `npm test` (integration tests against the local Postgres). Build check: `
 | `NODE_ENV` | Yes | `production` makes Express serve the built frontend |
 | `TRUSTED_PROXY` | Yes on Railway | Set to `1` (the number of proxy hops in front of the app). Railway puts a proxy in front of every request, so without this every visitor looks like the same address and the login/save rate limits lock everyone out at once. Leave unset locally. |
 | `PORT`, `CORS_ORIGIN` | No | Defaults fine locally. `CORS_ORIGIN` falls back to `APP_URL` when that is set, then to the local dev address. |
+| `SIGNUP_INVITE_CODES` | Yes in production (until the paywall is live) | Comma-separated signup invite codes, 8+ characters each. When set, creating an account requires one of them (invitation-only). Rotate by editing the variable and redeploying. Not the same as coach invite codes. |
+| `SIGNUPS_OPEN` | No | `true` lets anyone sign up without a code. In production with neither this nor codes set, sign-up is closed. Locally sign-up is open unless codes are set. `/api/health` reports the current mode as `signups`. |
 | `SENTRY_DSN` | Optional switch | Wakes error tracking: server errors are reported to Sentry. Dormant (nothing imported or sent) until set. |
 | `PG_POOL_MAX` | No | Most database connections one copy of the server will open (default 10). Lower it if Railway runs several copies, so copies × this stays under the database's connection limit. |
 | `PG_IDLE_TIMEOUT_MS`, `PG_CONNECTION_TIMEOUT_MS` | No | Close an idle database connection after this long (default 30000), and give up waiting for a free one after this long (default 10000). Defaults fine. |

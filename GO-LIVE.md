@@ -11,6 +11,7 @@ Plain-English list of what to set up before launch. Full context: `Agents/docs/g
 - [ ] **`NODE_ENV=production`** — makes Express serve the built frontend.
 - [ ] **`DATABASE_SSL=true`** — needed for essentially all hosted Postgres.
 - [ ] **`TRUSTED_PROXY=1`** — Railway puts a proxy in front of the app, so without this every visitor looks like one and the same address and the rate limits lock everyone out at once.
+- [ ] **`SIGNUP_INVITE_CODES`** — sign-up is invitation-only until the paywall is live. Set this to one or more codes (comma-separated, 8+ characters each, e.g. `friends-2026,gym-buddies-1`) and hand a code to each person you invite. Without it, production sign-up is **closed** and nobody can create an account. To rotate a code, edit the variable and redeploy; to open sign-up to everyone later, set `SIGNUPS_OPEN=true`. `/api/health` shows the current mode under `signups`. (These are signup invites — different from the coach invite codes inside the app.)
 
 ## Backups
 Railway does not back up the database unless you switch it on.
