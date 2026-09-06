@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import LineChart from '../components/LineChart.jsx';
+import Sparkline from '../components/Sparkline.jsx';
 import {
+  Avatar,
   Button,
   Card,
+  Chip,
   ConfirmDialog,
   EmptyState,
   ErrorText,
@@ -11,15 +15,19 @@ import {
   Screen,
   SectionTitle,
   Skeleton,
+  StatCard,
+  TextArea,
   Toast,
   useToast,
 } from '../components/ui/index.js';
 import {
   useAssignProgram,
+  useClientNote,
   useClients,
   useClientSummary,
   useCreateInvite,
   useRemoveClient,
+  useSaveClientNote,
 } from '../hooks/useCoach.js';
 import {
   useAcceptRequest,
@@ -39,18 +47,26 @@ function formatDateLabel(date) {
   return new Date(`${date.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function startOfThisWeek() {
-  const d = new Date();
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // back to Monday
-  d.setHours(0, 0, 0, 0);
-  return d;
+// "just now" / "today at 3:42 PM" / "Sep 4 at 3:42 PM" for the note's last-saved line.
+function formatSavedTime(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  if (Number.isNaN(d.getTime()) || now - d < 60000) return 'just now';
+  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  if (d.toDateString() === now.toDateString()) return `today at ${time}`;
+  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at ${time}`;
 }
 
-function daysSince(dateStr) {
-  const then = new Date(`${dateStr.slice(0, 10)}T00:00:00`);
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  return Math.round((now - then) / 86400000);
+// Attention = never logged, or quiet for 3+ days (the server already sorts these first).
+function needsAttention(client) {
+  return client.quietDays == null || client.quietDays >= 3;
+}
+
+// On track = logged at least as many sessions as their program has days this
+// week. A client with no program isn't on or off track — just unmeasured.
+function isOnTrack(client) {
+  const planned = client.adherence?.planned ?? 0;
+  return planned > 0 && (client.adherence?.done ?? 0) >= planned;
 }
 
 function blankDay(index) {
@@ -216,7 +232,132 @@ function AssignProgramBuilder({ clientId }) {
   );
 }
 
-function ClientDetail({ clientId, summary, isLoading }) {
+const NOTE_MAX = 4000;
+const NOTE_COUNTER_FROM = 3800;
+
+// Private notes on one client. Saves when the coach taps away from the box,
+// never on every keystroke, and never throws away what they typed on a failure.
+function ClientNotes({ clientId, onSaved }) {
+  const note = useClientNote(clientId);
+  const save = useSaveClientNote(clientId);
+  // `draft` is null until the coach types; before that the box shows the saved text.
+  const [draft, setDraft] = useState(null);
+  const [savedAtOverride, setSavedAtOverride] = useState(null);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const lastSavedRef = useRef(null); // text the server is known to hold
+  const inFlightRef = useRef(false); // a PUT is running right now
+  const queuedRef = useRef(false); // the text changed again mid-save — save once more when done
+  const latestRef = useRef('');
+
+  const loadedBody = note.data?.note?.body ?? '';
+  const value = draft ?? loadedBody;
+  const savedAt = savedAtOverride ?? note.data?.note?.updatedAt ?? null;
+  latestRef.current = value;
+
+  // Saves run one at a time, always with the newest text, so an older save can
+  // never overwrite a newer one and only the final save decides what to show.
+  async function runSave() {
+    const text = latestRef.current;
+    inFlightRef.current = true;
+    queuedRef.current = false;
+    setSaving(true);
+    setSaveFailed(false);
+    let ok = false;
+    let result = null;
+    try {
+      result = await save.mutateAsync(text);
+      ok = true;
+    } catch {
+      ok = false;
+    }
+    inFlightRef.current = false;
+    if (queuedRef.current) {
+      // Newer text is waiting — its save is the one that gets to report.
+      if (ok) lastSavedRef.current = text;
+      runSave();
+      return;
+    }
+    setSaving(false);
+    if (ok) {
+      lastSavedRef.current = text;
+      // Clearing the note returns null — the moment of clearing is the "last saved" time.
+      setSavedAtOverride(result?.note?.updatedAt ?? new Date().toISOString());
+      onSaved('Saved');
+    } else {
+      // Keep the text; tapping away again retries the same save.
+      setSaveFailed(true);
+    }
+  }
+
+  function handleBlur() {
+    const baseline = lastSavedRef.current ?? loadedBody;
+    if (value === baseline) return;
+    if (inFlightRef.current) {
+      queuedRef.current = true;
+      return;
+    }
+    runSave();
+  }
+
+  if (note.isLoading) {
+    return <Skeleton height="6rem" />;
+  }
+
+  if (note.isError) {
+    return (
+      <>
+        <ErrorText>Couldn&apos;t load your notes — please try again.</ErrorText>
+        <Button variant="secondary" size="sm" onClick={() => note.refetch()}>
+          Retry
+        </Button>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <TextArea
+        rows={4}
+        maxLength={NOTE_MAX}
+        placeholder="e.g. mentioned a knee niggle, check in Thursday"
+        value={value}
+        onChange={(e) => setDraft(e.target.value.slice(0, NOTE_MAX))}
+        onBlur={handleBlur}
+        aria-label="Private notes about this client"
+      />
+      {value.length >= NOTE_COUNTER_FROM && (
+        <div className={value.length >= NOTE_MAX ? styles.counterOver : styles.counter} aria-live="polite">
+          {value.length}/{NOTE_MAX}
+        </div>
+      )}
+      {saving ? (
+        <p className={styles.noteStatus}>Saving...</p>
+      ) : saveFailed ? (
+        <ErrorText>Couldn&apos;t save your note — please try again.</ErrorText>
+      ) : savedAt ? (
+        <p className={styles.noteStatus}>Last saved {formatSavedTime(savedAt)}</p>
+      ) : null}
+    </>
+  );
+}
+
+// The expanded row. The summary loads only once a row is opened — the list
+// rows already carry everything the coach needs to scan without tapping.
+function ClientDetail({ clientId, onToast }) {
+  const { data: summary, isLoading, isError, refetch } = useClientSummary(clientId);
+
+  if (isError) {
+    return (
+      <div className={styles.clientDetail}>
+        <ErrorText>Couldn&apos;t load this client&apos;s details — please try again.</ErrorText>
+        <Button variant="secondary" size="sm" onClick={() => refetch()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
   if (isLoading || !summary) {
     return <Skeleton height={160} style={{ marginTop: 'var(--space-3)' }} />;
   }
@@ -278,6 +419,11 @@ function ClientDetail({ clientId, summary, isLoading }) {
       <div className={styles.detailSection}>
         <SectionTitle>Assign a program</SectionTitle>
         <AssignProgramBuilder clientId={clientId} />
+      </div>
+
+      <div className={styles.detailSection}>
+        <SectionTitle>Notes (only you see these)</SectionTitle>
+        <ClientNotes clientId={clientId} onSaved={onToast} />
       </div>
     </div>
   );
@@ -381,52 +527,63 @@ function InviteByEmail({ onSent }) {
   );
 }
 
-// One triage row: name, weight direction, sessions this week, last log.
-// The summary loads for every row up front so the coach can scan without
-// tapping; expanding is instant because the data is already cached.
-function ClientRow({ client, expanded, onToggle, onRemove, removing = false }) {
-  const { data: summary, isLoading } = useClientSummary(client.clientId);
+// Left side of the row's status line: an amber chip when the client needs a
+// nudge, plain text when they're active.
+function StatusLabel({ quietDays }) {
+  if (quietDays == null) return <Chip tone="warn">Never logged</Chip>;
+  if (quietDays >= 3) return <Chip tone="warn">Quiet {quietDays}d</Chip>;
+  if (quietDays === 0) return <span>Active today</span>;
+  return <span>Active {quietDays}d ago</span>;
+}
 
-  const weighIns = summary?.weighIns ?? [];
-  const recentSessions = summary?.recentSessions ?? [];
+// Right side: "2/4 this week" plus one dot per program day. The count is
+// capped at the program's days (six sessions on a four-day plan reads 4/4).
+// An unfilled dot is neutral grey — a missed day is never marked red.
+function AdherenceLabel({ adherence }) {
+  const planned = adherence?.planned ?? 0;
+  if (!planned) return <span>No program assigned</span>;
+  const done = Math.min(Math.max(adherence?.done ?? 0, 0), planned);
+  return (
+    <span className={styles.adherence}>
+      <span>
+        {done}/{planned} this week
+      </span>
+      <span className={styles.dots} aria-hidden="true">
+        {Array.from({ length: planned }, (_, i) => (
+          <span key={i} className={i < done ? styles.dotFilled : styles.dot} />
+        ))}
+      </span>
+    </span>
+  );
+}
 
-  let direction = null;
-  if (weighIns.length >= 2) {
-    const diff = Number(weighIns[weighIns.length - 1].weight) - Number(weighIns[weighIns.length - 2].weight);
-    direction = Math.abs(diff) < 0.05 ? 'steady' : `${diff < 0 ? '↓' : '↑'} ${Math.abs(diff).toFixed(1)} kg`;
-  }
-
-  const weekStart = startOfThisWeek();
-  const sessionsThisWeek = recentSessions.filter(
-    (s) => new Date(`${s.date.slice(0, 10)}T00:00:00`) >= weekStart
-  ).length;
-
-  // Approximation: the most recent of the last weigh-in and last session
-  // (the summary endpoint has no general "last log of any kind" date yet).
-  const lastDates = [weighIns[weighIns.length - 1]?.date, recentSessions[0]?.date].filter(Boolean);
-  let lastLog = 'No logs yet';
-  if (lastDates.length > 0) {
-    const days = Math.min(...lastDates.map(daysSince));
-    lastLog = days <= 0 ? 'Logged today' : days === 1 ? 'Last log: yesterday' : `Last log: ${days} days ago`;
-  }
+// One triage row: avatar, name, 4-week weight sparkline, then the status and
+// adherence line. Everything here arrives with the client list itself, so
+// the row paints in one go with no per-row loading. The order is the
+// server's — never sorted here.
+function ClientRow({ client, expanded, onToggle, onRemove, onToast, removing = false }) {
+  const weights = (client.weightSeries ?? []).map((w) => Number(w.weight));
 
   return (
     <div className={styles.clientRow}>
       <div className={styles.clientHead} onClick={onToggle}>
+        <div className={styles.avatarSlot}>
+          <Avatar name={client.displayName} size={36} />
+        </div>
         <div className={styles.clientInfo}>
-          <div className={styles.clientName}>{client.displayName}</div>
+          <div className={styles.clientTop}>
+            <div className={styles.clientName}>{client.displayName}</div>
+            {weights.length >= 2 ? (
+              <Sparkline values={weights} />
+            ) : (
+              <span className={styles.noWeighIns}>No weigh-ins yet</span>
+            )}
+          </div>
           <div className={styles.clientEmail}>{client.email}</div>
-          {isLoading ? (
-            <Skeleton width="70%" height="0.8rem" style={{ marginTop: 'var(--space-1)' }} />
-          ) : (
-            <div className={styles.triageStats}>
-              {direction && <span>{direction}</span>}
-              <span>
-                {sessionsThisWeek} session{sessionsThisWeek === 1 ? '' : 's'} this week
-              </span>
-              <span>{lastLog}</span>
-            </div>
-          )}
+          <div className={styles.triageStats}>
+            <StatusLabel quietDays={client.quietDays} />
+            <AdherenceLabel adherence={client.adherence} />
+          </div>
         </div>
         <div className={styles.rowActions}>
           <button
@@ -444,13 +601,13 @@ function ClientRow({ client, expanded, onToggle, onRemove, removing = false }) {
           <span className={styles.chevron}>{expanded ? '▲' : '▼'}</span>
         </div>
       </div>
-      {expanded && <ClientDetail clientId={client.clientId} summary={summary} isLoading={isLoading} />}
+      {expanded && <ClientDetail clientId={client.clientId} onToast={onToast} />}
     </div>
   );
 }
 
 export default function Clients() {
-  const { data, isLoading } = useClients();
+  const { data, isLoading, isError, refetch } = useClients();
   const requests = useCoachRequests();
   const createInvite = useCreateInvite();
   const removeClient = useRemoveClient();
@@ -490,8 +647,32 @@ export default function Clients() {
   // loading) — a busy coach's screen stays calm otherwise.
   const showRequests = requests.isLoading || requestList.length > 0;
 
+  // The scoreboard only appears once there are real numbers to show — an
+  // empty practice doesn't need three zeros above the "invite" card.
+  const showSummary = !isLoading && !isError && clients.length > 0;
+  const attentionCount = clients.filter(needsAttention).length;
+  const onTrackCount = clients.filter(isOnTrack).length;
+
   return (
     <Screen title="Clients">
+      {showSummary && (
+        <div className={styles.summaryStrip}>
+          <StatCard label="Clients" value={clients.length} />
+          <StatCard
+            label="Need attention"
+            value={attentionCount}
+            sub="Quiet 3+ days"
+            subTone={attentionCount > 0 ? 'warn' : 'neutral'}
+          />
+          <StatCard
+            label="On track"
+            value={onTrackCount}
+            sub="Hit their program"
+            subTone={onTrackCount > 0 ? 'good' : 'neutral'}
+          />
+        </div>
+      )}
+
       <Card className={styles.stackCard} title="Invite a client">
         {newCode && (
           <div className={styles.inviteCodeBox}>
@@ -545,8 +726,24 @@ export default function Clients() {
       <Card className={styles.stackCard} title="Your clients">
         {isLoading ? (
           <Skeleton height="3.5rem" count={3} />
+        ) : isError ? (
+          <>
+            <ErrorText>Couldn&apos;t load your clients — please try again.</ErrorText>
+            <Button variant="secondary" onClick={() => refetch()}>
+              Retry
+            </Button>
+          </>
         ) : clients.length === 0 ? (
-          <EmptyState>No clients yet. Send an invite code to get started.</EmptyState>
+          <EmptyState
+            action={
+              <Link className={styles.linkAsButton} to="/coach/profile">
+                Set up your profile
+              </Link>
+            }
+          >
+            No clients yet. Send an invite code above, or set up your public profile so students can find
+            you.
+          </EmptyState>
         ) : (
           clients.map((client) => (
             <ClientRow
@@ -555,6 +752,7 @@ export default function Clients() {
               expanded={expandedId === client.clientId}
               onToggle={() => setExpandedId((id) => (id === client.clientId ? null : client.clientId))}
               onRemove={() => setClientToRemove(client)}
+              onToast={(message) => toast.show(message)}
               removing={removeClient.isPending}
             />
           ))

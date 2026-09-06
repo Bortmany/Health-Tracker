@@ -56,6 +56,24 @@ export function useAssignProgram(clientId) {
   });
 }
 
+// The coach's private note on one client. Saving refreshes only this note —
+// the client list doesn't change when a note does.
+export function useClientNote(clientId) {
+  return useQuery({
+    queryKey: ['clientNote', clientId],
+    queryFn: () => coachApi.getClientNote(clientId),
+    enabled: Boolean(clientId),
+  });
+}
+
+export function useSaveClientNote(clientId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => coachApi.saveClientNote(clientId, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clientNote', clientId] }),
+  });
+}
+
 // ---- Student side ----
 
 // { coach: {displayName, slug} | null, pendingRequest: {...} | null, coachInvites: [...] }

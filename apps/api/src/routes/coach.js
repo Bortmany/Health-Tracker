@@ -273,6 +273,85 @@ router.post('/invites/email', asyncHandler(async (req, res) => {
   res.status(202).json({ message: "If that address has a Cut account, they'll see your invite." });
 }));
 
+// The "who needs me today" signals for the Clients list. Everything is
+// worked out from logs the client already keeps for themselves; nothing new
+// is asked of them. Each signal is one query over ALL of this coach's active
+// clients at once (never one query per client), then matched up in JS.
+// "Today" and "this week" (Monday–Sunday) come from the database clock, so the
+// app has exactly one idea of what day it is.
+async function fetchClientSignals(coachId, clientIds) {
+  const empty = { lastActive: new Map(), done: new Map(), planned: new Map(), weights: new Map() };
+  if (clientIds.length === 0) return empty;
+
+  // Last day the client logged anything (a daily log, a training session or a
+  // meal), and how many whole days ago that was.
+  const { rows: activeRows } = await pool.query(
+    `SELECT user_id, MAX(date)::text AS last_active,
+            (CURRENT_DATE - MAX(date))::integer AS quiet_days
+     FROM (
+       SELECT user_id, date FROM daily_logs WHERE user_id = ANY($1::uuid[])
+       UNION ALL
+       SELECT user_id, date FROM training_logs WHERE user_id = ANY($1::uuid[])
+       UNION ALL
+       SELECT user_id, date FROM nutrition_logs WHERE user_id = ANY($1::uuid[])
+     ) logged
+     GROUP BY user_id`,
+    [clientIds]
+  );
+
+  // Training sessions logged this week (Monday through Sunday, today's week).
+  const { rows: doneRows } = await pool.query(
+    `SELECT user_id, COUNT(*)::integer AS done
+     FROM training_logs
+     WHERE user_id = ANY($1::uuid[])
+       AND date >= date_trunc('week', CURRENT_DATE)::date
+       AND date < (date_trunc('week', CURRENT_DATE) + INTERVAL '7 days')::date
+     GROUP BY user_id`,
+    [clientIds]
+  );
+
+  // How many training days are in the newest program THIS coach assigned to
+  // each client (archived programs don't count).
+  const { rows: plannedRows } = await pool.query(
+    `SELECT DISTINCT ON (p.user_id) p.user_id,
+            (SELECT COUNT(*) FROM program_days d WHERE d.program_id = p.id)::integer AS planned
+     FROM programs p
+     WHERE p.user_id = ANY($1::uuid[]) AND p.created_by_coach_id = $2 AND p.archived_at IS NULL
+     ORDER BY p.user_id, p.created_at DESC`,
+    [clientIds, coachId]
+  );
+
+  // Weigh-ins from the last 28 days, oldest first, for the small trend line.
+  const { rows: weightRows } = await pool.query(
+    `SELECT user_id, date::text AS date, weight
+     FROM daily_logs
+     WHERE user_id = ANY($1::uuid[]) AND weight IS NOT NULL
+       AND date > (CURRENT_DATE - INTERVAL '28 days')::date
+     ORDER BY date`,
+    [clientIds]
+  );
+
+  const signals = empty;
+  for (const row of activeRows) {
+    signals.lastActive.set(row.user_id, { lastActiveAt: row.last_active, quietDays: row.quiet_days });
+  }
+  for (const row of doneRows) signals.done.set(row.user_id, row.done);
+  for (const row of plannedRows) signals.planned.set(row.user_id, row.planned);
+  for (const row of weightRows) {
+    if (!signals.weights.has(row.user_id)) signals.weights.set(row.user_id, []);
+    signals.weights.get(row.user_id).push({ date: row.date, weight: Number(row.weight) });
+  }
+  return signals;
+}
+
+// Who needs attention first: never logged, then quietest, then by name.
+function compareClientsForTriage(a, b) {
+  if (a.quietDays === null && b.quietDays !== null) return -1;
+  if (a.quietDays !== null && b.quietDays === null) return 1;
+  if (a.quietDays !== b.quietDays) return b.quietDays - a.quietDays;
+  return a.displayName.localeCompare(b.displayName);
+}
+
 router.get('/clients', asyncHandler(async (req, res) => {
   const { rows: activeRows } = await pool.query(
     `SELECT cc.id AS link_id, cc.client_id, u.display_name, u.email
@@ -290,13 +369,30 @@ router.get('/clients', asyncHandler(async (req, res) => {
     [req.userId]
   );
 
-  res.json({
-    clients: activeRows.map((row) => ({
+  const signals = await fetchClientSignals(req.userId, activeRows.map((row) => row.client_id));
+
+  const clients = activeRows.map((row) => {
+    const activity = signals.lastActive.get(row.client_id) ?? { lastActiveAt: null, quietDays: null };
+    return {
       linkId: row.link_id,
       clientId: row.client_id,
       displayName: row.display_name,
       email: row.email,
-    })),
+      lastActiveAt: activity.lastActiveAt,
+      // A log dated tomorrow (a phone ahead of the server's clock) counts as
+      // active today rather than as a negative number of quiet days.
+      quietDays: activity.quietDays === null ? null : Math.max(0, activity.quietDays),
+      adherence: {
+        done: signals.done.get(row.client_id) ?? 0,
+        planned: signals.planned.get(row.client_id) ?? null,
+      },
+      weightSeries: signals.weights.get(row.client_id) ?? [],
+    };
+  });
+  clients.sort(compareClientsForTriage);
+
+  res.json({
+    clients,
     pendingInvites: pendingRows.map((row) => ({
       linkId: row.link_id,
       inviteCode: row.invite_code,
@@ -373,6 +469,64 @@ router.get('/clients/:clientId/summary', asyncHandler(async (req, res) => {
       fromMe: row.created_by_coach_id === req.userId,
     })),
   });
+}));
+
+// The coach's private note on a client. Only the coach who wrote it can read
+// it, and only while their link to that client is active — once the link
+// ends, the note is out of reach for everyone (a "not found", never a hint
+// that it exists). The client can never reach this route at all: every
+// /api/coach route is coach-only.
+const MAX_NOTE_LENGTH = 4000;
+
+function toPublicNote(row) {
+  return { body: row.body, updatedAt: row.updated_at };
+}
+
+router.get('/clients/:clientId/notes', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.clientId)) return clientNotFound(res);
+  const link = await findActiveLink(req.userId, req.params.clientId);
+  if (!link) return clientNotFound(res);
+
+  const { rows } = await pool.query(
+    'SELECT body, updated_at FROM coach_notes WHERE coach_id = $1 AND client_id = $2',
+    [req.userId, req.params.clientId]
+  );
+  res.json({ note: rows[0] ? toPublicNote(rows[0]) : null });
+}));
+
+router.put('/clients/:clientId/notes', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.clientId)) return clientNotFound(res);
+
+  // A missing or blank note means "clear it"; anything else must be text of a
+  // sane length. Checked before the link lookup so a bad body is a quick 400.
+  const raw = req.body?.body;
+  if (raw != null && typeof raw !== 'string') {
+    throw new validate.ValidationError('body must be text');
+  }
+  const body = (raw ?? '').trim();
+  if (body.length > MAX_NOTE_LENGTH) {
+    throw new validate.ValidationError(`body must be no more than ${MAX_NOTE_LENGTH} characters long`);
+  }
+
+  const link = await findActiveLink(req.userId, req.params.clientId);
+  if (!link) return clientNotFound(res);
+
+  if (body === '') {
+    await pool.query(
+      'DELETE FROM coach_notes WHERE coach_id = $1 AND client_id = $2',
+      [req.userId, req.params.clientId]
+    );
+    return res.json({ note: null });
+  }
+
+  const { rows } = await pool.query(
+    `INSERT INTO coach_notes (coach_id, client_id, body)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (coach_id, client_id) DO UPDATE SET body = EXCLUDED.body, updated_at = now()
+     RETURNING body, updated_at`,
+    [req.userId, req.params.clientId, body]
+  );
+  res.json({ note: toPublicNote(rows[0]) });
 }));
 
 router.post('/clients/:clientId/programs', asyncHandler(async (req, res) => {

@@ -30,3 +30,7 @@
 .good {
   color: var(--color-success);
 }
+
+.warn {
+  color: var(--color-warning);
+}

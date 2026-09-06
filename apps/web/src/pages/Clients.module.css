@@ -69,19 +69,52 @@
 
 .clientHead {
   display: flex;
-  align-items: center;
+  /* Top-aligned so the avatar, ✕ and chevron all sit on the name line. */
+  align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2);
   cursor: pointer;
   min-height: 2.75rem;
 }
 
 .clientInfo {
   min-width: 0;
+  flex: 1;
 }
 
 .clientName {
   font-weight: 600;
+}
+
+/* Avatar column: centred on the 44px-tall name line. */
+.avatarSlot {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  flex: none;
+}
+
+/* Name line: name grows and clips with an ellipsis; the sparkline (or its
+   "No weigh-ins yet" stand-in) hugs the right edge. */
+.clientTop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+}
+
+.clientTop > .clientName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.noWeighIns {
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+  flex: none;
 }
 
 .clientEmail {
@@ -89,11 +122,14 @@
   font-size: var(--text-sm);
 }
 
-/* Triage numbers stay neutral muted — Cut never assumes which weight
-   direction is "good" for a given client. */
+/* Status line: quiet/active on the left, adherence on the right. Stays
+   neutral muted — Cut never assumes which weight direction is "good" for a
+   given client, and a missed day is never marked red. */
 .triageStats {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-1) var(--space-3);
   color: var(--color-text-muted);
   font-size: var(--text-sm);
@@ -101,11 +137,42 @@
   margin-top: var(--space-1);
 }
 
+.adherence {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* One dot per program day: filled = logged, outlined = not yet. */
+.dots {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.dot,
+.dotFilled {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  box-sizing: border-box;
+}
+
+.dot {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+}
+
+.dotFilled {
+  background: var(--color-accent);
+}
+
 .rowActions {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   flex: none;
+  min-height: 2.75rem;
 }
 
 .chevron {
@@ -285,4 +352,61 @@
   justify-content: space-between;
   gap: var(--space-3);
   min-height: 2.75rem;
+}
+
+/* Three at-a-glance numbers under the page title; hidden with no clients. */
+.summaryStrip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+/* Empty-state link styled like a raised secondary button (same as More). */
+.linkAsButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-2);
+  border: var(--surface-outline);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-4);
+  min-height: 2.75rem;
+  text-decoration: none;
+}
+
+.linkAsButton:hover {
+  border-color: var(--color-text-faint);
+}
+
+.linkAsButton:active {
+  background: var(--color-border);
+}
+
+/* Under the notes box: "Saving..." / "Last saved ..." in quiet grey. */
+.noteStatus {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: var(--space-1) 0 0;
+}
+
+/* Live "3822/4000" under the notes box once it's nearly full: quiet grey,
+   red only at the cap (the box itself stops accepting text there). */
+.counter {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  text-align: right;
+  margin-top: var(--space-1);
+}
+
+.counterOver {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-danger);
+  text-align: right;
+  margin-top: var(--space-1);
 }

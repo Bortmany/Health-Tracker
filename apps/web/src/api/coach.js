@@ -85,3 +85,14 @@ export function acceptCoachInvite(id, { replaceCurrent = false } = {}) {
 export function declineCoachInvite(id) {
   return request(`/coach-link/invites/${id}/decline`, { method: 'POST' });
 }
+
+// ---- Private coach notes (one per coach–client pair; the client never sees them) ----
+
+export function getClientNote(clientId) {
+  return request(`/coach/clients/${clientId}/notes`);
+}
+
+// An empty or whitespace-only body deletes the note on the server.
+export function saveClientNote(clientId, body) {
+  return request(`/coach/clients/${clientId}/notes`, { method: 'PUT', body: JSON.stringify({ body }) });
+}

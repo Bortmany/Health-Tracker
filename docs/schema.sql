@@ -392,3 +392,15 @@ SELECT u.id,
 FROM users u
 WHERE u.role = 'coach'
   AND NOT EXISTS (SELECT 1 FROM coach_profiles p WHERE p.user_id = u.id);
+
+-- 021: private coach notes — one per coach-and-client pairing, only the coach can read it,
+-- and only while the link is active (enforced by the routes).
+CREATE TABLE coach_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  coach_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  client_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body TEXT NOT NULL CHECK (char_length(body) <= 4000),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (coach_id, client_id)
+);
+CREATE INDEX coach_notes_coach_id_idx ON coach_notes(coach_id);

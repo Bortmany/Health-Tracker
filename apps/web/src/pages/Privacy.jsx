@@ -107,6 +107,10 @@ export default function Privacy() {
             (including any notes you write on those sessions), and
             your programs — and can create and edit programs in your account.
             A coach does not see your nutrition, habits, or injuries.
+            A coach can also keep private notes about you inside Cut — their
+            own reminders about your training — which you never see. Those
+            notes stop being readable by anyone, including that coach, the
+            moment the coaching connection ends.
             You can disconnect your coach at any time from the More page, which
             immediately ends their access.
           </p>
