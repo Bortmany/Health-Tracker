@@ -17,8 +17,16 @@ import {
 import { useDeleteAccount, useExportData } from '../hooks/useAccount.js';
 import { useMe, useLogout } from '../hooks/useAuth.js';
 import { useBillingStatus, useCheckout } from '../hooks/useBilling.js';
-import { useMyCoach, useRedeemCoachCode, useRemoveMyCoach } from '../hooks/useCoach.js';
+import {
+  useAcceptCoachInvite,
+  useCancelCoachRequest,
+  useDeclineCoachInvite,
+  useMyCoach,
+  useRedeemCoachCode,
+  useRemoveMyCoach,
+} from '../hooks/useCoach.js';
 import { useMyApplication } from '../hooks/useCoachApplications.js';
+import { useCoachProfile } from '../hooks/useCoachProfile.js';
 import { useSettings, useUpdateSettings } from '../hooks/useSettings.js';
 import styles from './More.module.css';
 
@@ -70,13 +78,81 @@ function PlanTierLine({ planTier }) {
   );
 }
 
-function CoachSection() {
-  const { data: coach, isLoading } = useMyCoach();
+function formatDate(iso) {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// A coach asked this student to train with them (from the coach's "Invite
+// by email" tool). Accept fires straight away unless the student already
+// has a coach — then a confirmation first, since accepting ends that link.
+function CoachInviteRow({ invite, currentCoach, onDone }) {
+  const accept = useAcceptCoachInvite();
+  const decline = useDeclineCoachInvite();
+  const [confirming, setConfirming] = useState(false);
+  const busy = accept.isPending || decline.isPending;
+  const name = invite.coach?.displayName ?? 'A coach';
+
+  function doAccept(replaceCurrent) {
+    accept.mutate(
+      { id: invite.id, replaceCurrent },
+      {
+        onSuccess: () => onDone(`You're now training with ${name}`),
+        onSettled: () => setConfirming(false),
+      }
+    );
+  }
+
+  function handleAccept() {
+    if (currentCoach) setConfirming(true);
+    else doAccept(false);
+  }
+
+  return (
+    <div className={styles.inviteRow}>
+      <div className={styles.row}>
+        <div className={styles.mutedLine}>Coach {name} invited you to train with them.</div>
+        <div className={styles.rowActions}>
+          <Button size="sm" onClick={handleAccept} disabled={busy}>
+            {accept.isPending ? 'Accepting...' : 'Accept'}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => decline.mutate(invite.id, { onSuccess: () => onDone('Invite declined') })}
+            disabled={busy}
+          >
+            {decline.isPending ? 'Declining...' : 'Decline'}
+          </Button>
+        </div>
+      </div>
+      {(accept.isError || decline.isError) && <ErrorText>Something went wrong — please try again.</ErrorText>}
+      <ConfirmDialog
+        open={confirming}
+        message={`Accept ${name}'s invite? This will end your coaching relationship with ${currentCoach?.displayName ?? 'your current coach'}.`}
+        confirmLabel="Accept invite"
+        busy={accept.isPending}
+        onConfirm={() => doAccept(true)}
+        onCancel={() => setConfirming(false)}
+      />
+    </div>
+  );
+}
+
+// The student's "Your coach" card. When more than one state could apply:
+// active coach → a coach's invite → the student's own pending request →
+// the invite-code form.
+function CoachSection({ onToast }) {
+  const { data: link, isLoading } = useMyCoach();
   const redeemCode = useRedeemCoachCode();
   const removeCoach = useRemoveMyCoach();
+  const cancelRequest = useCancelCoachRequest();
   const [code, setCode] = useState('');
   const [success, setSuccess] = useState(null);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+
+  const coach = link?.coach ?? null;
+  const pendingRequest = link?.pendingRequest ?? null;
+  const coachInvites = link?.coachInvites ?? [];
 
   function handleRedeem(e) {
     e.preventDefault();
@@ -98,11 +174,22 @@ function CoachSection() {
     });
   }
 
-  return (
-    <Card className={styles.stackCard} title="Your coach">
-      {isLoading ? (
-        <Skeleton height={60} />
-      ) : coach ? (
+  function handleCancelRequest() {
+    cancelRequest.mutate(pendingRequest.id, { onSuccess: () => onToast('Request cancelled') });
+  }
+
+  // A coach's invite is shown even when the student already has a coach —
+  // accepting it then asks for confirmation, since it ends the current link.
+  const inviteRows = coachInvites.map((invite) => (
+    <CoachInviteRow key={invite.id} invite={invite} currentCoach={coach} onDone={onToast} />
+  ));
+
+  let body;
+  if (isLoading) {
+    body = <Skeleton height={60} />;
+  } else if (coach) {
+    body = (
+      <>
         <div className={styles.row}>
           <div>Coached by {coach.displayName}</div>
           <Button
@@ -122,31 +209,98 @@ function CoachSection() {
             onCancel={() => setConfirmingRemove(false)}
           />
         </div>
-      ) : (
-        <form onSubmit={handleRedeem}>
-          {success && <p className={styles.mutedLine}>Connected with {success}.</p>}
-          <div className={styles.connectRow}>
-            {/* The label stays visible; the greyed example only shows the
-                shape of a code, and disappears as soon as one is typed. */}
-            <div className={styles.connectField}>
-              <Field label="Invite code">
-                <Input
-                  type="text"
-                  placeholder="K7xM2pQ9tR"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-              </Field>
-            </div>
-            <Button type="submit" disabled={redeemCode.isPending}>
-              {redeemCode.isPending ? 'Connecting...' : 'Connect'}
-            </Button>
+        {inviteRows.length > 0 && <div className={styles.inviteBlock}>{inviteRows}</div>}
+      </>
+    );
+  } else if (coachInvites.length > 0) {
+    body = inviteRows;
+  } else if (pendingRequest) {
+    body = (
+      <div>
+        <div className={styles.row}>
+          <div className={styles.mutedLine}>
+            Request sent to {pendingRequest.coach?.displayName ?? 'your coach'}
           </div>
-          {redeemCode.isError && <ErrorText>{redeemCode.error.message}</ErrorText>}
-        </form>
-      )}
+          <Button variant="secondary" size="sm" onClick={handleCancelRequest} disabled={cancelRequest.isPending}>
+            {cancelRequest.isPending ? 'Cancelling...' : 'Cancel'}
+          </Button>
+        </div>
+        {cancelRequest.isError && <ErrorText>Couldn&apos;t cancel that — please try again.</ErrorText>}
+      </div>
+    );
+  } else {
+    body = (
+      <form onSubmit={handleRedeem}>
+        {success && <p className={styles.mutedLine}>Connected with {success}.</p>}
+        <div className={styles.connectRow}>
+          {/* The label stays visible; the greyed example only shows the
+              shape of a code, and disappears as soon as one is typed. */}
+          <div className={styles.connectField}>
+            <Field label="Invite code">
+              <Input
+                type="text"
+                placeholder="K7xM2pQ9tR"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </Field>
+          </div>
+          <Button type="submit" disabled={redeemCode.isPending}>
+            {redeemCode.isPending ? 'Connecting...' : 'Connect'}
+          </Button>
+        </div>
+        {redeemCode.isError && <ErrorText>{redeemCode.error.message}</ErrorText>}
+        <div className={`${styles.row} ${styles.findCoachRow}`}>
+          <div className={styles.mutedLine}>Don&apos;t have a code?</div>
+          <Link className={styles.linkAsButton} to="/coaches">
+            Find a coach
+          </Link>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <Card className={styles.stackCard} title="Your coach">
+      {body}
+    </Card>
+  );
+}
+
+// The coach's own card in the same slot: is the profile public, are they
+// taking clients, and the door to the editor. The link always renders,
+// even if the status can't load, so the editor is always reachable.
+function CoachProfileRow() {
+  const { data: profile, isLoading, isError } = useCoachProfile();
+
+  let status;
+  if (isLoading) {
+    status = <Skeleton height={40} />;
+  } else if (isError || !profile) {
+    status = <div className={styles.mutedLine}>Couldn&apos;t load your profile status</div>;
+  } else {
+    status = (
+      <div className={styles.profileStatus}>
+        <div>
+          {profile.isPublic ? <Chip tone="accent">Public</Chip> : <Chip>Not public yet</Chip>}
+        </div>
+        <div className={styles.mutedLine}>
+          {profile.acceptingClients ? 'Accepting clients' : 'Not accepting new clients'}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Card className={styles.stackCard} title="Your coach profile">
+      <div className={styles.row}>
+        <div className={styles.accountInfo}>{status}</div>
+        <Link className={styles.linkAsButton} to="/coach/profile">
+          Edit profile
+        </Link>
+      </div>
     </Card>
   );
 }
@@ -371,7 +525,8 @@ export default function More() {
         </div>
       </Card>
 
-      {user?.role !== 'coach' && <CoachSection />}
+      {user?.role === 'coach' && <CoachProfileRow />}
+      {user?.role !== 'coach' && <CoachSection onToast={showToast} />}
       {user?.role !== 'coach' && <CoachApplicationRow />}
 
       <Card className={styles.stackCard} title="Training quiz">

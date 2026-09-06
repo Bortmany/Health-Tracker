@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { ensureCoachProfile } from '../lib/coachProfiles.js';
 import * as validate from '../lib/validate.js';
 import { Rollback, withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -58,6 +59,9 @@ router.post('/coach-applications/:id/approve', asyncHandler(async (req, res) => 
     }
     // Approval is the one legitimate path that makes someone a coach.
     await client.query(`UPDATE users SET role = 'coach' WHERE id = $1`, [rows[0].user_id]);
+    // Every coach gets a profile (web address + referral link) the moment
+    // they're approved; they fill in the rest under More → Your coach profile.
+    await ensureCoachProfile(client, rows[0].user_id, rows[0].display_name);
     // Email hook: when Cut gets an email transport, the 'you've been approved' message would be sent from here. No email is sent today.
     return rows[0];
   });

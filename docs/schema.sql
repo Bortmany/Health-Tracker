@@ -348,3 +348,47 @@ DROP INDEX IF EXISTS coach_clients_coach_id_client_id_idx;
 CREATE UNIQUE INDEX coach_clients_coach_id_client_id_idx
   ON coach_clients(coach_id, client_id)
   WHERE client_id IS NOT NULL AND status <> 'revoked';
+
+-- 020: coach profiles (public directory + referral links), student requests,
+-- coach invites by email, and links that end instead of being deleted.
+CREATE TABLE coach_profiles (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  slug TEXT UNIQUE NOT NULL,
+  headline TEXT,
+  bio TEXT,
+  specialties TEXT[] NOT NULL DEFAULT '{}',
+  accepting_clients BOOLEAN NOT NULL DEFAULT true,
+  is_public BOOLEAN NOT NULL DEFAULT false,
+  referral_code TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT coach_profiles_specialties_check CHECK (
+    specialties <@ ARRAY['fat-loss', 'muscle-gain', 'beginners', 'strength', 'running',
+                         'injury-safe', 'nutrition', 'womens-training', 'over-40', 'online-only']::text[]
+  )
+);
+CREATE INDEX coach_profiles_is_public_idx ON coach_profiles(is_public);
+ALTER TABLE coach_clients DROP CONSTRAINT coach_clients_status_check;
+ALTER TABLE coach_clients ADD CONSTRAINT coach_clients_status_check
+  CHECK (status IN ('pending', 'requested', 'active', 'declined', 'ended', 'revoked'));
+ALTER TABLE coach_clients ALTER COLUMN invite_code DROP NOT NULL;
+ALTER TABLE coach_clients ADD COLUMN requested_by TEXT
+  CHECK (requested_by IN ('coach', 'client', 'referral'));
+ALTER TABLE coach_clients ADD COLUMN ended_at TIMESTAMPTZ;
+ALTER TABLE coach_clients ADD COLUMN invite_email TEXT;
+-- 020 (continued): ended/declined links no longer block the same pair from reconnecting.
+DROP INDEX coach_clients_coach_id_client_id_idx;
+CREATE UNIQUE INDEX coach_clients_coach_id_client_id_idx
+  ON coach_clients(coach_id, client_id)
+  WHERE client_id IS NOT NULL AND status NOT IN ('revoked', 'ended', 'declined');
+ALTER TABLE users ADD COLUMN referred_by_coach_id UUID REFERENCES users(id) ON DELETE SET NULL;
+CREATE INDEX users_referred_by_coach_id_idx ON users(referred_by_coach_id);
+-- 020 (continued): existing coaches get a profile row (slug = display name + random suffix, random referral code).
+INSERT INTO coach_profiles (user_id, slug, referral_code)
+SELECT u.id,
+       left(trim(BOTH '-' FROM regexp_replace(lower(u.display_name), '[^a-z0-9]+', '-', 'g')), 40)
+         || '-' || substr(md5(random()::text || u.id::text), 1, 4),
+       upper(substr(md5(random()::text || u.id::text), 1, 10))
+FROM users u
+WHERE u.role = 'coach'
+  AND NOT EXISTS (SELECT 1 FROM coach_profiles p WHERE p.user_id = u.id);

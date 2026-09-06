@@ -93,8 +93,16 @@ export default function Privacy() {
           <h2>Coaches and your data</h2>
           <p>
             Nobody sees your data unless you connect a coach, and connecting is
-            always your action: a coach gives you an invite code, and entering
-            it in the app is your consent. A connected coach can see your name,
+            always your action. A coach only sees your data after you connect
+            with them, and you can do that in one of four ways: by entering
+            their invite code, by sending them a request from the coach
+            directory (they must accept), by accepting an invite a coach sent
+            you inside the app, or by signing up through a coach's referral
+            link (which creates a request that coach must accept). We keep a
+            note of which coach's link you signed up through, and a record of
+            coaching connections that ended or were declined, so the history
+            stays honest; you can end a coaching connection at any time from
+            the More page. A connected coach can see your name,
             email, last 30 days of weigh-ins, recent training sessions
             (including any notes you write on those sessions), and
             your programs — and can create and edit programs in your account.
@@ -109,6 +117,16 @@ export default function Privacy() {
             give us. The app owner reads these to decide on your application,
             and they stay on file with the decision. Withdrawing a pending
             application deletes it.
+          </p>
+          <p>
+            <strong>Public coach profiles:</strong> if you're a coach, you
+            control whether your profile is visible in Cut's public coach
+            directory — it's off by default. If you switch it on, your name,
+            headline, bio, specialties, credentials, years coaching, and any
+            link you added become visible to anyone on the internet, without
+            needing a Cut account. Your email address is never shown. You can
+            switch your profile back to private at any time from your coach
+            profile page.
           </p>
 
           <h2>Cookies</h2>

@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Card, ErrorText, Field, Input, Skeleton } from '../components/ui/index.js';
 import { useRegister, useSignupMode } from '../hooks/useAuth.js';
+import { useReferralCoach } from '../hooks/useCoachDirectory.js';
 import { emailError } from '../lib/validation.js';
 import styles from './Auth.module.css';
 
@@ -17,6 +18,11 @@ export default function Register() {
   const [emailTouched, setEmailTouched] = useState(false);
   const register = useRegister();
   const navigate = useNavigate();
+  // Arriving through a coach's share link: the code stands in for the
+  // invite code, and the banner names the coach once the lookup resolves.
+  const [searchParams] = useSearchParams();
+  const referralCode = (searchParams.get('ref') ?? '').trim() || null;
+  const referralCoach = useReferralCoach(referralCode);
   // "open" | "invite" | "closed". While loading we show a skeleton; if the
   // check fails we assume "open" and let the server decide on submit.
   const signupMode = useSignupMode();
@@ -24,6 +30,10 @@ export default function Register() {
 
   const emailMessage = emailTouched ? emailError(email) : '';
   const inviteError = register.isError && register.error.code === 'INVITE_REQUIRED';
+  // With a referral there's no invite field to attach the message to, so it
+  // shows as its own line — in words about the link, not a code.
+  const referralError = referralCode && inviteError;
+  const showInviteField = mode === 'invite' && !referralCode;
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -35,7 +45,8 @@ export default function Register() {
         displayName,
         email: email.trim(),
         password,
-        inviteCode: inviteCode.trim() === '' ? null : inviteCode.trim(),
+        inviteCode: referralCode ? null : inviteCode.trim() === '' ? null : inviteCode.trim(),
+        referralCode,
       },
       { onSuccess: () => navigate('/onboarding') }
     );
@@ -80,8 +91,15 @@ export default function Register() {
         <Card className={styles.card}>
           <h1 className={styles.wordmark}>Cut</h1>
           <p className={styles.subtitle}>Create your account</p>
+          {referralCode && (
+            <p className={styles.notice}>
+              {referralCoach.data?.displayName
+                ? `Invited by Coach ${referralCoach.data.displayName}`
+                : 'Invited by a Cut coach.'}
+            </p>
+          )}
           <form className={styles.form} onSubmit={handleSubmit} noValidate>
-            {mode === 'invite' && (
+            {showInviteField && (
               <Field label="Invite code" error={inviteError ? register.error.message : false}>
                 <Input
                   id="inviteCode"
@@ -134,6 +152,9 @@ export default function Register() {
               />
             </Field>
             {register.isError && !inviteError && <ErrorText>{register.error.message}</ErrorText>}
+            {referralError && (
+              <ErrorText>That referral link isn&apos;t valid anymore. Ask your coach for a new one.</ErrorText>
+            )}
             <Button type="submit" block disabled={register.isPending}>
               {register.isPending ? 'Creating account...' : 'Create account'}
             </Button>

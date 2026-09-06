@@ -119,3 +119,39 @@
   outline: 2px solid var(--color-accent);
   outline-offset: 4px;
 }
+
+/* Accept / Decline pair on a coach's invite row. */
+.rowActions {
+  display: flex;
+  gap: var(--space-2);
+  flex: none;
+}
+
+/* One invite per row; a hairline between them when there are several. */
+.inviteRow {
+  padding: var(--space-2) 0;
+  border-bottom: var(--surface-outline);
+}
+
+.inviteRow:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+/* "Don't have a code? Find a coach" under the invite-code form. */
+.findCoachRow {
+  margin-top: var(--space-3);
+}
+
+.profileStatus {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* Invites listed under the "Coached by" row, set apart by a hairline. */
+.inviteBlock {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: var(--surface-outline);
+}

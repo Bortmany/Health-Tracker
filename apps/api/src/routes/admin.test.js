@@ -146,6 +146,15 @@ test('approve: the applicant becomes a coach and appears in the coaches list', a
   const me = await (await fetch(`${baseUrl}/auth/me`, { headers: { Cookie: applicant.cookie } })).json();
   assert.equal(me.user.role, 'coach');
 
+  // Approval also creates the coach's profile (private by default), with the
+  // credentials and years carried over from the application for display.
+  const profile = (await (await json(applicant.cookie, 'GET', '/coach/profile')).json()).profile;
+  assert.match(profile.slug, /^coach-sam-[a-z0-9]{4}$/);
+  assert.match(profile.referralCode, /^[A-HJ-NP-Z2-9]{10}$/);
+  assert.equal(profile.isPublic, false);
+  assert.equal(profile.credentials, application.credentials);
+  assert.equal(profile.yearsCoaching, application.yearsCoaching);
+
   const coaches = (await (await json(admin.cookie, 'GET', '/admin/coaches')).json()).coaches;
   const coach = coaches.find((c) => c.userId === applicant.user.id);
   assert.ok(coach);

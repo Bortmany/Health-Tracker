@@ -11,6 +11,8 @@ import {
   Screen,
   SectionTitle,
   Skeleton,
+  Toast,
+  useToast,
 } from '../components/ui/index.js';
 import {
   useAssignProgram,
@@ -19,8 +21,19 @@ import {
   useCreateInvite,
   useRemoveClient,
 } from '../hooks/useCoach.js';
+import {
+  useAcceptRequest,
+  useCoachRequests,
+  useDeclineRequest,
+  useInviteByEmail,
+} from '../hooks/useCoachRequests.js';
+import { emailError } from '../lib/validation.js';
 import { smoothSeries, trendCaption } from '../lib/trend.js';
 import styles from './Clients.module.css';
+
+function formatDate(iso) {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 function formatDateLabel(date) {
   return new Date(`${date.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -270,6 +283,104 @@ function ClientDetail({ clientId, summary, isLoading }) {
   );
 }
 
+// A student who asked to train with this coach. Each row owns its own
+// requests so "Accepting..." and any error stay on the row they belong to.
+function RequestRow({ request, onDone }) {
+  const accept = useAcceptRequest();
+  const decline = useDeclineRequest();
+  const busy = accept.isPending || decline.isPending;
+
+  const takenElsewhere = accept.isError && accept.error?.status === 409;
+  const failed = (accept.isError && !takenElsewhere) || decline.isError;
+
+  return (
+    <div className={styles.requestRow}>
+      <div className={styles.requestHead}>
+        <div className={styles.clientInfo}>
+          <div className={styles.clientName}>{request.displayName}</div>
+          <div className={styles.clientEmail}>Requested {formatDate(request.createdAt)}</div>
+        </div>
+        <div className={styles.rowActions}>
+          <Button
+            size="sm"
+            onClick={() =>
+              accept.mutate(request.id, {
+                onSuccess: () => onDone(`Accepted — ${request.displayName} is now training with you.`),
+              })
+            }
+            disabled={busy}
+          >
+            {accept.isPending ? 'Accepting...' : 'Accept'}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => decline.mutate(request.id, { onSuccess: () => onDone('Declined.') })}
+            disabled={busy}
+          >
+            {decline.isPending ? 'Declining...' : 'Decline'}
+          </Button>
+        </div>
+      </div>
+      {takenElsewhere && <ErrorText>This student now has another coach — nothing to do here.</ErrorText>}
+      {failed && <ErrorText>Couldn&apos;t save that — please try again.</ErrorText>}
+    </div>
+  );
+}
+
+// Enter an email; the answer is the same neutral line whether or not that
+// address has a Cut account, so the coach can never tell which it was.
+function InviteByEmail({ onSent }) {
+  const invite = useInviteByEmail();
+  const [email, setEmail] = useState('');
+  const [touched, setTouched] = useState(false);
+
+  const message = emailError(email);
+  const canSend = email.trim() !== '' && !message && !invite.isPending;
+  const rateLimited = invite.isError && (invite.error?.status === 429 || invite.error?.code === 'RATE_LIMITED');
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    setTouched(true);
+    if (!canSend) return;
+    invite.mutate(email.trim(), {
+      onSuccess: () => {
+        setEmail('');
+        setTouched(false);
+        onSent("If that address has a Cut account, they'll see your invite.");
+      },
+    });
+  }
+
+  return (
+    <form className={styles.emailInviteBlock} onSubmit={handleSubmit} noValidate>
+      <div className={styles.emailInviteRow}>
+        <div className={styles.emailInviteField}>
+          <Field label="Invite by email" error={touched ? message : ''}>
+            <Input
+              type="email"
+              placeholder="clientname@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onBlur={() => setTouched(true)}
+              autoComplete="off"
+              aria-invalid={touched && message ? 'true' : undefined}
+            />
+          </Field>
+        </div>
+        <Button type="submit" size="sm" disabled={!canSend}>
+          {invite.isPending ? 'Sending...' : 'Send invite'}
+        </Button>
+      </div>
+      {rateLimited ? (
+        <ErrorText>You&apos;ve sent a lot of invites today — try again tomorrow</ErrorText>
+      ) : (
+        invite.isError && <ErrorText>{invite.error?.message || "Couldn't send that — please try again."}</ErrorText>
+      )}
+    </form>
+  );
+}
+
 // One triage row: name, weight direction, sessions this week, last log.
 // The summary loads for every row up front so the coach can scan without
 // tapping; expanding is instant because the data is already cached.
@@ -326,7 +437,7 @@ function ClientRow({ client, expanded, onToggle, onRemove, removing = false }) {
               onRemove();
             }}
             disabled={removing}
-            aria-label={`Remove ${client.displayName}`}
+            aria-label={`End coaching with ${client.displayName}`}
           >
             ✕
           </button>
@@ -340,8 +451,10 @@ function ClientRow({ client, expanded, onToggle, onRemove, removing = false }) {
 
 export default function Clients() {
   const { data, isLoading } = useClients();
+  const requests = useCoachRequests();
   const createInvite = useCreateInvite();
   const removeClient = useRemoveClient();
+  const toast = useToast();
   const [newCode, setNewCode] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -372,6 +485,10 @@ export default function Clients() {
 
   const clients = data?.clients ?? [];
   const pendingInvites = data?.pendingInvites ?? [];
+  const requestList = requests.data ?? [];
+  // The card only exists while there's something to answer (or it's still
+  // loading) — a busy coach's screen stays calm otherwise.
+  const showRequests = requests.isLoading || requestList.length > 0;
 
   return (
     <Screen title="Clients">
@@ -389,6 +506,8 @@ export default function Clients() {
         </Button>
         {createInvite.isError && <ErrorText>{createInvite.error.message}</ErrorText>}
         <p className={styles.hint}>Share this code with your client — they enter it under More.</p>
+
+        <InviteByEmail onSent={(message) => toast.show(message)} />
 
         {pendingInvites.length > 0 && (
           <div className={styles.pendingBlock}>
@@ -411,6 +530,18 @@ export default function Clients() {
         )}
       </Card>
 
+      {showRequests && (
+        <Card className={styles.stackCard} title="Requests">
+          {requests.isLoading ? (
+            <Skeleton height="3.5rem" count={2} />
+          ) : (
+            requestList.map((request) => (
+              <RequestRow key={request.id} request={request} onDone={(message) => toast.show(message)} />
+            ))
+          )}
+        </Card>
+      )}
+
       <Card className={styles.stackCard} title="Your clients">
         {isLoading ? (
           <Skeleton height="3.5rem" count={3} />
@@ -432,8 +563,12 @@ export default function Clients() {
 
       <ConfirmDialog
         open={Boolean(clientToRemove)}
-        message={clientToRemove ? `Remove ${clientToRemove.displayName} as a client?` : ''}
-        confirmLabel="Remove client"
+        message={
+          clientToRemove
+            ? `End coaching with ${clientToRemove.displayName}? They'll keep all their own logged data and programs — only the coaching connection ends.`
+            : ''
+        }
+        confirmLabel="End coaching"
         busy={removeClient.isPending}
         onConfirm={() => {
           // Stays open (with both buttons disabled) until the removal is
@@ -444,6 +579,8 @@ export default function Clients() {
         }}
         onCancel={() => setClientToRemove(null)}
       />
+
+      <Toast message={toast.message} />
     </Screen>
   );
 }

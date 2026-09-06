@@ -10,6 +10,8 @@ export { default as EmptyState } from './EmptyState.jsx';
 export { default as ErrorText } from './ErrorText.jsx';
 export { default as Skeleton } from './Skeleton.jsx';
 export { default as Chip } from './Chip.jsx';
+export { default as ChipToggle } from './ChipToggle.jsx';
+export { default as Avatar } from './Avatar.jsx';
 export { default as ProgressRing } from './ProgressRing.jsx';
 export { default as Toast, useToast } from './Toast.jsx';
 export { default as ConfirmDialog } from './ConfirmDialog.jsx';
