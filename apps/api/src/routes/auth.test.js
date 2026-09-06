@@ -138,6 +138,68 @@ test('an oversized request body returns a clean 413, not a 500', async () => {
   assert.equal(body.error.code, 'PAYLOAD_TOO_LARGE');
 });
 
+// Signup invite gate (lib/signupMode.js). Test files run in their own process,
+// so setting the env var here only affects this file, and it is reset after.
+test('signup invites: invite-only mode requires a valid code on /auth/register', async (t) => {
+  process.env.SIGNUP_INVITE_CODES = 'test-invite-2026,second-code-99';
+  t.after(() => { delete process.env.SIGNUP_INVITE_CODES; });
+
+  const modeRes = await fetch(`${baseUrl}/auth/signup-mode`);
+  assert.equal(modeRes.status, 200);
+  assert.deepEqual(await modeRes.json(), { mode: 'invite' });
+
+  const health = await (await fetch(`${baseUrl}/health`)).json();
+  assert.equal(health.signups, 'invite');
+
+  // No code → refused, and the reply never includes a real code.
+  const missing = await register({
+    email: `auth-test-${stamp}-nocode@example.com`,
+    password: 'hunter2pass',
+    displayName: 'No Code',
+  });
+  assert.equal(missing.status, 403);
+  const missingBody = await missing.json();
+  assert.equal(missingBody.error.code, 'INVITE_REQUIRED');
+  assert.equal(missingBody.error.message, 'Sign-up is by invitation. Enter a valid invite code.');
+  assert.ok(!JSON.stringify(missingBody).includes('test-invite-2026'));
+
+  // Wrong code → refused.
+  const wrong = await register({
+    email: `auth-test-${stamp}-wrongcode@example.com`,
+    password: 'hunter2pass',
+    displayName: 'Wrong Code',
+    inviteCode: 'test-invite-2025',
+  });
+  assert.equal(wrong.status, 403);
+  assert.equal((await wrong.json()).error.code, 'INVITE_REQUIRED');
+
+  // Nothing was written for either attempt.
+  const { rowCount } = await pool.query('SELECT 1 FROM users WHERE email LIKE $1', [`auth-test-${stamp}-%code@example.com`]);
+  assert.equal(rowCount, 0);
+
+  // Right code → account created as normal.
+  const right = await register({
+    email: `auth-test-${stamp}-rightcode@example.com`,
+    password: 'hunter2pass',
+    displayName: 'Right Code',
+    inviteCode: 'second-code-99',
+  });
+  assert.equal(right.status, 201);
+  assert.equal((await right.json()).user.email, `auth-test-${stamp}-rightcode@example.com`);
+});
+
+test('signup invites: open mode (no codes, not production) ignores the code field', async () => {
+  const modeRes = await fetch(`${baseUrl}/auth/signup-mode`);
+  assert.deepEqual(await modeRes.json(), { mode: 'open' });
+
+  const res = await register({
+    email: `auth-test-${stamp}-open@example.com`,
+    password: 'hunter2pass',
+    displayName: 'Open Mode',
+  });
+  assert.equal(res.status, 201);
+});
+
 test('POST /auth/register trims and lower-cases the stored address', async () => {
   const res = await register({
     email: `  AUTH-TEST-${stamp}-Mixed@Example.COM `,

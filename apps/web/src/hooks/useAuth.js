@@ -37,6 +37,21 @@ export function useRegister() {
   });
 }
 
+// Whether sign-up is open, invite-only, or closed. If the check itself fails
+// (e.g. offline) the screen falls back to "open" so the form still shows and
+// the server gives the real answer on submit.
+export function useSignupMode() {
+  return useQuery({
+    queryKey: ['auth', 'signup-mode'],
+    queryFn: async () => {
+      const { mode } = await authApi.signupMode();
+      return mode;
+    },
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useLogout() {
   const queryClient = useQueryClient();
   return useMutation({

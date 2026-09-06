@@ -10,6 +10,7 @@ import { pool } from './db/pool.js';
 import { verifyToken } from './lib/jwt.js';
 import { logger } from './lib/logger.js';
 import { captureException, initSentry } from './lib/sentry.js';
+import { getSignupMode } from './lib/signupMode.js';
 import accountRouter from './routes/account.js';
 import activitiesRouter from './routes/activities.js';
 import authRouter from './routes/auth.js';
@@ -124,48 +125,65 @@ const authLimiter = makeAuthLimiter('Too many attempts. Please wait 15 minutes a
 // succeeds and clears the IP's failure streak; only wrong guesses accumulate,
 // and once an IP is over its budget, further WRONG guesses get a 429. The
 // per-account limiter below still hard-caps guesses against any single email.
-const LOGIN_IP_WINDOW_MS = 15 * 60 * 1000;
-const LOGIN_IP_MAX_FAILURES = 20;
-const loginFailuresByIp = new Map();
+//
+// The same failure-only mechanism guards signup invite codes on /register: a
+// wrong or missing code answers 403, and after 10 of those in 15 minutes an IP
+// gets a 429. Successful registrations (201) clear the streak.
+const FAILURE_WINDOW_MS = 15 * 60 * 1000;
 
-function loginIpFailureThrottle(req, res, next) {
-  if (rateLimitDisabled()) return next();
+function makeIpFailureThrottle({ successStatus, failureStatus, maxFailures, message }) {
+  const failuresByIp = new Map();
 
-  const key = req.ip;
-  const now = Date.now();
-  const originalJson = res.json.bind(res);
+  return function ipFailureThrottle(req, res, next) {
+    if (rateLimitDisabled()) return next();
 
-  res.json = (body) => {
-    const status = res.statusCode;
-    if (status === 200) {
-      // A correct login clears this IP's failure streak.
-      loginFailuresByIp.delete(key);
-    } else if (status === 401) {
-      // A failed login counts against this IP's budget.
-      const existing = loginFailuresByIp.get(key);
-      const entry = existing && existing.resetAt > now
-        ? existing
-        : { count: 0, resetAt: now + LOGIN_IP_WINDOW_MS };
-      entry.count += 1;
-      loginFailuresByIp.set(key, entry);
-      if (entry.count > LOGIN_IP_MAX_FAILURES) {
-        res.status(429);
-        return originalJson({
-          error: { message: 'Too many login attempts. Please wait 15 minutes and try again.', code: 'RATE_LIMITED' },
-        });
+    const key = req.ip;
+    const now = Date.now();
+    const originalJson = res.json.bind(res);
+
+    res.json = (body) => {
+      const status = res.statusCode;
+      if (status === successStatus) {
+        // A success clears this IP's failure streak.
+        failuresByIp.delete(key);
+      } else if (status === failureStatus) {
+        // A failure counts against this IP's budget.
+        const existing = failuresByIp.get(key);
+        const entry = existing && existing.resetAt > now
+          ? existing
+          : { count: 0, resetAt: now + FAILURE_WINDOW_MS };
+        entry.count += 1;
+        failuresByIp.set(key, entry);
+        if (entry.count > maxFailures) {
+          res.status(429);
+          return originalJson({ error: { message, code: 'RATE_LIMITED' } });
+        }
       }
-    }
-    return originalJson(body);
-  };
+      return originalJson(body);
+    };
 
-  next();
+    next();
+  };
 }
+
+const loginIpFailureThrottle = makeIpFailureThrottle({
+  successStatus: 200,
+  failureStatus: 401,
+  maxFailures: 20,
+  message: 'Too many login attempts. Please wait 15 minutes and try again.',
+});
+const registerInviteFailureThrottle = makeIpFailureThrottle({
+  successStatus: 201,
+  failureStatus: 403,
+  maxFailures: 10,
+  message: 'Too many invite code attempts. Please wait 15 minutes and try again.',
+});
 
 // Registered as exact/literal paths (not the whole '/api/auth' prefix) so a
 // login or register request only ever counts against its own limiter, never
 // falling through into the shared authLimiter below as well.
 app.use('/api/auth/login', loginIpFailureThrottle);
-app.use('/api/auth/register', registerLimiter);
+app.use('/api/auth/register', registerLimiter, registerInviteFailureThrottle);
 app.use('/api/auth/logout', authLimiter);
 app.use('/api/auth/me', authLimiter);
 // Invite codes get the same guessing protection as passwords.
@@ -239,6 +257,8 @@ app.get('/api/health', async (_req, res) => {
       status: 'ok',
       db: 'connected',
       sentry: process.env.SENTRY_DSN ? 'configured' : 'dormant',
+      // "open" | "invite" | "closed" — who can create an account right now.
+      signups: getSignupMode(),
     });
   } catch (err) {
     // Log the real reason for us; the public response stays a fixed message so
