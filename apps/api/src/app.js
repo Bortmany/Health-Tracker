@@ -22,6 +22,7 @@ import exportRouter from './routes/export.js';
 import habitsRouter from './routes/habits.js';
 import healthSyncRouter from './routes/healthSync.js';
 import injuriesRouter from './routes/injuries.js';
+import legalRouter from './routes/legal.js';
 import logsRouter from './routes/logs.js';
 import nutritionRouter from './routes/nutrition.js';
 import plansRouter from './routes/plans.js';
@@ -280,6 +281,7 @@ app.use('/api/coach-link', coachLinkRouter);
 app.use('/api/exercises', exercisesRouter);
 app.use('/api/health-sync', healthSyncRouter);
 app.use('/api/injuries', injuriesRouter);
+app.use('/api/legal', legalRouter); // public — contact address for the legal pages
 app.use('/api/logs', logsRouter);
 app.use('/api/nutrition', nutritionRouter);
 app.use('/api/plans', plansRouter);

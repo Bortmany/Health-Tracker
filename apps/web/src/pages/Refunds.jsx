@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import ContactEmail from '../components/ContactEmail.jsx';
 import styles from './Legal.module.css';
 
 // Public page — no login needed. Paddle (who sells Premium as the merchant of
@@ -80,7 +81,7 @@ export default function Refunds() {
           <h2>How to ask for one</h2>
           <p>
             Email us from the address on your account, saying which payment you
-            mean: [owner — add your contact email here before launch]. We aim to
+            mean: <ContactEmail />. We aim to
             answer within a few working days. Approved refunds go back to the
             card or account you paid with, and usually arrive within 5–10
             working days depending on your bank.
@@ -109,8 +110,7 @@ export default function Refunds() {
 
           <h2>Contact</h2>
           <p>
-            Questions about billing, cancelling, or a refund: [owner — add your
-            contact email here before launch].
+            Questions about billing, cancelling, or a refund: <ContactEmail />.
           </p>
         </div>
 
