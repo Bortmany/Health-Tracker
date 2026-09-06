@@ -40,7 +40,11 @@ Tests: `npm test` (integration tests against the local Postgres). Build check: `
 | `JWT_SECRET` | Yes | Signs login cookies |
 | `DATABASE_SSL` | Hosted DBs | `true` on Railway and most hosted Postgres |
 | `NODE_ENV` | Yes | `production` makes Express serve the built frontend |
-| `PORT`, `CORS_ORIGIN` | No | Defaults fine locally |
+| `TRUSTED_PROXY` | Yes on Railway | Set to `1` (the number of proxy hops in front of the app). Railway puts a proxy in front of every request, so without this every visitor looks like the same address and the login/save rate limits lock everyone out at once. Leave unset locally. |
+| `PORT`, `CORS_ORIGIN` | No | Defaults fine locally. `CORS_ORIGIN` falls back to `APP_URL` when that is set, then to the local dev address. |
+| `SENTRY_DSN` | Optional switch | Wakes error tracking: server errors are reported to Sentry. Dormant (nothing imported or sent) until set. |
+| `PG_POOL_MAX` | No | Most database connections one copy of the server will open (default 10). Lower it if Railway runs several copies, so copies × this stays under the database's connection limit. |
+| `PG_IDLE_TIMEOUT_MS`, `PG_CONNECTION_TIMEOUT_MS` | No | Close an idle database connection after this long (default 30000), and give up waiting for a free one after this long (default 10000). Defaults fine. |
 | `ANTHROPIC_API_KEY` | Optional switch | Wakes the AI plan writer (personalized plans written by Claude instead of picked from the library) |
 | `PADDLE_API_KEY` + `PADDLE_WEBHOOK_SECRET` + `PADDLE_PRICE_ID` + `APP_URL` | Optional switch | Wakes paid Premium upgrades (Paddle checkout + webhook). Until all of them are set, the upgrade button shows "coming soon" and Premium can be granted manually: `UPDATE users SET plan_tier = 'premium' WHERE email = '...';` |
 | `PADDLE_ENV` | Optional | `sandbox` (the default, and what anything unrecognised falls back to) or `production` for real money. Decides which Paddle address the server talks to. |
