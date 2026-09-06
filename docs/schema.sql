@@ -318,3 +318,33 @@ ALTER TABLE users
 -- across, and the Paddle customer reference takes its place.
 ALTER TABLE users DROP COLUMN IF EXISTS stripe_customer_id;
 ALTER TABLE users ADD COLUMN paddle_customer_id TEXT;
+
+-- 019: "Become a coach" applications, reviewed by the one admin account
+-- (ADMIN_EMAIL, granted once, ever). Revoking a coach marks their client
+-- links 'revoked' instead of deleting them.
+CREATE TABLE coach_applications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  display_name TEXT NOT NULL,
+  credentials TEXT NOT NULL,
+  years_coaching INTEGER NOT NULL,
+  approach TEXT NOT NULL,
+  link TEXT,
+  agreed_to_terms BOOLEAN NOT NULL DEFAULT false,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'declined')),
+  decided_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  decision_reason TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  decided_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX coach_applications_one_pending_idx ON coach_applications(user_id) WHERE status = 'pending';
+CREATE INDEX coach_applications_status_created_idx ON coach_applications(status, created_at DESC);
+CREATE INDEX coach_applications_user_id_idx ON coach_applications(user_id);
+ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE coach_clients DROP CONSTRAINT coach_clients_status_check;
+ALTER TABLE coach_clients ADD CONSTRAINT coach_clients_status_check CHECK (status IN ('pending', 'active', 'revoked'));
+-- 019 (continued): only live links count towards one-link-per-coach-and-client.
+DROP INDEX IF EXISTS coach_clients_coach_id_client_id_idx;
+CREATE UNIQUE INDEX coach_clients_coach_id_client_id_idx
+  ON coach_clients(coach_id, client_id)
+  WHERE client_id IS NOT NULL AND status <> 'revoked';

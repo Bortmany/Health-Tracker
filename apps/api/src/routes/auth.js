@@ -38,6 +38,7 @@ function toPublicUser(row) {
     displayName: row.display_name,
     planTier: row.plan_tier ?? 'free',
     role: row.role ?? 'consumer',
+    isAdmin: row.is_admin === true,
     createdAt: row.created_at,
   };
 }
@@ -137,6 +138,23 @@ router.post('/login', asyncHandler(async (req, res) => {
 
   if (!user || !valid) {
     return res.status(401).json({ error: { message: 'Invalid email or password', code: 'INVALID_CREDENTIALS' } });
+  }
+
+  // One-time admin grant. If ADMIN_EMAIL names this account and nobody is an
+  // admin yet, this account becomes the admin. The check and the update are one
+  // SQL statement so two logins at the same moment cannot both be granted. It
+  // grants exactly once, ever: once any admin exists, changing ADMIN_EMAIL
+  // later never promotes a second account.
+  const adminEmail = (process.env.ADMIN_EMAIL ?? '').trim().toLowerCase();
+  if (adminEmail && adminEmail === String(user.email).trim().toLowerCase()) {
+    const { rowCount } = await pool.query(
+      `UPDATE users SET is_admin = true
+       WHERE id = $1 AND lower(email) = lower($2)
+         AND NOT EXISTS (SELECT 1 FROM users WHERE is_admin)
+       RETURNING id`,
+      [user.id, adminEmail]
+    );
+    if (rowCount > 0) user.is_admin = true;
   }
 
   const token = signToken(user.id, user.token_version ?? 0);

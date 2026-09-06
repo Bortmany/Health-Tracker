@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Button,
   Card,
+  Chip,
   ConfirmDialog,
   ErrorText,
   Field,
@@ -17,6 +18,7 @@ import { useDeleteAccount, useExportData } from '../hooks/useAccount.js';
 import { useMe, useLogout } from '../hooks/useAuth.js';
 import { useBillingStatus, useCheckout } from '../hooks/useBilling.js';
 import { useMyCoach, useRedeemCoachCode, useRemoveMyCoach } from '../hooks/useCoach.js';
+import { useMyApplication } from '../hooks/useCoachApplications.js';
 import { useSettings, useUpdateSettings } from '../hooks/useSettings.js';
 import styles from './More.module.css';
 
@@ -149,6 +151,65 @@ function CoachSection() {
   );
 }
 
+// The one door into applying to coach. Only rendered for non-coaches; shows
+// nothing while the application status is still loading (no skeleton — the
+// rest of the page already covers loading, and a brief gap beats a jump).
+function CoachApplicationRow() {
+  const { data, isLoading, isError } = useMyApplication();
+  if (isLoading || isError) return null;
+
+  const application = data?.application ?? null;
+  const canReapply = data?.canReapply ?? false;
+  const status = application?.status;
+
+  if (status === 'pending') {
+    return (
+      <Card className={styles.stackCard} title="Coaching">
+        <Link className={styles.rowLink} to="/coach-application/status">
+          <div className={styles.row}>
+            <div className={styles.mutedLine}>Your coach application is under review.</div>
+            <Chip tone="warn">Pending</Chip>
+          </div>
+        </Link>
+      </Card>
+    );
+  }
+
+  if (status === 'declined') {
+    return (
+      <Card className={styles.stackCard} title="Coaching">
+        {canReapply ? (
+          <div className={styles.row}>
+            <div className={styles.mutedLine}>Your last application wasn&apos;t approved.</div>
+            <Link className={styles.linkAsButton} to="/coach-application">
+              Apply again
+            </Link>
+          </div>
+        ) : (
+          <div className={styles.mutedLine}>
+            Your application wasn&apos;t approved. Contact us if you&apos;d like to discuss it.
+          </div>
+        )}
+      </Card>
+    );
+  }
+
+  // No application on file (or an old approved one whose coach access has
+  // since been revoked) — only offer the door if the server allows it.
+  if (application && !canReapply) return null;
+
+  return (
+    <Card className={styles.stackCard} title="Coaching">
+      <div className={styles.row}>
+        <div className={styles.mutedLine}>Want to coach clients in Cut?</div>
+        <Link className={styles.linkAsButton} to="/coach-application">
+          Become a coach
+        </Link>
+      </div>
+    </Card>
+  );
+}
+
 function DataSection() {
   const exportData = useExportData();
   const deleteAccount = useDeleteAccount();
@@ -235,8 +296,21 @@ export default function More() {
   const logout = useLogout();
   const [form, setForm] = useState(buildForm(settings));
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const showToast = toast.show;
+
+  // Another page (e.g. withdrawing a coach application) can send us here
+  // with a one-off message to show; it's cleared so Back doesn't repeat it.
+  useEffect(() => {
+    const message = location.state?.toast;
+    if (message) {
+      showToast(message);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.state, location.pathname, navigate, showToast]);
 
   // Coming back from a successful Paddle checkout: refresh the account so
   // the Premium label shows up without a manual reload.
@@ -298,6 +372,7 @@ export default function More() {
       </Card>
 
       {user?.role !== 'coach' && <CoachSection />}
+      {user?.role !== 'coach' && <CoachApplicationRow />}
 
       <Card className={styles.stackCard} title="Training quiz">
         <div className={styles.row}>

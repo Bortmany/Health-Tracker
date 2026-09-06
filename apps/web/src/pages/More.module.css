@@ -102,3 +102,20 @@
 .legalLinks a {
   color: var(--color-text-muted);
 }
+
+/* A whole card row that acts as a link (the pending-application row). */
+.rowLink {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius-md);
+}
+
+.rowLink:hover .mutedLine {
+  color: var(--color-text);
+}
+
+.rowLink:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+}

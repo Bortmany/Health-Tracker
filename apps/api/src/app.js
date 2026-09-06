@@ -12,11 +12,13 @@ import { logger } from './lib/logger.js';
 import { captureException, initSentry } from './lib/sentry.js';
 import { getSignupMode } from './lib/signupMode.js';
 import accountRouter from './routes/account.js';
+import adminRouter from './routes/admin.js';
 import activitiesRouter from './routes/activities.js';
 import authRouter from './routes/auth.js';
 import billingRouter from './routes/billing.js';
 import coachRouter from './routes/coach.js';
 import coachLinkRouter from './routes/coachLink.js';
+import coachApplicationsRouter from './routes/coachApplications.js';
 import exercisesRouter from './routes/exercises.js';
 import exportRouter from './routes/export.js';
 import habitsRouter from './routes/habits.js';
@@ -251,6 +253,21 @@ for (const path of ['/api/logs', '/api/nutrition', '/api/training-logs', '/api/p
   app.use(path, writeLimiter);
 }
 
+// "Become a coach" applications: 3 per person per rolling 24 hours, on its
+// own counter so it never eats into the everyday save budget above. Only the
+// POST (submit) counts — reading your own status or withdrawing is free.
+const applicationLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  limit: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: writeLimiterKey,
+  skip: (req) => rateLimitDisabled() || req.method !== 'POST',
+  message: { error: { message: 'You have sent the most applications allowed for today. Please try again tomorrow.', code: 'RATE_LIMITED' } },
+});
+app.use('/api/coach-applications', applicationLimiter);
+
 app.get('/api/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -260,6 +277,8 @@ app.get('/api/health', async (_req, res) => {
       sentry: process.env.SENTRY_DSN ? 'configured' : 'dormant',
       // "open" | "invite" | "closed" — who can create an account right now.
       signups: getSignupMode(),
+      // Whether ADMIN_EMAIL is set — the switch for the coach-application review screen.
+      admin: process.env.ADMIN_EMAIL ? 'configured' : 'dormant',
     });
   } catch (err) {
     // Log the real reason for us; the public response stays a fixed message so
@@ -270,6 +289,7 @@ app.get('/api/health', async (_req, res) => {
 });
 
 app.use('/api/account', accountRouter);
+app.use('/api/admin', adminRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/export', exportRouter);
@@ -278,6 +298,7 @@ app.use('/api/habits', habitsRouter);
 app.use('/api/activities', activitiesRouter);
 app.use('/api/coach', coachRouter);
 app.use('/api/coach-link', coachLinkRouter);
+app.use('/api/coach-applications', coachApplicationsRouter);
 app.use('/api/exercises', exercisesRouter);
 app.use('/api/health-sync', healthSyncRouter);
 app.use('/api/injuries', injuriesRouter);
