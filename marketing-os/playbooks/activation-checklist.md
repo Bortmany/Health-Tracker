@@ -4,7 +4,7 @@
 
 | Agent | Turns on when… | Why that moment | Owner cost when on |
 |---|---|---|---|
-| `ops-watchdog` | The Cut Render URL is confirmed live (owner opens it once and says "that's it") | Pointless before there's a site to watch; critical the day there is | ~0 — only hear from it when something breaks |
+| `ops-watchdog` | The Cut Railway URL is confirmed live (owner opens it once and says "that's it") | Pointless before there's a site to watch; critical the day there is | ~0 — only hear from it when something breaks |
 | `support-agent` | A support email address exists AND the first real user email arrives | No inbox, nothing to triage | ~5 min/day approving reply drafts (scales with users) |
 | `publisher` (full mode) | Publer + Reddit accounts connected (the 25-min setup) | Until then it runs prepare-only | 0 extra |
 | `feedback-curator` (#4) | **25 total signups** OR the first piece of unsolicited user feedback, whichever first | Below that, "patterns" are noise — one person is an anecdote | ~5 min/month reading the ranked list |

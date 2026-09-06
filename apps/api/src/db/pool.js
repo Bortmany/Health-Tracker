@@ -4,7 +4,7 @@ const { Pool } = pg;
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // Hosted Postgres (e.g. Render) requires SSL; local Postgres doesn't support it.
+  // Hosted Postgres (e.g. Railway) requires SSL; local Postgres doesn't support it.
   ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
   // Connection-pool limits, set explicitly rather than relying on pg's defaults
   // so we stay well under the database's max_connections when more than one copy

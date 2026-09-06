@@ -6,7 +6,7 @@ Cut is a fat-loss and training tracker for people who aren't sure what to train,
 
 ## Current state (roadmap complete)
 
-All planned phases are built, tested, reviewed, and merged to `main`. 136/136 backend tests passing (the old "48/48" count was long out of date). Features live:
+All planned phases are built, tested, reviewed, and merged to `main`. 141/141 backend tests passing (older counts in this file were out of date — re-run `npm test` rather than trusting a number). Features live:
 
 - Auth (JWT httpOnly cookie), consumer/coach roles, rate-limited login, 8+ char passwords
 - Onboarding quiz → matched against 14 seeded workout plans (progression rules + 52-week phases); free tier = 4-week plans, premium = 52-week; `plan_tier` on users

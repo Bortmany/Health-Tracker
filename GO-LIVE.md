@@ -10,6 +10,19 @@ Plain-English list of what to set up before launch. Full context: `Agents/docs/g
 - [ ] **Strong `JWT_SECRET`** — replace the `change-me` placeholder (signs login cookies).
 - [ ] **`NODE_ENV=production`** — makes Express serve the built frontend.
 - [ ] **`DATABASE_SSL=true`** — needed for essentially all hosted Postgres.
+- [ ] **`TRUSTED_PROXY=1`** — Railway puts a proxy in front of the app, so without this every visitor looks like one and the same address and the rate limits lock everyone out at once.
+
+## Backups
+Railway does not back up the database unless you switch it on.
+
+- [ ] **Turn on backups** — Railway dashboard → the Postgres service → *Backups* → enable daily backups (keep at least 7 days).
+- [ ] **Confirm the first one appears** — come back the next day and check a backup is listed with a size bigger than zero. A backup you have never seen is not a backup.
+- [ ] **Do one restore drill** (about 15 minutes, do it once before launch and again every few months):
+  1. In Railway, add a second, scratch Postgres service to the project (do **not** touch the live one).
+  2. Restore the latest backup into that scratch service (Backups → the backup → *Restore* → pick the scratch service).
+  3. Open the scratch service's *Data* / query tab and run: `SELECT count(*) FROM users;`, `SELECT count(*) FROM daily_logs;`, `SELECT count(*) FROM training_sessions;`. The numbers should match roughly what the live database shows for the same three tables (a little lower is fine — the backup is from earlier).
+  4. Delete the scratch service so it stops costing money.
+  5. Note the date and the three counts somewhere — that is your proof the backup can actually be restored.
 
 ## Payments — Paddle (built, asleep until keys are set)
 

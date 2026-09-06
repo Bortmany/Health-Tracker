@@ -82,7 +82,13 @@ app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 // parser throw, which the error handler below turns into a clean 413.
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }));
+// Which browser origin may call the API: an explicit CORS_ORIGIN wins; otherwise
+// the app's own public address (APP_URL, set on Railway) so production never
+// silently falls back to the local dev address; otherwise the Vite dev server.
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || process.env.APP_URL || 'http://localhost:5173',
+  credentials: true,
+}));
 
 // Rate limits run in every environment (dev, staging, production). Only the
 // automated test runner turns them off, by setting DISABLE_RATE_LIMIT=true, so
@@ -235,7 +241,10 @@ app.get('/api/health', async (_req, res) => {
       sentry: process.env.SENTRY_DSN ? 'configured' : 'dormant',
     });
   } catch (err) {
-    res.status(503).json({ status: 'error', db: 'disconnected', message: err.message });
+    // Log the real reason for us; the public response stays a fixed message so
+    // database host names, credentials or driver internals never leak out.
+    logger.error('Health check failed', { error: err });
+    res.status(503).json({ status: 'error', db: 'disconnected', message: 'database unavailable' });
   }
 });
 

@@ -45,7 +45,7 @@ One folder per project inside `marketing-os/brands/`. Everything project-specifi
 - **Channels:** Instagram (tips, before/after style graphics, feature highlights) + X (short tips, build-in-public updates) + Reddit (helpful replies in fat-loss and coaching communities)
 - **Voice:** encouraging, plain-English, zero fitness-bro jargon — same tone as the app
 - **Content pillars:** training tips · nutrition simplified · app features · streaks & habit science · coach corner
-- **Goal:** app signups (link in bio → the Render URL)
+- **Goal:** app signups (link in bio → the Railway URL)
 
 **`brands/<trading-app>/`** (starts lean — the repo is currently empty, so there's no product to screenshot yet)
 - **Strategy while pre-product:** "build-in-public" on X — progress updates, lessons, audience-building, collecting a waitlist — plus Reddit monitoring of trading communities to learn what people complain about and want (pure listening at first; that feedback shapes the product itself). Instagram waits until there's something visual to show.

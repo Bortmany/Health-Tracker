@@ -2,7 +2,7 @@
 
 ## Product
 - **What it is:** A fat-loss and training tracker for people who aren't sure what to train — plus the coaches who train them. An onboarding quiz matches you to a real workout plan (14 plans, up to 52-week progressions), then you track weight, food, sleep, steps, habits, workouts and streaks in one place. Installable on any phone (PWA). Free tier gives 4-week plans; Premium unlocks the full 52-week progressions. Coaches get invite codes, client summaries, and can assign programs directly.
-- **Live URL:** the Render `.onrender.com` URL — CONFIRM WITH OWNER and fill in before any card links out.
+- **Live URL:** the Railway `.up.railway.app` URL — CONFIRM WITH OWNER and fill in before any card links out.
 - **Stage:** built, deploying — treat as "launching now".
 - **Optimizing for:** app signups.
 
