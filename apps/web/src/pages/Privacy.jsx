@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import ContactEmail from '../components/ContactEmail.jsx';
 import styles from './Legal.module.css';
 
 // Public page — no login needed. Everything stated here is matched to what
@@ -154,8 +155,7 @@ export default function Privacy() {
 
           <h2>Contact</h2>
           <p>
-            Questions about your data: [owner — add your contact email here
-            before launch].
+            Questions about your data: <ContactEmail />.
           </p>
 
           <h2>Changes to this policy</h2>

@@ -78,10 +78,12 @@ whoever runs the app.
 
 **Two things still to do on these pages before applying:**
 
-1. **Add your contact email.** Three pages carry the placeholder
-   `[owner — add your contact email here before launch]` — `/terms`,
-   `/privacy` and `/refunds` (twice on the refunds page). Paddle needs a real
-   support address visible on the site, so replace all of them.
+1. **Check the contact email.** `/terms`, `/privacy` and `/refunds` show a
+   contact address (as a clickable email link) that defaults to
+   `naeljam@hotmail.com`. To use a different one, set the optional
+   `PRIVACY_CONTACT_EMAIL` variable on Railway — no code change needed.
+   Paddle needs a real support address visible on the site, so make sure
+   whichever address is showing is one you actually read.
 2. **Have a lawyer read them.** All three pages are plain-language templates
    and each shows a visible "not yet reviewed by a lawyer" notice. Get them
    reviewed, then remove that notice — it looks weak to a reviewer.

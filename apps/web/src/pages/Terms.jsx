@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import ContactEmail from '../components/ContactEmail.jsx';
 import styles from './Legal.module.css';
 
 // Public page — no login needed.
@@ -102,8 +103,7 @@ export default function Terms() {
 
           <h2>Contact</h2>
           <p>
-            Questions about these terms: [owner — add your contact email here
-            before launch].
+            Questions about these terms: <ContactEmail />.
           </p>
         </div>
 
