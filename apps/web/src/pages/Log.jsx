@@ -21,18 +21,9 @@ import { useCreateHabit, useDeleteHabit } from '../hooks/useHabits.js';
 import { useLog, usePutLog } from '../hooks/useLogs.js';
 import { useNutrition, usePutNutrition } from '../hooks/useNutrition.js';
 import styles from './Log.module.css';
+import { addDays, localToday } from '../lib/localDate.js';
 
 const DURATIONS = [5, 10, 15, 20, 30, 45, 60, 75, 90, 120];
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function shiftDate(date, days) {
-  const d = new Date(`${date}T00:00:00`);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 function formatDateLabel(date) {
   return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
@@ -124,10 +115,10 @@ function Group({ title, open, onToggle, hasData = false, children }) {
 }
 
 export default function Log() {
-  const [date, setDate] = useState(todayISO());
+  const [date, setDate] = useState(localToday());
   const { data, isLoading } = useLog(date);
   const { data: nutritionData, isLoading: nutritionLoading } = useNutrition(date);
-  const { data: yesterdayData } = useLog(shiftDate(date, -1));
+  const { data: yesterdayData } = useLog(addDays(date, -1));
   const { data: activityOptions = [] } = useActivities();
   const putLog = usePutLog(date);
   const putNutrition = usePutNutrition(date);
@@ -374,19 +365,19 @@ export default function Log() {
           <button
             type="button"
             className={styles.dateNavButton}
-            onClick={() => setDate((d) => shiftDate(d, -1))}
+            onClick={() => setDate((d) => addDays(d, -1))}
             aria-label="Previous day"
           >
             ←
           </button>
           <span className={styles.dateLabel}>
             {formatDateLabel(date)}
-            {date === todayISO() && <Chip tone="accent">Today</Chip>}
+            {date === localToday() && <Chip tone="accent">Today</Chip>}
           </span>
           <button
             type="button"
             className={styles.dateNavButton}
-            onClick={() => setDate((d) => shiftDate(d, 1))}
+            onClick={() => setDate((d) => addDays(d, 1))}
             aria-label="Next day"
           >
             →

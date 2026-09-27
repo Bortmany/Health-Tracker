@@ -10,6 +10,7 @@ import {
   referralLink,
 } from '../lib/coachProfiles.js';
 import * as validate from '../lib/validate.js';
+import { resolveToday, weekStartOf } from '../lib/userToday.js';
 import { Rollback, withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireCoach } from '../middleware/requireCoach.js';
@@ -277,9 +278,9 @@ router.post('/invites/email', asyncHandler(async (req, res) => {
 // worked out from logs the client already keeps for themselves; nothing new
 // is asked of them. Each signal is one query over ALL of this coach's active
 // clients at once (never one query per client), then matched up in JS.
-// "Today" and "this week" (Monday–Sunday) come from the database clock, so the
-// app has exactly one idea of what day it is.
-async function fetchClientSignals(coachId, clientIds) {
+// "Today" is the coach's own day (see lib/userToday.js), and "this week" is
+// the Monday–Sunday week it falls in, never the server's UTC day.
+async function fetchClientSignals(coachId, clientIds, today) {
   const empty = { lastActive: new Map(), done: new Map(), planned: new Map(), weights: new Map() };
   if (clientIds.length === 0) return empty;
 
@@ -287,7 +288,7 @@ async function fetchClientSignals(coachId, clientIds) {
   // meal), and how many whole days ago that was.
   const { rows: activeRows } = await pool.query(
     `SELECT user_id, MAX(date)::text AS last_active,
-            (CURRENT_DATE - MAX(date))::integer AS quiet_days
+            GREATEST(0, $2::date - MAX(date))::integer AS quiet_days
      FROM (
        SELECT user_id, date FROM daily_logs WHERE user_id = ANY($1::uuid[])
        UNION ALL
@@ -296,7 +297,7 @@ async function fetchClientSignals(coachId, clientIds) {
        SELECT user_id, date FROM nutrition_logs WHERE user_id = ANY($1::uuid[])
      ) logged
      GROUP BY user_id`,
-    [clientIds]
+    [clientIds, today]
   );
 
   // Training sessions logged this week (Monday through Sunday, today's week).
@@ -304,10 +305,10 @@ async function fetchClientSignals(coachId, clientIds) {
     `SELECT user_id, COUNT(*)::integer AS done
      FROM training_logs
      WHERE user_id = ANY($1::uuid[])
-       AND date >= date_trunc('week', CURRENT_DATE)::date
-       AND date < (date_trunc('week', CURRENT_DATE) + INTERVAL '7 days')::date
+       AND date >= $2::date
+       AND date < $2::date + 7
      GROUP BY user_id`,
-    [clientIds]
+    [clientIds, weekStartOf(today)]
   );
 
   // How many training days are in the newest program THIS coach assigned to
@@ -326,9 +327,9 @@ async function fetchClientSignals(coachId, clientIds) {
     `SELECT user_id, date::text AS date, weight
      FROM daily_logs
      WHERE user_id = ANY($1::uuid[]) AND weight IS NOT NULL
-       AND date > (CURRENT_DATE - INTERVAL '28 days')::date
+       AND date > $2::date - 28
      ORDER BY date`,
-    [clientIds]
+    [clientIds, today]
   );
 
   const signals = empty;
@@ -353,6 +354,8 @@ function compareClientsForTriage(a, b) {
 }
 
 router.get('/clients', asyncHandler(async (req, res) => {
+  // `?today=YYYY-MM-DD` is the coach's device day; without it, Oman's day.
+  const today = resolveToday(req.query.today);
   const { rows: activeRows } = await pool.query(
     `SELECT cc.id AS link_id, cc.client_id, u.display_name, u.email
      FROM coach_clients cc
@@ -369,7 +372,7 @@ router.get('/clients', asyncHandler(async (req, res) => {
     [req.userId]
   );
 
-  const signals = await fetchClientSignals(req.userId, activeRows.map((row) => row.client_id));
+  const signals = await fetchClientSignals(req.userId, activeRows.map((row) => row.client_id), today);
 
   const clients = activeRows.map((row) => {
     const activity = signals.lastActive.get(row.client_id) ?? { lastActiveAt: null, quietDays: null };
@@ -426,6 +429,7 @@ router.delete('/clients/:linkId', asyncHandler(async (req, res) => {
 
 router.get('/clients/:clientId/summary', asyncHandler(async (req, res) => {
   if (!validate.isUuid(req.params.clientId)) return clientNotFound(res);
+  const today = resolveToday(req.query.today);
   const link = await findActiveLink(req.userId, req.params.clientId);
   if (!link) {
     return clientNotFound(res);
@@ -441,9 +445,9 @@ router.get('/clients/:clientId/summary', asyncHandler(async (req, res) => {
 
   const { rows: weighInRows } = await pool.query(
     `SELECT date::text AS date, weight FROM daily_logs
-     WHERE user_id = $1 AND weight IS NOT NULL AND date >= (CURRENT_DATE - INTERVAL '30 days')
+     WHERE user_id = $1 AND weight IS NOT NULL AND date >= $2::date - 30
      ORDER BY date`,
-    [req.params.clientId]
+    [req.params.clientId, today]
   );
 
   const { rows: sessionRows } = await pool.query(

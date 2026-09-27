@@ -7,16 +7,7 @@ import { useNutritionRange } from '../hooks/useNutrition.js';
 import { usePersonalRecords, useTrainingLogs } from '../hooks/useTrainingLogs.js';
 import { smoothSeries, trendCaption } from '../lib/trend.js';
 import styles from './Progress.module.css';
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function dateNDaysAgo(n) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
-}
+import { localDaysAgo, localToday } from '../lib/localDate.js';
 
 // ---- Month helpers for the consistency calendar ----
 
@@ -34,8 +25,8 @@ const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 // The last seven days at a glance, with the current streak on top. Uses the
 // same colours as the consistency calendar below, so the two read as one.
 function WeekStrip() {
-  const today = todayISO();
-  const from = dateNDaysAgo(6);
+  const today = localToday();
+  const from = localDaysAgo(6);
   const { data: streak, isLoading: streakLoading } = useStreak();
   const { data: weekLogs = [], isLoading: logsLoading } = useLogsRange({ from, to: today });
   const { data: weekSessions = [], isLoading: sessionsLoading } = useTrainingLogs({ from, to: today });
@@ -49,7 +40,7 @@ function WeekStrip() {
   const loading = logsLoading || sessionsLoading;
 
   // Oldest first, ending on today.
-  const days = Array.from({ length: 7 }, (_, i) => dateNDaysAgo(6 - i));
+  const days = Array.from({ length: 7 }, (_, i) => localDaysAgo(6 - i));
 
   function describe(dateISO) {
     const date = new Date(`${dateISO}T00:00:00`);
@@ -205,8 +196,8 @@ function ConsistencyCalendar() {
 }
 
 export default function Progress() {
-  const today = todayISO();
-  const from = dateNDaysAgo(59);
+  const today = localToday();
+  const from = localDaysAgo(59);
   const { data: logs = [], isLoading: logsLoading } = useLogsRange({ from, to: today });
   const { data: nutritionLogs = [], isLoading: nutritionLoading } = useNutritionRange({ from, to: today });
   const { data: records = [], isLoading: recordsLoading } = usePersonalRecords();

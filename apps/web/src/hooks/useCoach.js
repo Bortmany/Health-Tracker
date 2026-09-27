@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as coachApi from '../api/coach.js';
+import { localToday } from '../lib/localDate.js';
 
 // Every screen that can show a coach–student link reads one of these keys.
 // Any change to a link (request, accept, decline, cancel, end) refreshes
@@ -17,9 +18,11 @@ export function invalidateLinkKeys(queryClient) {
 }
 
 export function useClients() {
+  // Part of the key, so quiet days refresh once the device passes midnight.
+  const today = localToday();
   return useQuery({
-    queryKey: CLIENTS_KEY,
-    queryFn: coachApi.getClients,
+    queryKey: [...CLIENTS_KEY, today],
+    queryFn: () => coachApi.getClients(today),
   });
 }
 
@@ -42,8 +45,8 @@ export function useRemoveClient() {
 
 export function useClientSummary(clientId) {
   return useQuery({
-    queryKey: ['clientSummary', clientId],
-    queryFn: () => coachApi.getClientSummary(clientId),
+    queryKey: ['clientSummary', clientId, localToday()],
+    queryFn: () => coachApi.getClientSummary(clientId, localToday()),
     enabled: Boolean(clientId),
   });
 }

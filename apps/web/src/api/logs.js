@@ -24,6 +24,8 @@ export function putLog(date, payload) {
   return request(`/logs/${date}`, { method: 'PUT', body: JSON.stringify(payload) });
 }
 
-export function getStreak() {
-  return request('/logs/streak');
+// `today` is this device's own day, so the streak counts from the right day
+// in Oman (the server's clock runs on UTC).
+export function getStreak(today) {
+  return request(`/logs/streak${today ? `?today=${today}` : ''}`);
 }

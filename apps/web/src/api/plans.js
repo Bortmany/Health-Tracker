@@ -21,8 +21,9 @@ export function adoptTemplate(id, payload = {}) {
   return request(`/plans/templates/${id}/adopt`, { method: 'POST', body: JSON.stringify(payload) });
 }
 
-export function getMyPlan() {
-  return request('/plans/my-plan');
+// `today` is this device's own day, so a new plan week starts at local midnight.
+export function getMyPlan(today) {
+  return request(`/plans/my-plan${today ? `?today=${today}` : ''}`);
 }
 
 export function deleteMyPlan() {
