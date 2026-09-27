@@ -29,7 +29,7 @@ All planned phases are built, tested, reviewed, and merged to `main`. 141/141 ba
 - **Nested writes:** transaction — BEGIN, upsert parent, DELETE children, re-INSERT, COMMIT; ROLLBACK in catch; `client.release()` in finally (see `routes/programs.js` `replaceDays`).
 - **Postgres trap:** placeholders in `COALESCE($n, …)` or typed comparisons need explicit casts (`::uuid`, `::boolean`, `::integer`) or you get runtime 42883 errors.
 - **Frontend:** thin wrappers in `src/api/`, TanStack Query hooks in `src/hooks/` (mutations invalidate BOTH list and detail keys), CSS Modules with the custom props from `index.css`, skeleton divs for loading (never spinners), forms keep `''` and convert with `x === '' ? null : Number(x)` on submit. Reuse `components/LineChart.jsx` for charts.
-- **Tests:** Node test runner, `app.listen(0)` + fetch, fresh timestamped user per file, cover happy path + replace-not-append + cross-user isolation. Calendar dates: select them as `date::text AS date` so they come back as plain `YYYY-MM-DD` strings (a raw `DATE` turns into a JS Date and slips a day when the server's timezone is ahead of UTC, e.g. Oman); tests still compare with `.slice(0, 10)`. The suite must pass under both `TZ=Asia/Muscat` and `TZ=UTC`.
+- **Tests:** Node test runner, `app.listen(0)` + fetch, fresh timestamped user per file, cover happy path + replace-not-append + cross-user isolation. Calendar dates: select them as `date::text AS date` so they come back as plain `YYYY-MM-DD` strings (a raw `DATE` turns into a JS Date and slips a day when the server's timezone is ahead of UTC, e.g. Oman); tests still compare with `.slice(0, 10)`. The suite must pass under both `TZ=Asia/Muscat` and `TZ=UTC`. On the screens, "today" is the device's own day, never `toISOString().slice(0, 10)` (that is the UTC day); plain-logic screen tests live next to the file as `*.test.js` in `apps/web` and run as part of `npm test`.
 
 ## Workflow (established with the owner)
 
@@ -50,7 +50,7 @@ All planned phases are built, tested, reviewed, and merged to `main`. 141/141 ba
 | Confirm Railway deploy is green | railway.app dashboard; open the app's public URL |
 | Real payments | Paddle account (they approve the app only once it's live, and expect a refund/cancellation page that doesn't exist yet), one subscription price, set the 5 env vars, point a Paddle notification at `/api/billing/webhook` — full sequence in `GO-LIVE.md` |
 | AI-written plans | Set `ANTHROPIC_API_KEY` on Railway |
-| Native iPhone/Android apps | Apple Developer $99/yr, Google Play $25, a Mac — follow `docs/mobile.md` |
+| Native iPhone/Android apps | Code side is DONE (Capacitor installed, `apps/web/capacitor.config.json`, Apple Health sync in `apps/web/src/native/healthSync.js`). Still needs: Apple Developer $99/yr, Google Play $25, a Mac, and the real live URL in the config — follow `docs/mobile.md` |
 | Premium meanwhile | `UPDATE users SET plan_tier = 'premium' WHERE email = '...';` in Railway's DB shell |
 
 Possible future work: Paddle customer portal (manage/cancel), password reset via email, progress photos (needs file storage), coach chat/notes, push notification reminders.

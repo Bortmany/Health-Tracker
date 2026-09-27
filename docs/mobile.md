@@ -13,30 +13,46 @@ The app already works on phones two ways today:
 | Google Play developer account | $25 once | Publishing to the Play Store |
 | A Mac with Xcode (or a cloud build service like Ionic Appflow) | — | Apple only allows iOS builds from macOS |
 
-## Steps (run from the repo root)
+## What's already done in this repo
+
+The code is iOS-ready — no more setup steps in the code itself:
+
+- Capacitor (the wrapper that turns the web app into a real iOS app) is
+  installed in `apps/web`.
+- `apps/web/capacitor.config.json` holds the app's identity (`com.cut.app`,
+  name "Cut"). **One thing to edit:** replace the placeholder in
+  `server.url` with the app's real live URL once Railway is confirmed.
+- Apple Health sync is wired in (`apps/web/src/native/healthSync.js`): when
+  the app runs on a real iPhone it reads the last 30 days of weight, steps,
+  active calories and sleep once a day and sends them to
+  `POST /api/health-sync`. On the website this code does nothing.
+- Ready-made commands in `apps/web`: `npm run ios:add` (create the Xcode
+  project — Mac only), `npm run ios:sync` (rebuild and copy into the iOS
+  project), `npm run ios:open` (open in Xcode).
+
+## Steps that still need a Mac
+
+Apple only allows iOS builds on macOS, so these run there (or in a cloud
+build service like Ionic Appflow):
 
 ```bash
-# 1. Install Capacitor into the web app
-npm install @capacitor/core -w apps/web
-npm install -D @capacitor/cli -w apps/web
+# 0. Get the code and put the real live URL in apps/web/capacitor.config.json
+npm install
 
-# 2. Initialize (appId must be unique, reverse-domain style)
+# 1. Create the native iOS project
 cd apps/web
-npx cap init Cut com.yourdomain.cut --web-dir dist
+npm run ios:add
 
-# 3. Build the web app, then add the native projects
-npm run build
-npx cap add ios       # requires macOS
-npx cap add android
+# 2. Install the Apple Health plugin the sync code talks to
+npm install @perfood/capacitor-healthkit
+npm run ios:sync
 
-# 4. Point the app at the live server: in capacitor.config.ts set
-#    server: { url: 'https://YOUR-RENDER-URL', cleartext: false }
-#    (or ship the bundle offline and let /api calls hit the server)
-
-# 5. Open in the native IDEs to run/sign/publish
-npx cap open ios
-npx cap open android
+# 3. Open in Xcode to run on a phone, sign, and publish
+npm run ios:open
 ```
+
+For Android later: `npx cap add android` plus a Health Connect plugin — same
+pattern.
 
 ## Health data
 
