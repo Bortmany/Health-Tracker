@@ -4,6 +4,8 @@ import {
   Button,
   Card,
   Chip,
+  ConfirmDialog,
+  EmptyState,
   ErrorText,
   Field,
   Input,
@@ -15,6 +17,7 @@ import {
   useToast,
 } from '../components/ui/index.js';
 import { useActivities } from '../hooks/useActivities.js';
+import { useCreateHabit, useDeleteHabit } from '../hooks/useHabits.js';
 import { useLog, usePutLog } from '../hooks/useLogs.js';
 import { useNutrition, usePutNutrition } from '../hooks/useNutrition.js';
 import styles from './Log.module.css';
@@ -128,7 +131,11 @@ export default function Log() {
   const { data: activityOptions = [] } = useActivities();
   const putLog = usePutLog(date);
   const putNutrition = usePutNutrition(date);
+  const createHabit = useCreateHabit();
+  const deleteHabit = useDeleteHabit();
   const [form, setForm] = useState(null);
+  const [newHabit, setNewHabit] = useState('');
+  const [habitToDelete, setHabitToDelete] = useState(null);
   const [searchParams] = useSearchParams();
   const toast = useToast();
 
@@ -193,6 +200,43 @@ export default function Log() {
       ...f,
       habits: f.habits.map((h) => (h.habitId === habitId ? { ...h, completed: !h.completed } : h)),
     }));
+  }
+
+  // Creating a habit saves it straight away (it belongs to the account, not to
+  // this one day) and then drops it into today's checklist by hand. We update
+  // the list in place instead of re-loading the day so anything half-typed in
+  // the other boxes isn't wiped while you add a habit.
+  async function addHabit() {
+    const label = newHabit.trim();
+    if (!label) return;
+    try {
+      const { habit } = await createHabit.mutateAsync({ label });
+      setForm((f) => ({
+        ...f,
+        habits: [...f.habits, { habitId: habit.id, label: habit.label, completed: false }],
+      }));
+      setNewHabit('');
+    } catch {
+      // The red message under the box already says what went wrong.
+    }
+  }
+
+  // Enter inside the habit box adds the habit instead of saving the whole day.
+  function handleHabitKeyDown(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addHabit();
+    }
+  }
+
+  function removeHabit() {
+    const habitId = habitToDelete?.habitId;
+    if (!habitId) return;
+    deleteHabit.mutate(habitId, {
+      onSuccess: () =>
+        setForm((f) => ({ ...f, habits: f.habits.filter((h) => h.habitId !== habitId) })),
+      onSettled: () => setHabitToDelete(null),
+    });
   }
 
   function addActivityRow() {
@@ -540,25 +584,77 @@ export default function Log() {
             </Button>
           </Group>
 
-          {form.habits.length > 0 && (
-            <Group
-              title="Habits"
-              open={open.habits}
-              onToggle={() => setOpen((o) => ({ ...o, habits: !o.habits }))}
-            >
-              {form.habits.map((h) => (
-                <label className={styles.habitRow} key={h.habitId}>
-                  <input
-                    className={styles.checkbox}
-                    type="checkbox"
-                    checked={h.completed}
-                    onChange={() => toggleHabit(h.habitId)}
+          <Group
+            title="Habits"
+            open={open.habits}
+            hasData={form.habits.some((h) => h.completed)}
+            onToggle={() => setOpen((o) => ({ ...o, habits: !o.habits }))}
+          >
+            {form.habits.length === 0 ? (
+              <EmptyState>No habits yet — add one below and it&apos;ll show up here every day.</EmptyState>
+            ) : (
+              <div>
+                {form.habits.map((h) => (
+                  <div className={styles.habitRow} key={h.habitId}>
+                    <label className={styles.habitLabel}>
+                      <input
+                        className={styles.checkbox}
+                        type="checkbox"
+                        checked={h.completed}
+                        onChange={() => toggleHabit(h.habitId)}
+                      />
+                      {h.label}
+                    </label>
+                    <button
+                      type="button"
+                      className={`${styles.removeButton} ${styles.habitRemove}`}
+                      onClick={() => setHabitToDelete(h)}
+                      disabled={deleteHabit.isPending}
+                      aria-label={`Remove habit ${h.label}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* The label stays visible; the greyed example only shows the kind
+                of habit that works, and disappears as soon as you type. */}
+            <div className={styles.addHabitRow}>
+              <div className={styles.addHabitField}>
+                <Field label="Add a habit">
+                  <Input
+                    type="text"
+                    aria-label="Add a habit"
+                    placeholder="Walk 10,000 steps"
+                    value={newHabit}
+                    maxLength={200}
+                    onChange={(e) => setNewHabit(e.target.value)}
+                    onKeyDown={handleHabitKeyDown}
                   />
-                  {h.label}
-                </label>
-              ))}
-            </Group>
-          )}
+                </Field>
+              </div>
+              <Button
+                size="sm"
+                onClick={addHabit}
+                disabled={newHabit.trim() === '' || createHabit.isPending}
+              >
+                {createHabit.isPending ? 'Adding...' : 'Add'}
+              </Button>
+            </div>
+            {createHabit.isError && <ErrorText>{createHabit.error.message}</ErrorText>}
+            {deleteHabit.isError && <ErrorText>{deleteHabit.error.message}</ErrorText>}
+
+            <ConfirmDialog
+              open={Boolean(habitToDelete)}
+              message={`Remove "${habitToDelete?.label ?? ''}"? Your past ticks for this habit go too.`}
+              confirmLabel="Remove habit"
+              busy={deleteHabit.isPending}
+              onConfirm={removeHabit}
+              onCancel={() => setHabitToDelete(null)}
+            />
+          </Group>
 
           {form.injuryCheckins.length > 0 && (
             <Group

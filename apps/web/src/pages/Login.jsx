@@ -1,9 +1,14 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Card, ErrorText, Field, Input } from '../components/ui/index.js';
 import { useLogin } from '../hooks/useAuth.js';
 import { emailError } from '../lib/validation.js';
 import styles from './Auth.module.css';
+
+function safeNext(value) {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) return '/';
+  return value;
+}
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -13,6 +18,10 @@ export default function Login() {
   const [emailTouched, setEmailTouched] = useState(false);
   const login = useLogin();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Where to go after logging in — only ever a path inside Cut (a public
+  // coach page, the directory), never an outside address.
+  const next = safeNext(searchParams.get('next'));
 
   const emailMessage = emailTouched ? emailError(email) : '';
 
@@ -20,7 +29,7 @@ export default function Login() {
     e.preventDefault();
     setEmailTouched(true);
     if (emailError(email)) return;
-    login.mutate({ email: email.trim(), password }, { onSuccess: () => navigate('/') });
+    login.mutate({ email: email.trim(), password }, { onSuccess: () => navigate(next, { replace: true }) });
   }
 
   return (

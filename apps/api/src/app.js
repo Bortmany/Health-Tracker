@@ -10,17 +10,22 @@ import { pool } from './db/pool.js';
 import { verifyToken } from './lib/jwt.js';
 import { logger } from './lib/logger.js';
 import { captureException, initSentry } from './lib/sentry.js';
+import { getSignupMode } from './lib/signupMode.js';
 import accountRouter from './routes/account.js';
+import adminRouter from './routes/admin.js';
 import activitiesRouter from './routes/activities.js';
 import authRouter from './routes/auth.js';
 import billingRouter from './routes/billing.js';
 import coachRouter from './routes/coach.js';
 import coachLinkRouter from './routes/coachLink.js';
+import coachesRouter from './routes/coaches.js';
+import coachApplicationsRouter from './routes/coachApplications.js';
 import exercisesRouter from './routes/exercises.js';
 import exportRouter from './routes/export.js';
 import habitsRouter from './routes/habits.js';
 import healthSyncRouter from './routes/healthSync.js';
 import injuriesRouter from './routes/injuries.js';
+import legalRouter from './routes/legal.js';
 import logsRouter from './routes/logs.js';
 import nutritionRouter from './routes/nutrition.js';
 import plansRouter from './routes/plans.js';
@@ -52,7 +57,7 @@ if (trustedProxy) {
 // Content-Security-Policy: tells the browser exactly which sources it may load
 // from, which blocks most injected-script attacks. These values are scoped to
 // what the Cut frontend actually uses: its own scripts/styles (same origin),
-// Google Fonts, and same-origin API calls. Stripe checkout is a full-page
+// Google Fonts, and same-origin API calls. Paddle checkout is a full-page
 // redirect (no embedded script), so it needs nothing extra here.
 app.use(helmet({
   contentSecurityPolicy: {
@@ -74,7 +79,7 @@ app.use(helmet({
   },
 }));
 app.use(compression());
-// Stripe's webhook signature is checked against the raw request bytes, so
+// Paddle's webhook signature is checked against the raw request bytes, so
 // that one path must skip JSON parsing. It's registered before express.json.
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 // Cap the request body so a huge (or malicious) payload can't tie up memory.
@@ -82,7 +87,13 @@ app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 // parser throw, which the error handler below turns into a clean 413.
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }));
+// Which browser origin may call the API: an explicit CORS_ORIGIN wins; otherwise
+// the app's own public address (APP_URL, set on Railway) so production never
+// silently falls back to the local dev address; otherwise the Vite dev server.
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || process.env.APP_URL || 'http://localhost:5173',
+  credentials: true,
+}));
 
 // Rate limits run in every environment (dev, staging, production). Only the
 // automated test runner turns them off, by setting DISABLE_RATE_LIMIT=true, so
@@ -118,52 +129,71 @@ const authLimiter = makeAuthLimiter('Too many attempts. Please wait 15 minutes a
 // succeeds and clears the IP's failure streak; only wrong guesses accumulate,
 // and once an IP is over its budget, further WRONG guesses get a 429. The
 // per-account limiter below still hard-caps guesses against any single email.
-const LOGIN_IP_WINDOW_MS = 15 * 60 * 1000;
-const LOGIN_IP_MAX_FAILURES = 20;
-const loginFailuresByIp = new Map();
+//
+// The same failure-only mechanism guards signup invite codes on /register: a
+// wrong or missing code answers 403, and after 10 of those in 15 minutes an IP
+// gets a 429. Successful registrations (201) clear the streak.
+const FAILURE_WINDOW_MS = 15 * 60 * 1000;
 
-function loginIpFailureThrottle(req, res, next) {
-  if (rateLimitDisabled()) return next();
+function makeIpFailureThrottle({ successStatus, failureStatus, maxFailures, message }) {
+  const failuresByIp = new Map();
 
-  const key = req.ip;
-  const now = Date.now();
-  const originalJson = res.json.bind(res);
+  return function ipFailureThrottle(req, res, next) {
+    if (rateLimitDisabled()) return next();
 
-  res.json = (body) => {
-    const status = res.statusCode;
-    if (status === 200) {
-      // A correct login clears this IP's failure streak.
-      loginFailuresByIp.delete(key);
-    } else if (status === 401) {
-      // A failed login counts against this IP's budget.
-      const existing = loginFailuresByIp.get(key);
-      const entry = existing && existing.resetAt > now
-        ? existing
-        : { count: 0, resetAt: now + LOGIN_IP_WINDOW_MS };
-      entry.count += 1;
-      loginFailuresByIp.set(key, entry);
-      if (entry.count > LOGIN_IP_MAX_FAILURES) {
-        res.status(429);
-        return originalJson({
-          error: { message: 'Too many login attempts. Please wait 15 minutes and try again.', code: 'RATE_LIMITED' },
-        });
+    const key = req.ip;
+    const now = Date.now();
+    const originalJson = res.json.bind(res);
+
+    res.json = (body) => {
+      const status = res.statusCode;
+      if (status === successStatus) {
+        // A success clears this IP's failure streak.
+        failuresByIp.delete(key);
+      } else if (status === failureStatus) {
+        // A failure counts against this IP's budget.
+        const existing = failuresByIp.get(key);
+        const entry = existing && existing.resetAt > now
+          ? existing
+          : { count: 0, resetAt: now + FAILURE_WINDOW_MS };
+        entry.count += 1;
+        failuresByIp.set(key, entry);
+        if (entry.count > maxFailures) {
+          res.status(429);
+          return originalJson({ error: { message, code: 'RATE_LIMITED' } });
+        }
       }
-    }
-    return originalJson(body);
-  };
+      return originalJson(body);
+    };
 
-  next();
+    next();
+  };
 }
+
+const loginIpFailureThrottle = makeIpFailureThrottle({
+  successStatus: 200,
+  failureStatus: 401,
+  maxFailures: 20,
+  message: 'Too many login attempts. Please wait 15 minutes and try again.',
+});
+const registerInviteFailureThrottle = makeIpFailureThrottle({
+  successStatus: 201,
+  failureStatus: 403,
+  maxFailures: 10,
+  message: 'Too many invite code attempts. Please wait 15 minutes and try again.',
+});
 
 // Registered as exact/literal paths (not the whole '/api/auth' prefix) so a
 // login or register request only ever counts against its own limiter, never
 // falling through into the shared authLimiter below as well.
 app.use('/api/auth/login', loginIpFailureThrottle);
-app.use('/api/auth/register', registerLimiter);
+app.use('/api/auth/register', registerLimiter, registerInviteFailureThrottle);
 app.use('/api/auth/logout', authLimiter);
 app.use('/api/auth/me', authLimiter);
 // Invite codes get the same guessing protection as passwords.
 app.use('/api/coach-link/redeem', authLimiter);
+// So do coach referral codes (the public "who invited me" lookup).
+app.use('/api/coaches/referral', authLimiter);
 // Deleting an account asks for your password first, so it gets the same
 // guessing protection as the login screen.
 app.use('/api/account', authLimiter);
@@ -222,9 +252,39 @@ const writeLimiter = rateLimit({
   skip: (req) => rateLimitDisabled() || req.method === 'GET',
   message: { error: { message: 'You are saving changes too quickly. Please slow down and try again shortly.', code: 'RATE_LIMITED' } },
 });
-for (const path of ['/api/logs', '/api/nutrition', '/api/training-logs', '/api/programs', '/api/health-sync']) {
+for (const path of ['/api/logs', '/api/nutrition', '/api/training-logs', '/api/programs', '/api/health-sync', '/api/coach', '/api/coach-link']) {
   app.use(path, writeLimiter);
 }
+
+// A coach's "Invite by email": 20 per coach per rolling 24 hours, on its own
+// counter. The reply never says whether an address has an account, and this
+// cap stops a coach from probing many addresses to work it out from patterns.
+const inviteEmailLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: writeLimiterKey,
+  skip: (req) => rateLimitDisabled() || req.method !== 'POST',
+  message: { error: { message: 'You have sent the most email invites allowed for today. Please try again tomorrow.', code: 'RATE_LIMITED' } },
+});
+app.use('/api/coach/invites/email', inviteEmailLimiter);
+
+// "Become a coach" applications: 3 per person per rolling 24 hours, on its
+// own counter so it never eats into the everyday save budget above. Only the
+// POST (submit) counts — reading your own status or withdrawing is free.
+const applicationLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  limit: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: writeLimiterKey,
+  skip: (req) => rateLimitDisabled() || req.method !== 'POST',
+  message: { error: { message: 'You have sent the most applications allowed for today. Please try again tomorrow.', code: 'RATE_LIMITED' } },
+});
+app.use('/api/coach-applications', applicationLimiter);
 
 app.get('/api/health', async (_req, res) => {
   try {
@@ -233,13 +293,21 @@ app.get('/api/health', async (_req, res) => {
       status: 'ok',
       db: 'connected',
       sentry: process.env.SENTRY_DSN ? 'configured' : 'dormant',
+      // "open" | "invite" | "closed" — who can create an account right now.
+      signups: getSignupMode(),
+      // Whether ADMIN_EMAIL is set — the switch for the coach-application review screen.
+      admin: process.env.ADMIN_EMAIL ? 'configured' : 'dormant',
     });
   } catch (err) {
-    res.status(503).json({ status: 'error', db: 'disconnected', message: err.message });
+    // Log the real reason for us; the public response stays a fixed message so
+    // database host names, credentials or driver internals never leak out.
+    logger.error('Health check failed', { error: err });
+    res.status(503).json({ status: 'error', db: 'disconnected', message: 'database unavailable' });
   }
 });
 
 app.use('/api/account', accountRouter);
+app.use('/api/admin', adminRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/export', exportRouter);
@@ -248,9 +316,12 @@ app.use('/api/habits', habitsRouter);
 app.use('/api/activities', activitiesRouter);
 app.use('/api/coach', coachRouter);
 app.use('/api/coach-link', coachLinkRouter);
+app.use('/api/coaches', coachesRouter); // public — the coach directory and profile pages
+app.use('/api/coach-applications', coachApplicationsRouter);
 app.use('/api/exercises', exercisesRouter);
 app.use('/api/health-sync', healthSyncRouter);
 app.use('/api/injuries', injuriesRouter);
+app.use('/api/legal', legalRouter); // public — contact address for the legal pages
 app.use('/api/logs', logsRouter);
 app.use('/api/nutrition', nutritionRouter);
 app.use('/api/plans', plansRouter);

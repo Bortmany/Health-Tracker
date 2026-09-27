@@ -1,0 +1,14 @@
+.sparkline {
+  display: block;
+  flex: none;
+  overflow: visible;
+}
+
+/* Same series color the full LineChart uses, so the row and the detail agree. */
+.sparkline polyline {
+  fill: none;
+  stroke: var(--color-chart-line);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}

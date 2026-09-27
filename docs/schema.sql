@@ -312,3 +312,97 @@ ALTER TABLE users ADD COLUMN stripe_customer_id TEXT;
 -- bumps it, which invalidates any token signed with the old value.
 ALTER TABLE users
   ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0;
+
+-- 018: Paddle replaces Stripe as the payment provider. Nobody has paid yet —
+-- the Stripe column was always empty — so it is dropped rather than copied
+-- across, and the Paddle customer reference takes its place.
+ALTER TABLE users DROP COLUMN IF EXISTS stripe_customer_id;
+ALTER TABLE users ADD COLUMN paddle_customer_id TEXT;
+
+-- 019: "Become a coach" applications, reviewed by the one admin account
+-- (ADMIN_EMAIL, granted once, ever). Revoking a coach marks their client
+-- links 'revoked' instead of deleting them.
+CREATE TABLE coach_applications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  display_name TEXT NOT NULL,
+  credentials TEXT NOT NULL,
+  years_coaching INTEGER NOT NULL,
+  approach TEXT NOT NULL,
+  link TEXT,
+  agreed_to_terms BOOLEAN NOT NULL DEFAULT false,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'declined')),
+  decided_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  decision_reason TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  decided_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX coach_applications_one_pending_idx ON coach_applications(user_id) WHERE status = 'pending';
+CREATE INDEX coach_applications_status_created_idx ON coach_applications(status, created_at DESC);
+CREATE INDEX coach_applications_user_id_idx ON coach_applications(user_id);
+ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE coach_clients DROP CONSTRAINT coach_clients_status_check;
+ALTER TABLE coach_clients ADD CONSTRAINT coach_clients_status_check CHECK (status IN ('pending', 'active', 'revoked'));
+-- 019 (continued): only live links count towards one-link-per-coach-and-client.
+DROP INDEX IF EXISTS coach_clients_coach_id_client_id_idx;
+CREATE UNIQUE INDEX coach_clients_coach_id_client_id_idx
+  ON coach_clients(coach_id, client_id)
+  WHERE client_id IS NOT NULL AND status <> 'revoked';
+
+-- 020: coach profiles (public directory + referral links), student requests,
+-- coach invites by email, and links that end instead of being deleted.
+CREATE TABLE coach_profiles (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  slug TEXT UNIQUE NOT NULL,
+  headline TEXT,
+  bio TEXT,
+  specialties TEXT[] NOT NULL DEFAULT '{}',
+  accepting_clients BOOLEAN NOT NULL DEFAULT true,
+  is_public BOOLEAN NOT NULL DEFAULT false,
+  referral_code TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT coach_profiles_specialties_check CHECK (
+    specialties <@ ARRAY['fat-loss', 'muscle-gain', 'beginners', 'strength', 'running',
+                         'injury-safe', 'nutrition', 'womens-training', 'over-40', 'online-only']::text[]
+  )
+);
+CREATE INDEX coach_profiles_is_public_idx ON coach_profiles(is_public);
+ALTER TABLE coach_clients DROP CONSTRAINT coach_clients_status_check;
+ALTER TABLE coach_clients ADD CONSTRAINT coach_clients_status_check
+  CHECK (status IN ('pending', 'requested', 'active', 'declined', 'ended', 'revoked'));
+ALTER TABLE coach_clients ALTER COLUMN invite_code DROP NOT NULL;
+ALTER TABLE coach_clients ADD COLUMN requested_by TEXT
+  CHECK (requested_by IN ('coach', 'client', 'referral'));
+ALTER TABLE coach_clients ADD COLUMN ended_at TIMESTAMPTZ;
+ALTER TABLE coach_clients ADD COLUMN invite_email TEXT;
+-- 020 (continued): ended/declined links no longer block the same pair from reconnecting.
+DROP INDEX coach_clients_coach_id_client_id_idx;
+CREATE UNIQUE INDEX coach_clients_coach_id_client_id_idx
+  ON coach_clients(coach_id, client_id)
+  WHERE client_id IS NOT NULL AND status NOT IN ('revoked', 'ended', 'declined');
+ALTER TABLE users ADD COLUMN referred_by_coach_id UUID REFERENCES users(id) ON DELETE SET NULL;
+CREATE INDEX users_referred_by_coach_id_idx ON users(referred_by_coach_id);
+-- 020 (continued): existing coaches get a profile row (slug = display name + random suffix, random referral code).
+INSERT INTO coach_profiles (user_id, slug, referral_code)
+SELECT u.id,
+       -- Names with no Latin letters or digits (e.g. Arabic names) fall back
+       -- to 'coach', matching the app's makeSlug.
+       COALESCE(NULLIF(rtrim(left(trim(BOTH '-' FROM regexp_replace(lower(COALESCE(u.display_name, '')), '[^a-z0-9]+', '-', 'g')), 40), '-'), ''), 'coach')
+         || '-' || substr(md5(random()::text || u.id::text), 1, 4),
+       upper(substr(md5(random()::text || u.id::text), 1, 10))
+FROM users u
+WHERE u.role = 'coach'
+  AND NOT EXISTS (SELECT 1 FROM coach_profiles p WHERE p.user_id = u.id);
+
+-- 021: private coach notes — one per coach-and-client pairing, only the coach can read it,
+-- and only while the link is active (enforced by the routes).
+CREATE TABLE coach_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  coach_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  client_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body TEXT NOT NULL CHECK (char_length(body) <= 4000),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (coach_id, client_id)
+);
+CREATE INDEX coach_notes_coach_id_idx ON coach_notes(coach_id);

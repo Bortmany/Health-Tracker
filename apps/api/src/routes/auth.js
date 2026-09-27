@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { signToken, verifyTokenPayload } from '../lib/jwt.js';
+import { getSignupMode, isValidInviteCode } from '../lib/signupMode.js';
 import * as validate from '../lib/validate.js';
 import { withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -37,14 +38,61 @@ function toPublicUser(row) {
     displayName: row.display_name,
     planTier: row.plan_tier ?? 'free',
     role: row.role ?? 'consumer',
+    isAdmin: row.is_admin === true,
     createdAt: row.created_at,
   };
 }
 
+// Looks up which coach a referral code belongs to, or null when the code is
+// missing, malformed or unknown. Codes are random 10-character strings and
+// the register route's failure throttle limits guessing, so a plain lookup
+// is enough here.
+async function findReferringCoach(referralCode) {
+  if (typeof referralCode !== 'string') return null;
+  const code = referralCode.trim().toUpperCase();
+  if (code === '' || code.length > 100) return null;
+  const { rows } = await pool.query(
+    `SELECT p.user_id FROM coach_profiles p
+     JOIN users u ON u.id = p.user_id AND u.role = 'coach'
+     WHERE p.referral_code = $1`,
+    [code]
+  );
+  return rows[0] ? { userId: rows[0].user_id } : null;
+}
+
+// Public: tells the sign-up screen whether anyone can join ("open"), a signup
+// invite code is needed ("invite"), or sign-up is switched off ("closed").
+// Never returns the codes themselves. (Unrelated to coach invite codes.)
+router.get('/signup-mode', (_req, res) => {
+  res.json({ mode: getSignupMode() });
+});
+
 router.post('/register', asyncHandler(async (req, res) => {
   // Note: `role` is deliberately NOT read from the request. New accounts are
   // always regular ('consumer') accounts — see below.
-  const { email, password, displayName } = req.body ?? {};
+  const { email, password, displayName, inviteCode, referralCode } = req.body ?? {};
+
+  // Signup gate (see lib/signupMode.js). Checked before anything else so a
+  // closed or invite-only app does no work — and leaks nothing — for
+  // strangers. The 403 here is what the register failure throttle in app.js
+  // counts, so guessing codes is rate-limited per IP.
+  const signupMode = getSignupMode();
+  if (signupMode === 'closed') {
+    return res.status(403).json({
+      error: { message: 'Sign-up is closed for now.', code: 'SIGNUPS_CLOSED' },
+    });
+  }
+  // A coach's referral link carries their referral code. In invite-only mode
+  // it stands in for a signup invite code; in open mode it still records
+  // which coach brought this person in. Only a current coach's code counts —
+  // a revoked coach's link stops working the moment their role changes.
+  const referringCoach = await findReferringCoach(referralCode);
+  if (signupMode === 'invite' && !isValidInviteCode(inviteCode) && !referringCoach) {
+    return res.status(403).json({
+      error: { message: 'Sign-up is by invitation. Enter a valid invite code.', code: 'INVITE_REQUIRED' },
+    });
+  }
+
   if (!email || !password || !displayName) {
     return res.status(400).json({
       error: { message: 'email, password, and displayName are required', code: 'INVALID_INPUT' },
@@ -61,21 +109,30 @@ router.post('/register', asyncHandler(async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
 
-  // Security: every new account is a regular ('consumer') account. The route no
-  // longer lets a client ask to be created as a 'coach' — that let anyone grant
-  // themselves coach access, which can read and edit other people's data.
-  // TODO(coach onboarding): add a verified promotion path (e.g. an admin action
-  // or redeeming a coach invite) so genuine coaches can be created safely.
+  // Security: every new account is a regular ('consumer') account. The route
+  // never lets a client ask to be created as a 'coach' — that would let anyone
+  // grant themselves coach access, which can read and edit other people's
+  // data. The only way to become a coach is the "Become a coach" application
+  // approved by the owner (routes/coachApplications.js + routes/admin.js).
   let user;
   try {
     user = await withTransaction(async (client) => {
       const { rows } = await client.query(
-        `INSERT INTO users (email, password_hash, display_name, role)
-         VALUES ($1, $2, $3, 'consumer')
+        `INSERT INTO users (email, password_hash, display_name, role, referred_by_coach_id)
+         VALUES ($1, $2, $3, 'consumer', $4::uuid)
          RETURNING id, email, display_name, plan_tier, role, created_at, token_version`,
-        [normalizedEmail, passwordHash, cleanDisplayName]
+        [normalizedEmail, passwordHash, cleanDisplayName, referringCoach?.userId ?? null]
       );
       await client.query('INSERT INTO user_settings (user_id) VALUES ($1)', [rows[0].id]);
+      // Arriving through a referral link also asks that coach to take them on:
+      // the coach sees it under Requests and accepts or declines.
+      if (referringCoach) {
+        await client.query(
+          `INSERT INTO coach_clients (coach_id, client_id, status, requested_by)
+           VALUES ($1, $2, 'requested', 'referral')`,
+          [referringCoach.userId, rows[0].id]
+        );
+      }
       return rows[0];
     });
   } catch (err) {
@@ -112,6 +169,23 @@ router.post('/login', asyncHandler(async (req, res) => {
 
   if (!user || !valid) {
     return res.status(401).json({ error: { message: 'Invalid email or password', code: 'INVALID_CREDENTIALS' } });
+  }
+
+  // One-time admin grant. If ADMIN_EMAIL names this account and nobody is an
+  // admin yet, this account becomes the admin. The check and the update are one
+  // SQL statement so two logins at the same moment cannot both be granted. It
+  // grants exactly once, ever: once any admin exists, changing ADMIN_EMAIL
+  // later never promotes a second account.
+  const adminEmail = (process.env.ADMIN_EMAIL ?? '').trim().toLowerCase();
+  if (adminEmail && adminEmail === String(user.email).trim().toLowerCase()) {
+    const { rowCount } = await pool.query(
+      `UPDATE users SET is_admin = true
+       WHERE id = $1 AND lower(email) = lower($2)
+         AND NOT EXISTS (SELECT 1 FROM users WHERE is_admin)
+       RETURNING id`,
+      [user.id, adminEmail]
+    );
+    if (rowCount > 0) user.is_admin = true;
   }
 
   const token = signToken(user.id, user.token_version ?? 0);

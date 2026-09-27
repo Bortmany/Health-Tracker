@@ -23,3 +23,9 @@ export function Input(props) {
 export function Select(props) {
   return <select className={styles.input} {...props} />;
 }
+
+// Multi-line text box styled like Input, a few lines tall by default.
+// Forwards every native prop (so `maxLength`, `placeholder`, etc. all work).
+export function TextArea({ rows = 4, ...props }) {
+  return <textarea className={`${styles.input} ${styles.textarea}`} rows={rows} {...props} />;
+}
