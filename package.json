@@ -14,7 +14,7 @@
     "migrate": "npm run migrate -w apps/api",
     "test": "npm run test -w apps/api",
     "verify": "npm run build && npm test",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
