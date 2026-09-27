@@ -128,7 +128,7 @@ router.get('/', asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT cc.id, cc.status, cc.requested_by, cc.created_at, u.display_name, p.slug
      FROM coach_clients cc
-     JOIN users u ON u.id = cc.coach_id
+     JOIN users u ON u.id = cc.coach_id AND u.role = 'coach'
      LEFT JOIN coach_profiles p ON p.user_id = cc.coach_id
      WHERE cc.client_id = $1 AND cc.status IN ('active', 'requested')
      ORDER BY cc.created_at DESC`,
@@ -244,42 +244,51 @@ router.post('/invites/:id/accept', asyncHandler(async (req, res) => {
   if (!validate.isUuid(req.params.id)) return inviteNotFound(res);
   const replaceCurrent = validate.boolean(req.body?.replaceCurrent, 'replaceCurrent', { optional: true }) === true;
 
-  const coach = await withTransaction(async (client) => {
-    const { rows: inviteRows } = await client.query(
-      `SELECT cc.id, cc.coach_id FROM coach_clients cc
-       WHERE cc.id = $1 AND cc.client_id = $2 AND cc.status = 'requested' AND cc.requested_by = 'coach'
-       FOR UPDATE`,
-      [req.params.id, req.userId]
-    );
-    const invite = inviteRows[0];
-    if (!invite) {
-      inviteNotFound(res);
-      throw new Rollback();
-    }
-    const { rows: activeRows } = await client.query(
-      `SELECT id FROM coach_clients WHERE client_id = $1 AND status = 'active' FOR UPDATE`,
-      [req.userId]
-    );
-    if (activeRows[0]) {
-      if (!replaceCurrent) {
-        hasCoach(res);
+  let coach;
+  try {
+    coach = await withTransaction(async (client) => {
+      const { rows: inviteRows } = await client.query(
+        `SELECT cc.id, cc.coach_id FROM coach_clients cc
+         JOIN users u ON u.id = cc.coach_id AND u.role = 'coach'
+         WHERE cc.id = $1 AND cc.client_id = $2 AND cc.status = 'requested' AND cc.requested_by = 'coach'
+         FOR UPDATE OF cc`,
+        [req.params.id, req.userId]
+      );
+      const invite = inviteRows[0];
+      if (!invite) {
+        inviteNotFound(res);
         throw new Rollback();
       }
-      await client.query(
-        `UPDATE coach_clients SET status = 'ended', ended_at = now() WHERE id = $1 AND client_id = $2`,
-        [activeRows[0].id, req.userId]
+      const { rows: activeRows } = await client.query(
+        `SELECT id FROM coach_clients WHERE client_id = $1 AND status = 'active' FOR UPDATE`,
+        [req.userId]
       );
-    }
-    await client.query(`UPDATE coach_clients SET status = 'active' WHERE id = $1`, [invite.id]);
-    await closeOwnOpenRequests(client, req.userId);
-    const { rows } = await client.query(
-      `SELECT u.display_name, p.slug FROM users u
-       LEFT JOIN coach_profiles p ON p.user_id = u.id
-       WHERE u.id = $1`,
-      [invite.coach_id]
-    );
-    return toLinkedCoach(rows[0] ?? {});
-  });
+      if (activeRows[0]) {
+        if (!replaceCurrent) {
+          hasCoach(res);
+          throw new Rollback();
+        }
+        await client.query(
+          `UPDATE coach_clients SET status = 'ended', ended_at = now() WHERE id = $1 AND client_id = $2`,
+          [activeRows[0].id, req.userId]
+        );
+      }
+      await client.query(`UPDATE coach_clients SET status = 'active' WHERE id = $1`, [invite.id]);
+      await closeOwnOpenRequests(client, req.userId);
+      const { rows } = await client.query(
+        `SELECT u.display_name, p.slug FROM users u
+         LEFT JOIN coach_profiles p ON p.user_id = u.id
+         WHERE u.id = $1`,
+        [invite.coach_id]
+      );
+      return toLinkedCoach(rows[0] ?? {});
+    });
+  } catch (err) {
+    // The one-active-coach index caught a race the lock couldn't see (another
+    // coach's link went live at the same moment).
+    if (err.code === '23505') return hasCoach(res);
+    throw err;
+  }
   if (!coach) return;
   res.json({ coach });
 }));

@@ -127,7 +127,7 @@ router.post('/coaches/:userId/revoke', asyncHandler(async (req, res) => {
     }
     await client.query(
       `UPDATE coach_clients SET status = 'revoked'
-       WHERE coach_id = $1 AND status IN ('active', 'pending')`,
+       WHERE coach_id = $1 AND status IN ('active', 'pending', 'requested')`,
       [req.params.userId]
     );
     return true;

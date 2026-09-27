@@ -386,7 +386,9 @@ CREATE INDEX users_referred_by_coach_id_idx ON users(referred_by_coach_id);
 -- 020 (continued): existing coaches get a profile row (slug = display name + random suffix, random referral code).
 INSERT INTO coach_profiles (user_id, slug, referral_code)
 SELECT u.id,
-       left(trim(BOTH '-' FROM regexp_replace(lower(u.display_name), '[^a-z0-9]+', '-', 'g')), 40)
+       -- Names with no Latin letters or digits (e.g. Arabic names) fall back
+       -- to 'coach', matching the app's makeSlug.
+       COALESCE(NULLIF(rtrim(left(trim(BOTH '-' FROM regexp_replace(lower(COALESCE(u.display_name, '')), '[^a-z0-9]+', '-', 'g')), 40), '-'), ''), 'coach')
          || '-' || substr(md5(random()::text || u.id::text), 1, 4),
        upper(substr(md5(random()::text || u.id::text), 1, 10))
 FROM users u

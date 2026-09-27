@@ -396,3 +396,46 @@ test('download-my-data lists every coaching link and the referring coach, never 
   assert.deepEqual(otherBody.coachLinks.map((l) => [l.status, l.requestedBy]), [['requested', 'coach']]);
   assert.ok(!JSON.stringify(otherBody).includes(student.email));
 });
+
+test('an invite from someone who is no longer a coach is hidden and cannot be accepted', async () => {
+  const coach = await makeCoach('formercoach');
+  const student = await register('formerstudent');
+  await json(coach.cookie, 'POST', '/coach/invites/email', { email: student.email });
+  const { coachInvites } = await (await json(student.cookie, 'GET', '/coach-link')).json();
+  assert.equal(coachInvites.length, 1);
+
+  // Their coach role is taken away but the row is somehow still waiting.
+  await pool.query("UPDATE users SET role = 'consumer' WHERE id = $1", [coach.user.id]);
+  const view = await (await json(student.cookie, 'GET', '/coach-link')).json();
+  assert.deepEqual(view.coachInvites, []);
+  const accept = await json(student.cookie, 'POST', `/coach-link/invites/${coachInvites[0].id}/accept`);
+  assert.equal(accept.status, 404);
+  assert.equal((await linkStatus(coachInvites[0].id)).status, 'requested');
+});
+
+test('accepting two invites at the same moment: one wins, the other gets HAS_COACH (never a crash)', async () => {
+  const student = await register('dualstudent');
+  for (let round = 0; round < 3; round += 1) {
+    const a = await makeCoach(`duala${round}`);
+    const b = await makeCoach(`dualb${round}`);
+    await json(a.cookie, 'POST', '/coach/invites/email', { email: student.email });
+    await json(b.cookie, 'POST', '/coach/invites/email', { email: student.email });
+    const { coachInvites } = await (await json(student.cookie, 'GET', '/coach-link')).json();
+    assert.equal(coachInvites.length, 2);
+
+    const results = await Promise.all(
+      coachInvites.map((invite) => json(student.cookie, 'POST', `/coach-link/invites/${invite.id}/accept`))
+    );
+    const statuses = results.map((res) => res.status).sort();
+    assert.deepEqual(statuses, [200, 409]);
+    const loser = results.find((res) => res.status === 409);
+    assert.equal((await loser.json()).error.code, 'HAS_COACH');
+
+    // End the link so the next round starts coach-free.
+    assert.equal((await json(student.cookie, 'DELETE', '/coach-link')).status, 204);
+    const leftovers = await (await json(student.cookie, 'GET', '/coach-link')).json();
+    for (const invite of leftovers.coachInvites) {
+      await json(student.cookie, 'POST', `/coach-link/invites/${invite.id}/decline`);
+    }
+  }
+});
