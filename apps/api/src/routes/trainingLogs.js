@@ -189,7 +189,7 @@ router.get('/personal-records', asyncHandler(async (req, res) => {
 router.get('/:id', asyncHandler(async (req, res) => {
   if (!validate.isUuid(req.params.id)) return notFound(res);
 
-  const { rows } = await pool.query('SELECT * FROM training_logs WHERE id = $1 AND user_id = $2', [
+  const { rows } = await pool.query('SELECT *, date::text AS date FROM training_logs WHERE id = $1 AND user_id = $2', [
     req.params.id,
     req.userId,
   ]);
@@ -219,7 +219,7 @@ router.post('/', asyncHandler(async (req, res) => {
          program_id = EXCLUDED.program_id,
          program_day_id = EXCLUDED.program_day_id,
          notes = EXCLUDED.notes
-       RETURNING *`,
+       RETURNING *, date::text AS date`,
       [req.userId, cleanDate, cleanProgramId, cleanProgramDayId, cleanNotes]
     );
     await replaceExercises(client, rows[0].id, exercises);
@@ -254,7 +254,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
            program_day_id = COALESCE($4, program_day_id),
            notes = COALESCE($5, notes)
        WHERE id = $1
-       RETURNING *`,
+       RETURNING *, date::text AS date`,
       [req.params.id, cleanDate, cleanProgramId, cleanProgramDayId, cleanNotes]
     );
 

@@ -34,7 +34,7 @@ router.get('/', asyncHandler(async (req, res) => {
   const to = validate.queryDate(req.query.to, 'to', '9999-12-31');
 
   const { rows } = await pool.query(
-    `SELECT * FROM daily_logs WHERE user_id = $1 AND date BETWEEN $2 AND $3 ORDER BY date`,
+    `SELECT *, date::text AS date FROM daily_logs WHERE user_id = $1 AND date BETWEEN $2 AND $3 ORDER BY daily_logs.date`,
     [req.userId, from, to]
   );
   res.json({ logs: rows.map(toPublicLog) });
@@ -96,7 +96,7 @@ router.get('/:date', asyncHandler(async (req, res) => {
   // 2026-13-45) with a clean 400 instead of letting Postgres throw a 500.
   const date = validate.isoDate(req.params.date);
 
-  const { rows: logRows } = await pool.query('SELECT * FROM daily_logs WHERE user_id = $1 AND date = $2', [
+  const { rows: logRows } = await pool.query('SELECT *, date::text AS date FROM daily_logs WHERE user_id = $1 AND date = $2', [
     req.userId,
     date,
   ]);
@@ -254,7 +254,7 @@ router.put('/:date', asyncHandler(async (req, res) => {
          weight = EXCLUDED.weight, waist = EXCLUDED.waist, sleep = EXCLUDED.sleep, hrv = EXCLUDED.hrv,
          recovery = EXCLUDED.recovery, strain = EXCLUDED.strain, steps = EXCLUDED.steps,
          calories = EXCLUDED.calories, notes = EXCLUDED.notes
-       RETURNING *`,
+       RETURNING *, date::text AS date`,
       [req.userId, date, cleanWeight, cleanWaist, cleanSleep, cleanHrv, cleanRecovery,
         cleanStrain, cleanSteps, cleanCalories, cleanNotes]
     );

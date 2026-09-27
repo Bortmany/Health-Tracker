@@ -3,6 +3,14 @@ echo "Cut: checking everything still works before this push goes to GitHub —"
 echo "building the app and running all the tests (against the separate test"
 echo "database). This takes about a minute."
 echo ""
+if ! command -v pg_isready >/dev/null 2>&1; then
+  echo "Stopped: can't find the 'pg_isready' tool, so this check can't tell whether"
+  echo "the local database (Postgres) is running. It comes with Postgres; with"
+  echo "Homebrew it lives in /opt/homebrew/opt/postgresql@16/bin — add that folder"
+  echo "to your PATH, then push again. (In a real emergency, 'git push --no-verify'"
+  echo "skips this check.)"
+  exit 1
+fi
 if ! pg_isready -q; then
   echo "Stopped: the local database (Postgres) isn't running, so the tests can't run."
   echo "Start it with:  brew services start postgresql@16"

@@ -2,7 +2,7 @@
 // exists on this computer and has every migration applied.
 // Run it by hand with:  npm run test:db -w apps/api
 import pg from 'pg';
-import { databaseName, isLocalDatabase, testDatabaseUrl } from './testDb.js';
+import { databaseIdentity, databaseName, isLocalDatabase, testDatabaseUrl } from './testDb.js';
 
 const url = testDatabaseUrl();
 const name = databaseName(url);
@@ -15,7 +15,7 @@ if (!isLocalDatabase(url)) {
   );
   process.exit(1);
 }
-if (process.env.DATABASE_URL && url === process.env.DATABASE_URL) {
+if (process.env.DATABASE_URL && databaseIdentity(url) === databaseIdentity(process.env.DATABASE_URL)) {
   console.error('TEST_DATABASE_URL is the same as DATABASE_URL. Give the tests their own database.');
   process.exit(1);
 }

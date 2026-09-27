@@ -208,3 +208,23 @@ test('a second user cannot read another user\'s log for the same date', async ()
 
   assert.equal(body.log, null);
 });
+
+// Guards against dates slipping a day when the server's clock is ahead of UTC
+// (Oman is UTC+4). Run the suite with TZ=Asia/Muscat to prove it.
+test('a daily log comes back on the same calendar day it was saved for', async () => {
+  const day = '2026-07-12';
+  const putRes = await fetch(`${baseUrl}/logs/${day}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ weight: 80 }),
+  });
+  assert.equal(putRes.status, 200);
+  assert.equal((await putRes.json()).log.date, day);
+
+  const getRes = await fetch(`${baseUrl}/logs/${day}`, { headers: { Cookie: cookie } });
+  assert.equal((await getRes.json()).log.date, day);
+
+  const listRes = await fetch(`${baseUrl}/logs?from=${day}&to=${day}`, { headers: { Cookie: cookie } });
+  const { logs } = await listRes.json();
+  assert.deepEqual(logs.map((l) => l.date), [day]);
+});

@@ -25,7 +25,7 @@ function toPublicSettings(row) {
 router.use(requireAuth);
 
 router.get('/', asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM user_settings WHERE user_id = $1', [req.userId]);
+  const { rows } = await pool.query('SELECT *, target_date::text AS target_date FROM user_settings WHERE user_id = $1', [req.userId]);
   res.json({ settings: rows[0] ? toPublicSettings(rows[0]) : null });
 }));
 
@@ -65,7 +65,7 @@ router.put('/', asyncHandler(async (req, res) => {
          equipment = COALESCE($11, equipment),
          days_per_week = COALESCE($12::integer, days_per_week)
      WHERE user_id = $1
-     RETURNING *`,
+     RETURNING *, target_date::text AS target_date`,
     [req.userId, cleanStartWeight, cleanTargetWeight, cleanTargetDate, cleanHeight, cleanAge, cleanStepGoal, cleanSleepGoal,
       cleanExperienceLevel, cleanTrainingGoal, cleanEquipment, cleanDaysPerWeek]
   );
