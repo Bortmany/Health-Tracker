@@ -6,6 +6,7 @@ import CoachRoute from './components/CoachRoute.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import layoutStyles from './components/AppLayout.module.css';
 import { useMe } from './hooks/useAuth.js';
+import { useHealthSync } from './hooks/useHealthSync.js';
 import AdminCoaches from './pages/AdminCoaches.jsx';
 import Clients from './pages/Clients.jsx';
 import CoachApplication from './pages/CoachApplication.jsx';
@@ -34,6 +35,9 @@ import Train from './pages/Train.jsx';
 // so a logged-out visit to "/" doesn't get redirected to /login.
 function RootRoute() {
   const { data: user, isLoading } = useMe();
+  // The home screen sits outside AppLayout, so it starts the Apple Health
+  // sync too (only once per app open, and only when signed in).
+  useHealthSync();
 
   if (isLoading) return null;
   if (!user) return <Landing />;

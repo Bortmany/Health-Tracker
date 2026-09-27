@@ -6,10 +6,15 @@
 // build step — see docs/mobile.md) reads the last 30 days of weight, steps,
 // active calories and sleep, and pushes them to POST /api/health-sync.
 // The server only fills in blanks; it never overwrites anything typed by hand.
+// Because of that, only finished days (before the phone's today) are sent:
+// a half-finished day would get stuck at its morning numbers. Each sync
+// re-sends the whole last 30 finished days, so a day that was still empty
+// last time (for example the Watch hadn't handed over its data yet) gets
+// filled in on a later sync.
 
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { request } from '../api/client.js';
-import { buildDailyEntries, localToday } from './healthDays.js';
+import { buildDailyEntries, localDayKey, localToday } from './healthDays.js';
 
 export { buildDailyEntries };
 
@@ -19,7 +24,18 @@ export { buildDailyEntries };
 const HealthKit = registerPlugin('CapacitorHealthkit');
 
 const DAYS_TO_SYNC = 30;
-const LAST_SYNC_KEY = 'cut-health-last-sync';
+
+// Remembered per signed-in person, so a second account on the same phone
+// still gets its own sync on the same day.
+function lastSyncKey(userId) {
+  return `cut-health-last-sync:${userId}`;
+}
+
+// Failures never break the app, but they must not vanish either: a developer
+// looking at the Xcode / Safari console sees exactly what went wrong.
+function logProblem(what, err) {
+  console.warn(`[health-sync] ${what}:`, err);
+}
 
 async function querySamples(sampleName, startDate, endDate) {
   try {
@@ -30,21 +46,25 @@ async function querySamples(sampleName, startDate, endDate) {
       limit: 0,
     });
     return result?.resultData ?? [];
-  } catch {
+  } catch (err) {
     // The user may have denied access to this one metric — skip it.
+    logProblem(`could not read ${sampleName}`, err);
     return [];
   }
 }
 
-export async function syncHealthData() {
+// Returns true when new readings were sent to the server.
+export async function syncHealthData(userId) {
   // Web browser or Android build without the plugin: do nothing.
-  if (!Capacitor.isNativePlatform()) return;
-  if (!Capacitor.isPluginAvailable('CapacitorHealthkit')) return;
+  if (!userId) return false;
+  if (!Capacitor.isNativePlatform()) return false;
+  if (!Capacitor.isPluginAvailable('CapacitorHealthkit')) return false;
 
   // Sync at most once per day so opening the app stays fast. "Today" is the
   // phone's own day (Oman time for Oman users), never the UTC day.
   const today = localToday();
-  if (localStorage.getItem(LAST_SYNC_KEY) === today) return;
+  const syncKey = lastSyncKey(userId);
+  if (localStorage.getItem(syncKey) === today) return false;
 
   try {
     await HealthKit.requestAuthorization({
@@ -53,8 +73,14 @@ export async function syncHealthData() {
       read: ['weight', 'stepCount', 'activeEnergyBurned', 'sleepAnalysis'],
     });
 
-    const endDate = new Date().toISOString();
-    const startDate = new Date(Date.now() - DAYS_TO_SYNC * 24 * 3600000).toISOString();
+    // Up to midnight this morning, on the phone's clock. Reading starts one
+    // extra day back so a night's sleep that began before the first day is
+    // seen in full; that extra, half-covered day itself is not sent.
+    const now = new Date();
+    const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - DAYS_TO_SYNC);
+    const startDate = new Date(firstDay.getFullYear(), firstDay.getMonth(), firstDay.getDate() - 1).toISOString();
+    const from = localDayKey(firstDay);
 
     const [weightSamples, stepSamples, energySamples, sleepSamples] = await Promise.all([
       querySamples('weight', startDate, endDate),
@@ -63,18 +89,22 @@ export async function syncHealthData() {
       querySamples('sleepAnalysis', startDate, endDate),
     ]);
 
-    const entries = buildDailyEntries({ weightSamples, stepSamples, energySamples, sleepSamples });
+    const entries = buildDailyEntries({ weightSamples, stepSamples, energySamples, sleepSamples, from, today });
     if (entries.length === 0) {
-      localStorage.setItem(LAST_SYNC_KEY, today);
-      return;
+      localStorage.setItem(syncKey, today);
+      return false;
     }
 
     await request('/health-sync', {
       method: 'POST',
       body: JSON.stringify({ entries: entries.slice(-90) }),
     });
-    localStorage.setItem(LAST_SYNC_KEY, today);
-  } catch {
-    // Never let a failed sync break the app — we just try again tomorrow.
+    localStorage.setItem(syncKey, today);
+    return true;
+  } catch (err) {
+    // Never let a failed sync break the app. The day isn't marked as done,
+    // so the next app open tries again.
+    logProblem('sync failed', err);
+    return false;
   }
 }
