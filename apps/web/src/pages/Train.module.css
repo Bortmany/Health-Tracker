@@ -233,3 +233,13 @@
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
+
+.heatmapLink {
+  display: inline-block;
+  margin-bottom: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  color: var(--color-accent);
+  text-decoration: none;
+}

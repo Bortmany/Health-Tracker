@@ -406,3 +406,47 @@ CREATE TABLE coach_notes (
   UNIQUE (coach_id, client_id)
 );
 CREATE INDEX coach_notes_coach_id_idx ON coach_notes(coach_id);
+
+-- 022: muscle heatmap — which body regions each library exercise works.
+-- Values are limited to the 16 region ids the frontend body map can draw.
+-- (Migration 022 also ran one UPDATE per seeded exercise to fill these in.)
+ALTER TABLE exercise_library
+  ADD COLUMN primary_muscles TEXT[] NOT NULL DEFAULT '{}',
+  ADD COLUMN secondary_muscles TEXT[] NOT NULL DEFAULT '{}';
+
+ALTER TABLE exercise_library
+  ADD CONSTRAINT exercise_library_muscles_valid CHECK (
+    primary_muscles <@ ARRAY[
+      'chest','front-delts','side-delts','rear-delts','biceps','triceps',
+      'forearms','traps','lats','lower-back','abs','obliques','glutes',
+      'quads','hamstrings','calves'
+    ]::TEXT[]
+    AND secondary_muscles <@ ARRAY[
+      'chest','front-delts','side-delts','rear-delts','biceps','triceps',
+      'forearms','traps','lats','lower-back','abs','obliques','glutes',
+      'quads','hamstrings','calves'
+    ]::TEXT[]
+  );
+
+-- 022 (continued): the 14 seeded workout plans (migration 010) name 49 exercises that aren't in
+-- the 50-movement library, so a member following their plan would log them
+-- and see a dark map. They get their own muscle tags here (seeded by the migration), kept apart from
+-- the library so the library's search and instructions stay unchanged.
+CREATE TABLE exercise_muscle_tags (
+  name TEXT PRIMARY KEY,
+  primary_muscles TEXT[] NOT NULL DEFAULT '{}',
+  secondary_muscles TEXT[] NOT NULL DEFAULT '{}',
+  CONSTRAINT exercise_muscle_tags_muscles_valid CHECK (
+    primary_muscles <@ ARRAY[
+      'chest','front-delts','side-delts','rear-delts','biceps','triceps',
+      'forearms','traps','lats','lower-back','abs','obliques','glutes',
+      'quads','hamstrings','calves'
+    ]::TEXT[]
+    AND secondary_muscles <@ ARRAY[
+      'chest','front-delts','side-delts','rear-delts','biceps','triceps',
+      'forearms','traps','lats','lower-back','abs','obliques','glutes',
+      'quads','hamstrings','calves'
+    ]::TEXT[]
+  )
+);
+CREATE UNIQUE INDEX exercise_muscle_tags_lower_name_idx ON exercise_muscle_tags (LOWER(name));

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import PlanSection from '../components/PlanSection.jsx';
 import RestTimer from '../components/RestTimer.jsx';
@@ -693,6 +693,9 @@ export default function Train() {
       </form>
 
       <Card className={styles.stackCard} title="Recent sessions">
+        <Link className={styles.heatmapLink} to="/heatmap">
+          Muscle heat map →
+        </Link>
         {sessions.length === 0 ? (
           <EmptyState>No sessions yet — your first one starts your log.</EmptyState>
         ) : (
