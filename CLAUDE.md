@@ -13,6 +13,7 @@ All planned phases are built, tested, reviewed, and merged to `main`. 141/141 ba
 - Daily logs (weight/sleep/steps/habits/activities/injuries), nutrition (macros + meals), training logs (programs, sessions, sets), rest timer, personal records, streaks, 50-exercise library with autocomplete
 - Coach accounts: invite codes (redeem = consent), client summaries, assign/edit programs in the client's account
 - Coach journey (Sep 2026, plan in `Agents/docs/specs/cut/coach-journey.md`): members apply to coach from the More page and the owner approves at `/admin/coaches` (the `ADMIN_EMAIL` account, granted once at first sign-in); approved coaches get a profile and referral link, a public directory at `/coaches`, student requests and in-app invites; the Clients tab shows quiet days, weekly adherence, a weight trend and private notes. Billing for coaches is specced (`coach-billing.md`) but not built.
+- Muscle heat map (`/heatmap`, `GET /api/muscle-heatmap`): library exercises and the seeded plans' exercises carry muscle tags (migration 022, `exercise_muscle_tags` for the plan names); the screen sends its own day as `?today=` so the fading counts from the user's day, not UTC. Public front page at `/` for signed-out visitors; its join buttons follow the sign-up mode.
 - Charts (Chart.js, lazy-loaded), PWA manifest + service worker, weekly habit summary endpoint
 - `POST /api/health-sync` for future native apps (device data fills blanks, never overwrites manual entries)
 
@@ -23,7 +24,7 @@ All planned phases are built, tested, reviewed, and merged to `main`. 141/141 ba
 
 ## Conventions (non-negotiable)
 
-- **Migrations:** numbered SQL files in `apps/api/src/db/migrations/` (next is 022). Always append the same DDL to `docs/schema.sql`.
+- **Migrations:** numbered SQL files in `apps/api/src/db/migrations/` (next is 023). Always append the same DDL to `docs/schema.sql`.
 - **Routes:** `router.use(requireAuth)` first; every query parameterized (`$1…`); user-scoped queries filter `user_id = req.userId`; `asyncHandler` wrapper; snake_case → camelCase via `toPublicX(row)` mappers; errors `{ error: { message, code } }` in plain English; literal paths registered before `/:id`.
 - **Nested writes:** transaction — BEGIN, upsert parent, DELETE children, re-INSERT, COMMIT; ROLLBACK in catch; `client.release()` in finally (see `routes/programs.js` `replaceDays`).
 - **Postgres trap:** placeholders in `COALESCE($n, …)` or typed comparisons need explicit casts (`::uuid`, `::boolean`, `::integer`) or you get runtime 42883 errors.
@@ -63,4 +64,4 @@ Possible future work: Paddle customer portal (manage/cancel), password reset via
 | `docs/mobile.md` | Step-by-step for App Store / Play Store |
 | `railway.json` | Railway deploy config (build, migrate, start, health check) |
 | `Agents` repo, `.claude/agents/` | The generic dev crew (builder, researcher, content-curator in `development/`; verifier, code-reviewer in `quality/` — full roster in that repo's CLAUDE.md) — works on any repo by reading this file's conventions; include the Agents repo in the session |
-| `apps/api/src/db/migrations/` | 21 migrations so far; runner is `src/db/migrate.js` |
+| `apps/api/src/db/migrations/` | 22 migrations so far; runner is `src/db/migrate.js` |

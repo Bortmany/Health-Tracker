@@ -42,6 +42,7 @@ export function useCreateTrainingLog() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trainingLogs'] });
       queryClient.invalidateQueries({ queryKey: ['personalRecords'] });
+      queryClient.invalidateQueries({ queryKey: ['muscleHeatmap'] });
     },
   });
 }
@@ -54,6 +55,7 @@ export function useUpdateTrainingLog() {
       queryClient.invalidateQueries({ queryKey: ['trainingLogs'] });
       queryClient.invalidateQueries({ queryKey: ['trainingLog', id] });
       queryClient.invalidateQueries({ queryKey: ['personalRecords'] });
+      queryClient.invalidateQueries({ queryKey: ['muscleHeatmap'] });
     },
   });
 }
@@ -65,6 +67,7 @@ export function useDeleteTrainingLog() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trainingLogs'] });
       queryClient.invalidateQueries({ queryKey: ['personalRecords'] });
+      queryClient.invalidateQueries({ queryKey: ['muscleHeatmap'] });
     },
   });
 }

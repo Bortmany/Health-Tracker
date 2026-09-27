@@ -27,6 +27,7 @@ import healthSyncRouter from './routes/healthSync.js';
 import injuriesRouter from './routes/injuries.js';
 import legalRouter from './routes/legal.js';
 import logsRouter from './routes/logs.js';
+import muscleHeatmapRouter from './routes/muscleHeatmap.js';
 import nutritionRouter from './routes/nutrition.js';
 import plansRouter from './routes/plans.js';
 import programsRouter from './routes/programs.js';
@@ -323,6 +324,7 @@ app.use('/api/health-sync', healthSyncRouter);
 app.use('/api/injuries', injuriesRouter);
 app.use('/api/legal', legalRouter); // public — contact address for the legal pages
 app.use('/api/logs', logsRouter);
+app.use('/api/muscle-heatmap', muscleHeatmapRouter);
 app.use('/api/nutrition', nutritionRouter);
 app.use('/api/plans', plansRouter);
 app.use('/api/programs', programsRouter);
