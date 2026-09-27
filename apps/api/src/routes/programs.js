@@ -1,10 +1,17 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import * as validate from '../lib/validate.js';
 import { Rollback, withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
+
+// A malformed :id in the URL would otherwise reach Postgres as an invalid UUID
+// and throw a 500 — this turns it into a clean "not found".
+function notFound(res) {
+  return res.status(404).json({ error: { message: 'Program not found', code: 'NOT_FOUND' } });
+}
 
 function toPublicProgram(row, days) {
   return {
@@ -58,6 +65,12 @@ export async function fetchNestedDays(client, programId) {
 }
 
 export async function replaceDays(client, programId, days) {
+  // A non-list `days` (or a list holding null/garbage) would otherwise crash the
+  // route when we try to iterate it — reject it with a clean 400 instead.
+  if (!Array.isArray(days)) {
+    throw new validate.ValidationError('days must be a list');
+  }
+
   // Deleting the days would silently unlink every past session logged against
   // them (the foreign key sets them to null). Remember the old days and which
   // sessions point at each one, so the links can be moved to the new days.
@@ -76,18 +89,42 @@ export async function replaceDays(client, programId, days) {
   const newDays = [];
   for (const [dayIndex, day] of days.entries()) {
     if (!day?.name) continue;
+    // Cap the day name and make sure its order is a whole number before either
+    // reaches its column.
+    const dayName = validate.stringLength(day.name, 'day name', { max: 200 });
+    const daySortOrder = validate.nonNegativeNumber(day.sortOrder ?? dayIndex, 'day order', {
+      integer: true, max: 10000,
+    });
     const { rows } = await client.query(
       'INSERT INTO program_days (program_id, name, sort_order) VALUES ($1, $2, $3) RETURNING id',
-      [programId, day.name, day.sortOrder ?? dayIndex]
+      [programId, dayName, daySortOrder]
     );
     const dayId = rows[0].id;
-    newDays.push({ id: dayId, name: day.name });
-    for (const [exIndex, ex] of (day.exercises ?? []).entries()) {
+    newDays.push({ id: dayId, name: dayName });
+    const exercises = day.exercises ?? [];
+    if (!Array.isArray(exercises)) {
+      throw new validate.ValidationError('a day\'s exercises must be a list');
+    }
+    for (const [exIndex, ex] of exercises.entries()) {
       if (!ex?.name) continue;
+      // target sets/reps go into INTEGER columns: a non-numeric or overflow
+      // value here (from POST/PUT or the coach "assign program" route that
+      // reuses this) would otherwise throw a Postgres error (a 500). Validate
+      // them, along with the exercise name cap and its sort order.
+      const exName = validate.stringLength(ex.name, 'exercise name', { max: 200 });
+      const targetSets = validate.nonNegativeNumber(ex.targetSets, 'target sets', {
+        optional: true, integer: true, max: 1000,
+      });
+      const targetReps = validate.nonNegativeNumber(ex.targetReps, 'target reps', {
+        optional: true, integer: true, max: 10000,
+      });
+      const exSortOrder = validate.nonNegativeNumber(ex.sortOrder ?? exIndex, 'exercise order', {
+        integer: true, max: 10000,
+      });
       await client.query(
         `INSERT INTO program_exercises (program_day_id, name, target_sets, target_reps, sort_order)
          VALUES ($1, $2, $3, $4, $5)`,
-        [dayId, ex.name, ex.targetSets ?? null, ex.targetReps ?? null, ex.sortOrder ?? exIndex]
+        [dayId, exName, targetSets, targetReps, exSortOrder]
       );
     }
   }
@@ -122,14 +159,15 @@ router.get('/', asyncHandler(async (req, res) => {
 
 router.post('/', asyncHandler(async (req, res) => {
   const { name, description, days = [] } = req.body ?? {};
-  if (!name) {
-    return res.status(400).json({ error: { message: 'name is required', code: 'INVALID_INPUT' } });
-  }
+  // Caps the name/description like every other text field in the app, so a
+  // runaway request can't stuff an unbounded string into the database.
+  const cleanName = validate.stringLength(name, 'name', { max: 200 });
+  const cleanDescription = validate.stringLength(description, 'description', { optional: true, max: 2000 });
 
   const program = await withTransaction(async (client) => {
     const { rows } = await client.query(
       'INSERT INTO programs (user_id, name, description) VALUES ($1, $2, $3) RETURNING *',
-      [req.userId, name, description ?? null]
+      [req.userId, cleanName, cleanDescription]
     );
     await replaceDays(client, rows[0].id, days);
     return rows[0];
@@ -138,18 +176,27 @@ router.post('/', asyncHandler(async (req, res) => {
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) return notFound(res);
+
   const { rows } = await pool.query('SELECT * FROM programs WHERE id = $1 AND user_id = $2', [
     req.params.id,
     req.userId,
   ]);
   if (!rows[0]) {
-    return res.status(404).json({ error: { message: 'Program not found', code: 'NOT_FOUND' } });
+    return notFound(res);
   }
   res.json({ program: toPublicProgram(rows[0], await fetchNestedDays(pool, rows[0].id)) });
 }));
 
 router.put('/:id', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) return notFound(res);
+
   const { name, description, archived, days } = req.body ?? {};
+  // Same caps as creating a program, so an edit can't stuff in an unbounded string.
+  const cleanName = validate.stringLength(name, 'name', { optional: true, max: 200 });
+  const cleanDescription = validate.stringLength(description, 'description', { optional: true, max: 2000 });
+  // A string/number here would blow up the `$4::boolean` cast into a 500 — require a real boolean.
+  const cleanArchived = validate.boolean(archived, 'archived', { optional: true });
 
   const program = await withTransaction(async (client) => {
     const { rows: ownedRows } = await client.query(
@@ -167,7 +214,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
                                ELSE NULL END
        WHERE id = $1
        RETURNING *`,
-      [req.params.id, name ?? null, description ?? null, archived ?? null]
+      [req.params.id, cleanName, cleanDescription, cleanArchived]
     );
 
     if (days) {
@@ -178,18 +225,20 @@ router.put('/:id', asyncHandler(async (req, res) => {
   });
 
   if (!program) {
-    return res.status(404).json({ error: { message: 'Program not found', code: 'NOT_FOUND' } });
+    return notFound(res);
   }
   res.json({ program: toPublicProgram(program, await fetchNestedDays(pool, program.id)) });
 }));
 
 router.delete('/:id', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) return notFound(res);
+
   const { rowCount } = await pool.query('DELETE FROM programs WHERE id = $1 AND user_id = $2', [
     req.params.id,
     req.userId,
   ]);
   if (!rowCount) {
-    return res.status(404).json({ error: { message: 'Program not found', code: 'NOT_FOUND' } });
+    return notFound(res);
   }
   res.status(204).end();
 }));

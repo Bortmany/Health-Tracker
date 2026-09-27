@@ -18,7 +18,9 @@ function toPublicExercise(row) {
 router.use(requireAuth);
 
 router.get('/', asyncHandler(async (req, res) => {
-  const search = req.query.search ?? '';
+  // Only a single string is usable here; a repeated ?search= param arrives as an
+  // array, which would bind as text[] and break the `$1` text concat (a 500).
+  const search = typeof req.query.search === 'string' ? req.query.search : '';
 
   const { rows } = await pool.query(
     `SELECT * FROM exercise_library WHERE name ILIKE '%' || $1 || '%' ORDER BY name LIMIT 50`,

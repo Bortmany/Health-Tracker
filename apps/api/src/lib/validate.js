@@ -60,6 +60,37 @@ export function stringLength(value, name, { min = 1, max = 255, optional = false
   return trimmed;
 }
 
+// A real boolean. Passing a string ('true'), a number (1) or anything else is
+// rejected with a clean 400 instead of reaching a Postgres `$n::boolean` cast
+// that would throw a runtime error (a 500).
+// Pass { optional: true } to allow null/undefined/'' — returns null in that case.
+export function boolean(value, name, { optional = false } = {}) {
+  if (value == null || value === '') {
+    if (optional) return null;
+    throw new ValidationError(`${name} is required`);
+  }
+  if (typeof value !== 'boolean') {
+    throw new ValidationError(`${name} must be true or false`);
+  }
+  return value;
+}
+
+// One of a fixed set of allowed strings — used to keep a value in step with a
+// Postgres CHECK constraint (e.g. experience_level IN ('beginner', …)). An
+// unknown value is rejected with a clean 400 here instead of reaching the
+// column and throwing a CHECK-constraint violation (a 500).
+// Pass { optional: true } to allow null/undefined/'' — returns null in that case.
+export function oneOf(value, allowed, name, { optional = false } = {}) {
+  if (value == null || value === '') {
+    if (optional) return null;
+    throw new ValidationError(`${name} is required`);
+  }
+  if (typeof value !== 'string' || !allowed.includes(value)) {
+    throw new ValidationError(`${name} must be one of: ${allowed.join(', ')}`);
+  }
+  return value;
+}
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // A real calendar date in YYYY-MM-DD form (rejects e.g. 2026-13-40).
@@ -74,12 +105,49 @@ export function isoDate(value, name = 'date') {
   return value;
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// A date-range query parameter (?from=…&to=…). When absent/blank it falls back
+// to the given default; when present it must be a REAL calendar date. A bare
+// YYYY-MM-DD regex used to let calendar-impossible values like 2026-99-99 reach
+// a `date BETWEEN …` comparison and throw a Postgres range error (a 500) — this
+// runs the same full check the path-date params use, so a bad range is a 400.
+export function queryDate(value, name, fallback) {
+  if (value == null || value === '') return fallback;
+  return isoDate(value, name);
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// A quick shape check for an id. Used to turn a malformed :id in the URL into a
+// clean "not found" instead of letting Postgres throw a cast error (a 500).
+export function isUuid(value) {
+  return typeof value === 'string' && UUID_RE.test(value);
+}
+
+// An id supplied in a request body (e.g. which program a session belongs to).
+// Pass { optional: true } to allow null/undefined/'' — returns null in that case.
+// A wrongly-shaped id is rejected with a clean 400 instead of a database error.
+export function uuid(value, name = 'id', { optional = false } = {}) {
+  if (value == null || value === '') {
+    if (optional) return null;
+    throw new ValidationError(`${name} is required`);
+  }
+  if (!isUuid(value)) {
+    throw new ValidationError(`${name} must be a valid id`);
+  }
+  return value;
+}
+
+// An address must have something before the @, a domain, and end in a real
+// dot-ending (2+ letters). Deliberately a shape check and NOT a list of
+// allowed providers — work addresses on any domain have to keep working.
+// The browser side checks the same shape in apps/web/src/lib/validation.js;
+// keep the two in step.
+export const EMAIL_RE = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[A-Za-z]{2,}$/;
 
 // A syntactically valid email address; returns it trimmed and lower-cased.
 export function email(value, name = 'email') {
   if (typeof value !== 'string' || !EMAIL_RE.test(value.trim())) {
-    throw new ValidationError(`${name} must be a valid email address`);
+    throw new ValidationError(`${name} must be a valid email address, like JohnDoe@gmail.com`);
   }
   return value.trim().toLowerCase();
 }

@@ -119,6 +119,81 @@ test('registering with a short password is rejected', async () => {
   assert.equal(body.error.code, 'WEAK_PASSWORD');
 });
 
+test('PUT /logs/:date rejects an impossible date instead of crashing', async () => {
+  const res = await fetch(`${baseUrl}/logs/2026-13-45`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ weight: 90 }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.error.code, 'INVALID_INPUT');
+});
+
+test('PUT /logs/:date rejects out-of-range and infinite numbers', async () => {
+  // Raw bodies (not JSON.stringify, which turns Infinity into null): the "1e400"
+  // token parses to Infinity server-side, the exact value that used to be stored
+  // and break the chart. Each of these must be rejected with a 400.
+  for (const body of ['{"weight":"heavy"}', '{"weight":-5}', '{"steps":1e400}', '{"weight":999999}']) {
+    const res = await fetch(`${baseUrl}/logs/2026-01-20`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body,
+    });
+    assert.equal(res.status, 400, `expected ${body} to be rejected`);
+  }
+});
+
+test('GET /logs/:date with a non-date is a clean 400, never a 500', async () => {
+  const res = await fetch(`${baseUrl}/logs/not-a-date`, { headers: { Cookie: cookie } });
+  assert.equal(res.status, 400);
+});
+
+test('PUT /logs/:date rejects a valid-shaped but non-existent habitId with a clean 4xx, not a 500', async () => {
+  const unknownHabitId = '11111111-2222-3333-4444-555555555555';
+  const res = await fetch(`${baseUrl}/logs/2026-01-21`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ habits: [{ habitId: unknownHabitId, completed: true }] }),
+  });
+  assert.ok(res.status >= 400 && res.status < 500, `expected a clean 4xx, got ${res.status}`);
+  const body = await res.json();
+  assert.ok(body.error);
+});
+
+test('PUT /logs/:date rejects an out-of-range pain score instead of silently discarding it', async () => {
+  const res = await fetch(`${baseUrl}/logs/2026-01-22`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ injuryCheckins: [{ injuryId, painPre: 999 }] }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.match(body.error.message, /between 0 and 10/);
+});
+
+test('PUT /logs/:date rejects a wrong-type swelling value instead of silently coercing it', async () => {
+  const res = await fetch(`${baseUrl}/logs/2026-01-23`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ injuryCheckins: [{ injuryId, swelling: 'yes' }] }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.match(body.error.message, /true or false/);
+});
+
+test('a malformed JSON body returns the standard error envelope, not a raw echoed string', async () => {
+  const res = await fetch(`${baseUrl}/logs/2026-01-24`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: '{not valid json',
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.error.code, 'INVALID_JSON');
+});
+
 test('a second user cannot read another user\'s log for the same date', async () => {
   const email = `logs-test-other-${Date.now()}@example.com`;
   const registerRes = await fetch(`${baseUrl}/auth/register`, {
@@ -132,4 +207,24 @@ test('a second user cannot read another user\'s log for the same date', async ()
   const body = await getRes.json();
 
   assert.equal(body.log, null);
+});
+
+// Guards against dates slipping a day when the server's clock is ahead of UTC
+// (Oman is UTC+4). Run the suite with TZ=Asia/Muscat to prove it.
+test('a daily log comes back on the same calendar day it was saved for', async () => {
+  const day = '2026-07-12';
+  const putRes = await fetch(`${baseUrl}/logs/${day}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ weight: 80 }),
+  });
+  assert.equal(putRes.status, 200);
+  assert.equal((await putRes.json()).log.date, day);
+
+  const getRes = await fetch(`${baseUrl}/logs/${day}`, { headers: { Cookie: cookie } });
+  assert.equal((await getRes.json()).log.date, day);
+
+  const listRes = await fetch(`${baseUrl}/logs?from=${day}&to=${day}`, { headers: { Cookie: cookie } });
+  const { logs } = await listRes.json();
+  assert.deepEqual(logs.map((l) => l.date), [day]);
 });

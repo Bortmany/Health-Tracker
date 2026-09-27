@@ -24,11 +24,15 @@ export function useExerciseHistory(name, { before } = {}) {
   });
 }
 
+// Shared so a screen can also fetch the bests on demand (Train does, just
+// before saving, to know what a new session has to beat).
+export const personalRecordsQuery = {
+  queryKey: ['personalRecords'],
+  queryFn: async () => (await trainingLogsApi.getPersonalRecords()).records,
+};
+
 export function usePersonalRecords() {
-  return useQuery({
-    queryKey: ['personalRecords'],
-    queryFn: async () => (await trainingLogsApi.getPersonalRecords()).records,
-  });
+  return useQuery(personalRecordsQuery);
 }
 
 export function useCreateTrainingLog() {

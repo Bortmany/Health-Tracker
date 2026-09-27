@@ -6,6 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "node --test",
     "ios:add": "cap add ios",
     "ios:sync": "vite build && cap sync ios",
     "ios:open": "cap open ios",

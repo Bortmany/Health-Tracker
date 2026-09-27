@@ -44,6 +44,29 @@ test('POST /training-logs creates a log with nested exercises and sets', async (
   assert.equal(body.trainingLog.exercises[0].sets[0].setNumber, 1);
 });
 
+test('GET /training-logs lists a session with how many exercises it holds', async () => {
+  await fetch(`${baseUrl}/training-logs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({
+      date: '2026-04-05',
+      exercises: [
+        { name: 'Deadlift', sets: [{ weight: 100, reps: 5 }] },
+        { name: 'Pull Up', sets: [{ weight: 0, reps: 10 }] },
+      ],
+    }),
+  });
+
+  const listRes = await fetch(`${baseUrl}/training-logs?from=2026-04-05&to=2026-04-05`, {
+    headers: { Cookie: cookie },
+  });
+  const { trainingLogs } = await listRes.json();
+
+  assert.equal(trainingLogs.length, 1);
+  assert.equal(trainingLogs[0].date.slice(0, 10), '2026-04-05');
+  assert.equal(trainingLogs[0].exerciseCount, 2);
+});
+
 test('GET /training-logs/exercise-history returns the most recent prior entry for that exercise', async () => {
   await fetch(`${baseUrl}/training-logs`, {
     method: 'POST',
@@ -93,6 +116,52 @@ test('a second user cannot read another user\'s training log', async () => {
   assert.equal(getRes.status, 404);
 });
 
+test('POST /training-logs rejects negative reps and infinite weights', async () => {
+  // Raw bodies so "1e400" reaches the server as Infinity (JSON.stringify would
+  // flatten it to null). A negative rep count used to sneak in as a fake PR.
+  for (const body of [
+    '{"date":"2026-05-01","exercises":[{"name":"Curl","sets":[{"weight":10,"reps":-5}]}]}',
+    '{"date":"2026-05-01","exercises":[{"name":"Curl","sets":[{"weight":1e400,"reps":8}]}]}',
+    '{"date":"2026-05-01","exercises":[{"name":"Curl","sets":[{"weight":"heavy","reps":8}]}]}',
+  ]) {
+    const res = await fetch(`${baseUrl}/training-logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body,
+    });
+    assert.equal(res.status, 400, `expected ${body} to be rejected`);
+  }
+});
+
+test('POST /training-logs rejects an impossible date', async () => {
+  const res = await fetch(`${baseUrl}/training-logs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ date: '2026-02-30', exercises: [] }),
+  });
+  assert.equal(res.status, 400);
+});
+
+test('GET /training-logs/:id with a non-UUID id is a clean 404, never a 500', async () => {
+  const res = await fetch(`${baseUrl}/training-logs/not-a-real-id`, { headers: { Cookie: cookie } });
+  assert.equal(res.status, 404);
+});
+
+test('POST /training-logs twice for one day updates rather than duplicating', async () => {
+  const day = '2026-06-10';
+  for (const weight of [80, 85]) {
+    await fetch(`${baseUrl}/training-logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ date: day, exercises: [{ name: 'Squat', sets: [{ weight, reps: 5 }] }] }),
+    });
+  }
+  const listRes = await fetch(`${baseUrl}/training-logs?from=${day}&to=${day}`, { headers: { Cookie: cookie } });
+  const { trainingLogs } = await listRes.json();
+  // One session per day: the second save replaced the first, not appended.
+  assert.equal(trainingLogs.length, 1);
+});
+
 test('editing a program keeps past sessions linked to the matching day', async () => {
   const headers = { 'Content-Type': 'application/json', Cookie: cookie };
 
@@ -135,4 +204,35 @@ test('editing a program keeps past sessions linked to the matching day', async (
   const getRes = await fetch(`${baseUrl}/training-logs/${trainingLog.id}`, { headers: { Cookie: cookie } });
   const fetched = await getRes.json();
   assert.equal(fetched.trainingLog.programDayId, newDayId);
+});
+
+// Guards against dates slipping a day when the server's clock is ahead of UTC
+// (Oman is UTC+4). Run the suite with TZ=Asia/Muscat to prove it.
+test('opening a session and saving it again keeps the same day', async () => {
+  const headers = { 'Content-Type': 'application/json', Cookie: cookie };
+  const day = '2026-07-12';
+  const createRes = await fetch(`${baseUrl}/training-logs`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ date: day, exercises: [{ name: 'Row', sets: [{ weight: 40, reps: 10 }] }] }),
+  });
+  assert.equal(createRes.status, 201);
+  const created = (await createRes.json()).trainingLog;
+  assert.equal(created.date, day);
+
+  // Open it, then save it back with the date exactly as the Train page reads it.
+  const openRes = await fetch(`${baseUrl}/training-logs/${created.id}`, { headers: { Cookie: cookie } });
+  const opened = (await openRes.json()).trainingLog;
+  assert.equal(opened.date, day);
+
+  const saveRes = await fetch(`${baseUrl}/training-logs/${created.id}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ date: opened.date.slice(0, 10), exercises: [{ name: 'Row', sets: [{ weight: 42, reps: 10 }] }] }),
+  });
+  assert.equal(saveRes.status, 200);
+  assert.equal((await saveRes.json()).trainingLog.date, day);
+
+  const reopened = (await (await fetch(`${baseUrl}/training-logs/${created.id}`, { headers: { Cookie: cookie } })).json()).trainingLog;
+  assert.equal(reopened.date, day);
 });
