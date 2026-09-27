@@ -288,7 +288,7 @@ async function fetchClientSignals(coachId, clientIds, today) {
   // meal), and how many whole days ago that was.
   const { rows: activeRows } = await pool.query(
     `SELECT user_id, MAX(date)::text AS last_active,
-            ($2::date - MAX(date))::integer AS quiet_days
+            GREATEST(0, $2::date - MAX(date))::integer AS quiet_days
      FROM (
        SELECT user_id, date FROM daily_logs WHERE user_id = ANY($1::uuid[])
        UNION ALL
