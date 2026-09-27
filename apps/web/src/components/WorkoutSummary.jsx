@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Button, Chip, Skeleton } from './ui/index.js';
 import { useStreak } from '../hooks/useLogs.js';
 import { usePersonalRecords } from '../hooks/useTrainingLogs.js';
@@ -23,10 +24,13 @@ function sessionTotals(session) {
 }
 
 // A best is "new" when this session included that exercise and the record
-// now standing is heavier than the one on file before the save.
+// now standing is heavier than the one on file before the save. With no
+// "before" list (it couldn't be loaded) nothing counts as new — better no
+// badge than a false one.
 function newRecords(session, previousRecords, records) {
+  if (!Array.isArray(previousRecords)) return [];
   const doneToday = new Set(session.exercises.filter((ex) => ex.name).map((ex) => ex.name.toLowerCase()));
-  const before = new Map((previousRecords ?? []).map((r) => [r.name.toLowerCase(), Number(r.weight)]));
+  const before = new Map(previousRecords.map((r) => [r.name.toLowerCase(), Number(r.weight)]));
   return (records ?? []).filter((r) => {
     if (!doneToday.has(r.name.toLowerCase())) return false;
     const previousBest = before.get(r.name.toLowerCase());
@@ -34,12 +38,34 @@ function newRecords(session, previousRecords, records) {
   });
 }
 
-export default function WorkoutSummary({ session, previousRecords, nextDayName = null, onDone }) {
-  const { data: records, isLoading: recordsLoading } = usePersonalRecords();
+export default function WorkoutSummary({ session, previousRecords, savedAt = 0, nextDayName = null, onDone }) {
+  const { data: records, dataUpdatedAt, isError: recordsFailed } = usePersonalRecords();
   const { data: streak, isLoading: streakLoading } = useStreak();
 
+  // Only compare once we hold bests loaded AFTER the save — the list cached
+  // from before would show nothing new, then flicker.
+  const recordsFresh = records != null && dataUpdatedAt >= savedAt;
+  const recordsLoading = !recordsFresh && !recordsFailed;
+  const beaten = recordsFresh ? newRecords(session, previousRecords, records) : [];
+
   const { exerciseCount, setCount, volume } = sessionTotals(session);
-  const beaten = recordsLoading ? [] : newRecords(session, previousRecords, records);
+
+  // Escape closes it, and the page behind stops scrolling while it's open —
+  // same behaviour as the Premium panel and the confirm dialogs.
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') onDone?.();
+    }
+    document.addEventListener('keydown', handleKeyDown);
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [onDone]);
 
   return (
     <div className={styles.overlay}>
@@ -83,6 +109,10 @@ export default function WorkoutSummary({ session, previousRecords, nextDayName =
                 </div>
               ))}
             </>
+          ) : !Array.isArray(previousRecords) || !recordsFresh ? (
+            // Couldn't load the bests before or after the save — say nothing
+            // rather than claim a best that might not be one.
+            <p className={styles.note}>Your bests are on the Progress screen.</p>
           ) : (
             <p className={styles.note}>No new bests today — showing up still counts.</p>
           )}

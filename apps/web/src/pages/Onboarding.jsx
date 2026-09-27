@@ -183,7 +183,7 @@ function RevealStep() {
       <UpgradePanel
         open={showUpgrade}
         onClose={() => setShowUpgrade(false)}
-        message="This plan runs for a full year with Premium. Your free account starts with the first 4 weeks."
+        reason="thisPlan"
       />
     </div>
   );

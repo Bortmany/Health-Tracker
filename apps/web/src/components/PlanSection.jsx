@@ -129,7 +129,7 @@ export default function PlanSection() {
       <UpgradePanel
         open={showUpgrade}
         onClose={() => setShowUpgrade(false)}
-        message="Plans run for a full year with Premium. Your free account starts with the first 4 weeks."
+        reason="plans"
       />
     </Card>
   );

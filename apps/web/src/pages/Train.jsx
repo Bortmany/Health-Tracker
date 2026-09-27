@@ -21,6 +21,7 @@ import {
 import { useExercises } from '../hooks/useExercises.js';
 import { useActivePrograms, useCreateProgram, useUpdateProgram } from '../hooks/usePrograms.js';
 import {
+  personalRecordsQuery,
   useCreateTrainingLog,
   useExerciseHistory,
   useTrainingLog,
@@ -297,6 +298,8 @@ export default function Train() {
   const [showSaveChoice, setShowSaveChoice] = useState(false);
   // Set when a brand-new session is saved: what to show on the wrap-up card.
   const [summary, setSummary] = useState(null);
+  // True for the moment we spend loading the current bests before a save.
+  const [preparingSave, setPreparingSave] = useState(false);
   const toast = useToast();
   const restTimerRef = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -433,18 +436,33 @@ export default function Train() {
         { onSuccess: () => toast.show('Session saved') }
       );
     } else {
-      // Remember the bests as they stand before the save, so the wrap-up
-      // card can tell which ones this session just beat.
-      const previousRecords = queryClient.getQueryData(['personalRecords']) ?? [];
-      const nextName = nextDayName();
-      createTrainingLog.mutate(payload, {
-        onSuccess: () => {
-          setSummary({ session: payload, previousRecords, nextDayName: nextName });
-          setForm(blankForm());
-          setDoneSets({});
-        },
-      });
+      createWithSummary(payload);
     }
+  }
+
+  // Load the bests as they stand right now, straight from the server, before
+  // the new session is saved — the wrap-up card compares against these to
+  // tell which ones this session just beat. If they can't be loaded, the card
+  // shows no "new best" badges at all rather than guessing.
+  async function createWithSummary(payload) {
+    const nextName = nextDayName();
+    setPreparingSave(true);
+    let previousRecords = null;
+    try {
+      previousRecords = await queryClient.fetchQuery({ ...personalRecordsQuery, staleTime: 0 });
+    } catch {
+      previousRecords = null;
+    } finally {
+      setPreparingSave(false);
+    }
+    const savedAt = Date.now();
+    createTrainingLog.mutate(payload, {
+      onSuccess: () => {
+        setSummary({ session: payload, previousRecords, savedAt, nextDayName: nextName });
+        setForm(blankForm());
+        setDoneSets({});
+      },
+    });
   }
 
   // "Update my program too": save the session first and only then replace the
@@ -505,6 +523,8 @@ export default function Train() {
 
   function handleSubmit(e) {
     e.preventDefault();
+    // Already saving (or loading the bests just before a save) — ignore a second press.
+    if (preparingSave || createTrainingLog.isPending || updateTrainingLog.isPending) return;
     // Editing a session tied to a program day: ask whether the change is
     // just for today or should update the program itself.
     if (editingId && form.programDayId && selectedProgram && selectedDay) {
@@ -514,7 +534,7 @@ export default function Train() {
     saveSession();
   }
 
-  const saving = createTrainingLog.isPending || updateTrainingLog.isPending;
+  const saving = preparingSave || createTrainingLog.isPending || updateTrainingLog.isPending;
   const mutationError = createTrainingLog.error ?? updateTrainingLog.error ?? updateProgram.error;
 
   return (
@@ -698,6 +718,7 @@ export default function Train() {
         <WorkoutSummary
           session={summary.session}
           previousRecords={summary.previousRecords}
+          savedAt={summary.savedAt}
           nextDayName={summary.nextDayName}
           onDone={() => {
             setSummary(null);

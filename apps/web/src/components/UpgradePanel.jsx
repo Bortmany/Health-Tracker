@@ -30,9 +30,26 @@ export function PlanLengthBadge({ freeWeeks, premiumWeeks, planTier, onSeePremiu
   );
 }
 
-export default function UpgradePanel({ open, onClose, message = null }) {
+// Why the panel opened, when it opened because someone picked a plan.
+// Built from the server's numbers so no screen keeps its own copy.
+function reasonText(reason, freeWeeks) {
+  const start = freeWeeks
+    ? `Your free account starts with the first ${freeWeeks} weeks.`
+    : 'Your free account starts with the first block of weeks.';
+  if (reason === 'thisPlan') return `This plan runs for a full year with Premium. ${start}`;
+  if (reason === 'plans') return `Plans run for a full year with Premium. ${start}`;
+  return null;
+}
+
+// reason: 'plans' | 'thisPlan' | null — adds a line saying why it opened.
+export default function UpgradePanel({ open, onClose, reason = null }) {
   const { data: billing, isLoading } = useBillingStatus();
   const checkout = useCheckout();
+  // The plan lengths come from the server (billing status). Until they
+  // arrive — or if they never do — the wording simply leaves the number out.
+  const freeWeeks = billing?.freeWeeks;
+  const premiumWeeks = billing?.premiumWeeks;
+  const message = reasonText(reason, freeWeeks);
 
   // Escape closes it, and the page behind stops scrolling while it's open —
   // same behaviour as the app's confirm dialogs.
@@ -71,12 +88,17 @@ export default function UpgradePanel({ open, onClose, message = null }) {
         {message && <p className={styles.reason}>{message}</p>}
 
         <p className={styles.copy}>
-          Your free account covers the first 4 weeks of any plan — a full training block, yours to
-          keep. Premium opens the same plan across a whole year.
+          {freeWeeks
+            ? `Your free account covers the first ${freeWeeks} weeks of any plan`
+            : 'Your free account covers the opening weeks of any plan'}{' '}
+          — a full training block, yours to keep. Premium opens the same plan across a whole year.
         </p>
 
         <ul className={styles.list}>
-          <li>The full 52-week version of your plan, instead of the first 4 weeks.</li>
+          <li>
+            {premiumWeeks ? `The full ${premiumWeeks}-week version of your plan` : 'The full-year version of your plan'}
+            {freeWeeks ? `, instead of the first ${freeWeeks} weeks.` : ', instead of just the opening weeks.'}
+          </li>
           <li>The year split into phases, with a plain-English note on what each one is for.</li>
           <li>Everything you already use stays exactly as it is — nothing free is taken away.</li>
         </ul>

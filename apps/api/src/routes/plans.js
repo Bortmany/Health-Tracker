@@ -4,14 +4,10 @@ import { asyncHandler } from '../lib/asyncHandler.js';
 import { rankTemplates, weekTargets } from '../lib/planGenerator.js';
 import * as validate from '../lib/validate.js';
 import { withTransaction } from '../lib/withTransaction.js';
+import { FREE_WEEKS, PREMIUM_WEEKS } from '../lib/planLength.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
-
-// How much of a plan each account gets. Sent out with every template so the
-// app can say plainly what's free and what needs Premium.
-const FREE_WEEKS = 4;
-const PREMIUM_WEEKS = 52;
 
 // A malformed :id would otherwise reach Postgres as an invalid UUID and throw a
 // 500 — this turns it into a clean "not found".
