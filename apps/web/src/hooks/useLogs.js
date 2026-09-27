@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as logsApi from '../api/logs.js';
+import { localToday } from '../lib/localDate.js';
 
 export function useLog(date) {
   return useQuery({
@@ -24,9 +25,11 @@ export function useHabitSummary({ from, to } = {}) {
 }
 
 export function useStreak() {
+  // Part of the key, so the streak refreshes once the device passes midnight.
+  const today = localToday();
   return useQuery({
-    queryKey: ['streak'],
-    queryFn: async () => (await logsApi.getStreak()).streak,
+    queryKey: ['streak', today],
+    queryFn: async () => (await logsApi.getStreak(today)).streak,
   });
 }
 

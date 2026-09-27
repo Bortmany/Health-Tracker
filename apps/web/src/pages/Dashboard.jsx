@@ -19,16 +19,7 @@ import { useSettings } from '../hooks/useSettings.js';
 import { useTrainingLog, useTrainingLogs } from '../hooks/useTrainingLogs.js';
 import { smoothSeries, trendCaption } from '../lib/trend.js';
 import styles from './Dashboard.module.css';
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function dateNDaysAgo(n) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
-}
+import { localDaysAgo, localToday } from '../lib/localDate.js';
 
 function diffDays(a, b) {
   const ms = new Date(`${a}T00:00:00`) - new Date(`${b}T00:00:00`);
@@ -47,11 +38,11 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { data: user } = useMe();
   const { data: settings } = useSettings();
-  const today = todayISO();
-  const from = dateNDaysAgo(29);
+  const today = localToday();
+  const from = localDaysAgo(29);
   const { data: logs = [], isLoading: logsLoading } = useLogsRange({ from, to: today });
 
-  const { data: habitDays = [] } = useHabitSummary({ from: dateNDaysAgo(6), to: today });
+  const { data: habitDays = [] } = useHabitSummary({ from: localDaysAgo(6), to: today });
   const { data: activeHabits = [] } = useHabits();
   const { data: streak, isLoading: streakLoading } = useStreak();
 

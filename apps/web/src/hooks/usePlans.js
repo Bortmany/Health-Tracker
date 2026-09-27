@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as plansApi from '../api/plans.js';
+import { localToday } from '../lib/localDate.js';
 
 export function useTemplates(filters = {}) {
   return useQuery({
@@ -16,9 +17,11 @@ export function useRecommendedTemplates() {
 }
 
 export function useMyPlan() {
+  // Part of the key, so the week number refreshes once the device passes midnight.
+  const today = localToday();
   return useQuery({
-    queryKey: ['myPlan'],
-    queryFn: async () => (await plansApi.getMyPlan()).plan,
+    queryKey: ['myPlan', today],
+    queryFn: async () => (await plansApi.getMyPlan(today)).plan,
   });
 }
 

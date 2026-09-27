@@ -5,6 +5,7 @@ import { rankTemplates, weekTargets } from '../lib/planGenerator.js';
 import * as validate from '../lib/validate.js';
 import { withTransaction } from '../lib/withTransaction.js';
 import { FREE_WEEKS, PREMIUM_WEEKS } from '../lib/planLength.js';
+import { daysBetween, resolveToday, todayIn } from '../lib/userToday.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -124,12 +125,13 @@ router.post('/templates/:id/adopt', asyncHandler(async (req, res) => {
   }
   const durationWeeks = requestedWeeks > FREE_WEEKS ? PREMIUM_WEEKS : FREE_WEEKS;
 
-  // If no start date is given, default to today. If one IS given, run it through
+  // If no start date is given, default to today (Oman's day, not the
+  // server's UTC day; the screens always send their own). If one IS given, run it through
   // the real-calendar validator so an impossible-but-well-shaped date (e.g.
   // 2026-13-45) fails with a clean 400 instead of a Postgres date error (a 500).
   const rawStartDate = req.body?.startDate;
   const startDate = rawStartDate == null || rawStartDate === ''
-    ? new Date().toISOString().slice(0, 10)
+    ? todayIn()
     : validate.isoDate(rawStartDate, 'startDate');
 
   const days = await fetchTemplateDays(template.id);
@@ -173,6 +175,9 @@ router.post('/templates/:id/adopt', asyncHandler(async (req, res) => {
 }));
 
 router.get('/my-plan', asyncHandler(async (req, res) => {
+  // "Today" is the user's own day (?today= from the device, else Oman's day),
+  // so a new week starts at the user's midnight, not four hours later.
+  const today = resolveToday(req.query.today);
   const { rows } = await pool.query(
     `SELECT up.*, up.start_date::text AS start_date, t.name, t.description, t.progression, t.phases
      FROM user_plans up
@@ -187,8 +192,7 @@ router.get('/my-plan', asyncHandler(async (req, res) => {
   // drift by a day depending on what time of day someone opens the app.
   // start_date comes back as plain "YYYY-MM-DD" text (see the query above).
   const startDate = plan.start_date;
-  const today = new Date().toISOString().slice(0, 10);
-  const daysSinceStart = Math.round((Date.parse(today) - Date.parse(startDate)) / (1000 * 60 * 60 * 24));
+  const daysSinceStart = daysBetween(startDate, today);
   const rawWeek = Math.floor(Math.max(daysSinceStart, 0) / 7) + 1;
   const completed = rawWeek > plan.duration_weeks;
   const weekNumber = Math.min(rawWeek, plan.duration_weeks);

@@ -32,3 +32,21 @@ export function resolveToday(value, now = new Date()) {
   }
   return day;
 }
+
+// A 'YYYY-MM-DD' day moved by whole days (negative goes back). Pure calendar
+// arithmetic, so the server's own time zone never matters.
+export function addDays(day, days) {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+// Whole calendar days from `from` to `to` (both 'YYYY-MM-DD').
+export function daysBetween(from, to) {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
+}
+
+// The Monday that starts the week `day` falls in (weeks run Monday–Sunday).
+export function weekStartOf(day) {
+  const weekday = new Date(`${day}T00:00:00Z`).getUTCDay(); // 0 = Sunday
+  return addDays(day, -((weekday + 6) % 7));
+}

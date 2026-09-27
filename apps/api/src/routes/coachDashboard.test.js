@@ -8,6 +8,7 @@ import { after, before, test } from 'node:test';
 import { app } from '../app.js';
 import { pool } from '../db/pool.js';
 import { generateReferralCode } from '../lib/coachProfiles.js';
+import { addDays, todayIn, weekStartOf } from '../lib/userToday.js';
 
 let server;
 let baseUrl;
@@ -77,14 +78,12 @@ async function listClients(coach) {
   return (await res.json()).clients;
 }
 
-// Dates the way the database sees them, so the test and the server agree on "today".
+// Dates the way the server sees them when no ?today= is sent: Oman's day.
 async function dbDate(offsetDays) {
-  const { rows } = await pool.query(`SELECT (CURRENT_DATE + $1::integer)::text AS d`, [offsetDays]);
-  return rows[0].d;
+  return addDays(todayIn(), offsetDays);
 }
 async function dbWeekStart() {
-  const { rows } = await pool.query(`SELECT date_trunc('week', CURRENT_DATE)::date::text AS d`);
-  return rows[0].d;
+  return weekStartOf(todayIn());
 }
 
 test('quiet days and last active: today → 0, never → null (sorted first), 5 days ago → 5', async () => {

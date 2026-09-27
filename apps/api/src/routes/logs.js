@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { normalizeCheckins } from '../lib/injuryCheckins.js';
+import { countStreak } from '../lib/streak.js';
+import { resolveToday } from '../lib/userToday.js';
 import * as validate from '../lib/validate.js';
 import { withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -63,7 +65,10 @@ router.get('/habit-summary', asyncHandler(async (req, res) => {
 
 // Current streak of consecutive days with a log, counting back from today.
 // A streak that ended yesterday (no entry logged yet today) still counts.
+// `?today=YYYY-MM-DD` is the day on the user's device; without it, Oman's day
+// (never the server's UTC day, which lags Oman by four hours).
 router.get('/streak', asyncHandler(async (req, res) => {
+  const today = resolveToday(req.query.today);
   // date::text keeps calendar dates as plain strings, avoiding timezone
   // shifts that happen when the database driver turns them into JS Dates.
   const { rows } = await pool.query(
@@ -71,24 +76,7 @@ router.get('/streak', asyncHandler(async (req, res) => {
     [req.userId]
   );
 
-  const dates = new Set(rows.map((r) => r.date));
-
-  const cursor = new Date();
-  let streak = 0;
-
-  // If there's no entry for today yet, the streak still counts as long as
-  // yesterday has one, so start checking from today and stop at the first gap
-  // (but don't let a missing "today" alone break a streak that ended yesterday).
-  if (!dates.has(cursor.toISOString().slice(0, 10))) {
-    cursor.setUTCDate(cursor.getUTCDate() - 1);
-  }
-
-  while (dates.has(cursor.toISOString().slice(0, 10))) {
-    streak += 1;
-    cursor.setUTCDate(cursor.getUTCDate() - 1);
-  }
-
-  res.json({ streak });
+  res.json({ streak: countStreak(rows.map((r) => r.date), today) });
 }));
 
 router.get('/:date', asyncHandler(async (req, res) => {

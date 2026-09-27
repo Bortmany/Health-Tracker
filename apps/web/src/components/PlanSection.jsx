@@ -4,6 +4,7 @@ import { Button, Card, Chip, ConfirmDialog, EmptyState, ErrorText, SectionTitle,
 import { useMe } from '../hooks/useAuth.js';
 import { useAdoptTemplate, useDeleteMyPlan, useMyPlan, useRecommendedTemplates, useTemplates } from '../hooks/usePlans.js';
 import styles from './PlanSection.module.css';
+import { localToday } from '../lib/localDate.js';
 
 function TemplateCard({ template, onAdopt, adopting, planTier, onSeePremium }) {
   return (
@@ -106,7 +107,7 @@ export default function PlanSection() {
               adopting={adopt.isPending && adopt.variables?.id === t.id}
               onAdopt={() =>
                 adopt.mutate(
-                  { id: t.id, startDate: new Date().toLocaleDateString('en-CA') },
+                  { id: t.id, startDate: localToday() },
                   {
                     // The full-year plan needs Premium — explain rather than
                     // just show an error.
