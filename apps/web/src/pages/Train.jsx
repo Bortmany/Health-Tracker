@@ -29,10 +29,7 @@ import {
   useUpdateTrainingLog,
 } from '../hooks/useTrainingLogs.js';
 import styles from './Train.module.css';
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
+import { localToday } from '../lib/localDate.js';
 
 function formatDateLabel(date) {
   return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -47,7 +44,7 @@ function blankSet(setNumber) {
 }
 
 function blankForm() {
-  return { date: todayISO(), programId: '', programDayId: '', notes: '', exercises: [blankExercise()] };
+  return { date: localToday(), programId: '', programDayId: '', notes: '', exercises: [blankExercise()] };
 }
 
 function buildFormFromTrainingLog(log) {

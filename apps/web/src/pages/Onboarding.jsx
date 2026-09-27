@@ -7,6 +7,7 @@ import { useMe } from '../hooks/useAuth.js';
 import { useAdoptTemplate, useRecommendedTemplates } from '../hooks/usePlans.js';
 import { useSettings, useUpdateSettings } from '../hooks/useSettings.js';
 import styles from './Onboarding.module.css';
+import { localToday } from '../lib/localDate.js';
 
 const STEPS = [
   {
@@ -103,7 +104,7 @@ function RevealStep() {
   function handleStart() {
     if (!top) return;
     adopt.mutate(
-      { id: top.id, startDate: new Date().toLocaleDateString('en-CA') },
+      { id: top.id, startDate: localToday() },
       {
         onSuccess: saveWeightThenStart,
         // The full-year plan needs Premium — explain rather than just fail.

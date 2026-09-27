@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { countStreak } from '../lib/streak.js';
+import { resolveToday } from '../lib/userToday.js';
 import { requireAuth } from '../middleware/auth.js';
 import { fetchNestedDays } from './programs.js';
 
@@ -24,6 +26,9 @@ function groupBy(rows, key) {
 router.use(requireAuth);
 
 router.get('/', asyncHandler(async (req, res) => {
+  // The user's own day for the streak (?today= from the device, else Oman's).
+  const today = resolveToday(req.query.today);
+
   // Profile — the same public fields the app shows, never the password hash.
   const { rows: userRows } = await pool.query(
     'SELECT id, email, display_name, plan_tier, role, created_at FROM users WHERE id = $1',
@@ -169,16 +174,7 @@ router.get('/', asyncHandler(async (req, res) => {
     'SELECT date::text AS date FROM daily_logs WHERE user_id = $1 ORDER BY date DESC LIMIT 400',
     [req.userId]
   );
-  const dates = new Set(streakRows.map((r) => r.date));
-  const cursor = new Date();
-  let streak = 0;
-  if (!dates.has(cursor.toISOString().slice(0, 10))) {
-    cursor.setUTCDate(cursor.getUTCDate() - 1);
-  }
-  while (dates.has(cursor.toISOString().slice(0, 10))) {
-    streak += 1;
-    cursor.setUTCDate(cursor.getUTCDate() - 1);
-  }
+  const streak = countStreak(streakRows.map((r) => r.date), today);
 
   // Every coaching link this account has had as a client — current, waiting,
   // declined or ended — and, separately, which coach's referral link (if any)

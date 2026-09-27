@@ -1,7 +1,8 @@
 import { request } from './client.js';
 
-export function getClients() {
-  return request('/coach/clients');
+// `today` is this device's own day: quiet days and "this week" count from it.
+export function getClients(today) {
+  return request(`/coach/clients${today ? `?today=${today}` : ''}`);
 }
 
 export function createInvite() {
@@ -12,8 +13,8 @@ export function removeClient(linkId) {
   return request(`/coach/clients/${linkId}`, { method: 'DELETE' });
 }
 
-export function getClientSummary(clientId) {
-  return request(`/coach/clients/${clientId}/summary`);
+export function getClientSummary(clientId, today) {
+  return request(`/coach/clients/${clientId}/summary${today ? `?today=${today}` : ''}`);
 }
 
 export function assignProgram(clientId, program) {
