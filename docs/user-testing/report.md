@@ -1,5 +1,7 @@
 # Cut — user-testing report (2026-09-07)
 
+> The screenshots referenced below are not stored in this repo (app screenshots stay out of git). They can be viewed on the original pull request, #21, on GitHub.
+
 **Verdict: Not ready** — three of the four independently re-tested P1 code bugs sit inside the core loop (the target-date countdown, the day a log is filed on, and the coach's weight-trend caption), which meets the "3+ confirmed P1 code bugs in the core loop" rule. There is no P0 and nothing is lost or leaked; these are four fixes, not a rebuild.
 
 A first-time user can sign up, answer the quiz, get a sensible matched plan, and log weight, sleep, steps, food, habits and a full training session on either a phone or a laptop — every number they type comes back exactly as typed, and no user can see another user's data. What they cannot do is trust the app with a deadline: the target date they set disappears from the screen, the home screen then says they have "NaN" days to go, and anything logged between midnight and 4am in the Gulf is quietly filed on yesterday.
