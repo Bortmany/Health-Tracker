@@ -112,7 +112,8 @@ router.get('/', asyncHandler(async (req, res) => {
   // Includes how many exercises each session holds, so the list can show
   // "5 exercises" without loading every session's full detail.
   const { rows } = await pool.query(
-    `SELECT t.*, COUNT(e.id)::integer AS exercise_count
+    // t.date::text keeps the calendar date as a plain string (no timezone shift).
+    `SELECT t.*, t.date::text AS date, COUNT(e.id)::integer AS exercise_count
      FROM training_logs t
      LEFT JOIN training_log_exercises e ON e.training_log_id = t.id
      WHERE t.user_id = $1 AND t.date BETWEEN $2 AND $3
@@ -134,7 +135,7 @@ router.get('/exercise-history', asyncHandler(async (req, res) => {
   const cleanBefore = validate.uuid(before, 'before', { optional: true });
 
   const { rows } = await pool.query(
-    `SELECT tl.id AS training_log_id, tl.date, te.id AS exercise_id, te.name
+    `SELECT tl.id AS training_log_id, tl.date::text AS date, te.id AS exercise_id, te.name
      FROM training_log_exercises te
      JOIN training_logs tl ON tl.id = te.training_log_id
      WHERE tl.user_id = $1 AND te.name = $2 AND tl.id != COALESCE($3::uuid, '00000000-0000-0000-0000-000000000000')
@@ -168,7 +169,7 @@ router.get('/personal-records', asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT * FROM (
        SELECT DISTINCT ON (te.name)
-         te.name, s.weight, s.reps, tl.date
+         te.name, s.weight, s.reps, tl.date::text AS date
        FROM training_log_sets s
        JOIN training_log_exercises te ON te.id = s.training_log_exercise_id
        JOIN training_logs tl ON tl.id = te.training_log_id
@@ -188,7 +189,7 @@ router.get('/personal-records', asyncHandler(async (req, res) => {
 router.get('/:id', asyncHandler(async (req, res) => {
   if (!validate.isUuid(req.params.id)) return notFound(res);
 
-  const { rows } = await pool.query('SELECT * FROM training_logs WHERE id = $1 AND user_id = $2', [
+  const { rows } = await pool.query('SELECT *, date::text AS date FROM training_logs WHERE id = $1 AND user_id = $2', [
     req.params.id,
     req.userId,
   ]);
@@ -218,7 +219,7 @@ router.post('/', asyncHandler(async (req, res) => {
          program_id = EXCLUDED.program_id,
          program_day_id = EXCLUDED.program_day_id,
          notes = EXCLUDED.notes
-       RETURNING *`,
+       RETURNING *, date::text AS date`,
       [req.userId, cleanDate, cleanProgramId, cleanProgramDayId, cleanNotes]
     );
     await replaceExercises(client, rows[0].id, exercises);
@@ -253,7 +254,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
            program_day_id = COALESCE($4, program_day_id),
            notes = COALESCE($5, notes)
        WHERE id = $1
-       RETURNING *`,
+       RETURNING *, date::text AS date`,
       [req.params.id, cleanDate, cleanProgramId, cleanProgramDayId, cleanNotes]
     );
 

@@ -34,7 +34,7 @@ router.get('/', asyncHandler(async (req, res) => {
     return res.status(401).json({ error: { message: 'Not authenticated', code: 'NO_TOKEN' } });
   }
 
-  const { rows: settingsRows } = await pool.query('SELECT * FROM user_settings WHERE user_id = $1', [req.userId]);
+  const { rows: settingsRows } = await pool.query('SELECT *, target_date::text AS target_date FROM user_settings WHERE user_id = $1', [req.userId]);
   const s = settingsRows[0];
 
   const { rows: habitRows } = await pool.query(

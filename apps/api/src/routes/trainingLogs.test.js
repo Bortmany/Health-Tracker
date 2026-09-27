@@ -205,3 +205,34 @@ test('editing a program keeps past sessions linked to the matching day', async (
   const fetched = await getRes.json();
   assert.equal(fetched.trainingLog.programDayId, newDayId);
 });
+
+// Guards against dates slipping a day when the server's clock is ahead of UTC
+// (Oman is UTC+4). Run the suite with TZ=Asia/Muscat to prove it.
+test('opening a session and saving it again keeps the same day', async () => {
+  const headers = { 'Content-Type': 'application/json', Cookie: cookie };
+  const day = '2026-07-12';
+  const createRes = await fetch(`${baseUrl}/training-logs`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ date: day, exercises: [{ name: 'Row', sets: [{ weight: 40, reps: 10 }] }] }),
+  });
+  assert.equal(createRes.status, 201);
+  const created = (await createRes.json()).trainingLog;
+  assert.equal(created.date, day);
+
+  // Open it, then save it back with the date exactly as the Train page reads it.
+  const openRes = await fetch(`${baseUrl}/training-logs/${created.id}`, { headers: { Cookie: cookie } });
+  const opened = (await openRes.json()).trainingLog;
+  assert.equal(opened.date, day);
+
+  const saveRes = await fetch(`${baseUrl}/training-logs/${created.id}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ date: opened.date.slice(0, 10), exercises: [{ name: 'Row', sets: [{ weight: 42, reps: 10 }] }] }),
+  });
+  assert.equal(saveRes.status, 200);
+  assert.equal((await saveRes.json()).trainingLog.date, day);
+
+  const reopened = (await (await fetch(`${baseUrl}/training-logs/${created.id}`, { headers: { Cookie: cookie } })).json()).trainingLog;
+  assert.equal(reopened.date, day);
+});

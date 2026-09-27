@@ -174,7 +174,7 @@ router.post('/templates/:id/adopt', asyncHandler(async (req, res) => {
 
 router.get('/my-plan', asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT up.*, t.name, t.description, t.progression, t.phases
+    `SELECT up.*, up.start_date::text AS start_date, t.name, t.description, t.progression, t.phases
      FROM user_plans up
      LEFT JOIN plan_templates t ON t.id = up.plan_template_id
      WHERE up.user_id = $1`,
@@ -185,7 +185,8 @@ router.get('/my-plan', asyncHandler(async (req, res) => {
 
   // Compare calendar dates, not clock times, so week boundaries don't
   // drift by a day depending on what time of day someone opens the app.
-  const startDate = plan.start_date.toISOString().slice(0, 10);
+  // start_date comes back as plain "YYYY-MM-DD" text (see the query above).
+  const startDate = plan.start_date;
   const today = new Date().toISOString().slice(0, 10);
   const daysSinceStart = Math.round((Date.parse(today) - Date.parse(startDate)) / (1000 * 60 * 60 * 24));
   const rawWeek = Math.floor(Math.max(daysSinceStart, 0) / 7) + 1;

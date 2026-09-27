@@ -40,7 +40,7 @@ router.get('/', asyncHandler(async (req, res) => {
   const to = validate.queryDate(req.query.to, 'to', '9999-12-31');
 
   const { rows } = await pool.query(
-    'SELECT * FROM nutrition_logs WHERE user_id = $1 AND date BETWEEN $2 AND $3 ORDER BY date',
+    'SELECT *, date::text AS date FROM nutrition_logs WHERE user_id = $1 AND date BETWEEN $2 AND $3 ORDER BY nutrition_logs.date',
     [req.userId, from, to]
   );
   res.json({ logs: rows.map(toPublicLog) });
@@ -52,7 +52,7 @@ router.get('/:date', asyncHandler(async (req, res) => {
   const date = validate.isoDate(req.params.date);
 
   const { rows: logRows } = await pool.query(
-    'SELECT * FROM nutrition_logs WHERE user_id = $1 AND date = $2',
+    'SELECT *, date::text AS date FROM nutrition_logs WHERE user_id = $1 AND date = $2',
     [req.userId, date]
   );
   const log = logRows[0] ?? null;
@@ -105,7 +105,7 @@ router.put('/:date', asyncHandler(async (req, res) => {
        ON CONFLICT (user_id, date) DO UPDATE SET
          calories = EXCLUDED.calories, protein = EXCLUDED.protein, carbs = EXCLUDED.carbs,
          fat = EXCLUDED.fat, notes = EXCLUDED.notes
-       RETURNING *`,
+       RETURNING *, date::text AS date`,
       [req.userId, date, cleanCalories, cleanProtein, cleanCarbs, cleanFat, cleanNotes]
     );
     const log = rows[0];
