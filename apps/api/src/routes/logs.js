@@ -46,7 +46,9 @@ router.get('/habit-summary', asyncHandler(async (req, res) => {
   const to = validate.queryDate(req.query.to, 'to', '9999-12-31');
 
   const { rows } = await pool.query(
-    `SELECT dl.date,
+    // date::text keeps the calendar date as a plain string, so it can't slip
+    // a day when the server runs in a timezone ahead of UTC.
+    `SELECT dl.date::text AS date,
             COUNT(dlh.habit_id)::int AS possible,
             COUNT(dlh.habit_id) FILTER (WHERE dlh.completed)::int AS completed
      FROM daily_logs dl

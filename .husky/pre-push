@@ -1,0 +1,12 @@
+echo ""
+echo "Cut: checking everything still works before this push goes to GitHub —"
+echo "building the app and running all the tests (against the separate test"
+echo "database). This takes about a minute."
+echo ""
+if ! pg_isready -q; then
+  echo "Stopped: the local database (Postgres) isn't running, so the tests can't run."
+  echo "Start it with:  brew services start postgresql@16"
+  echo "then push again. (In a real emergency, 'git push --no-verify' skips this check.)"
+  exit 1
+fi
+npm run verify
