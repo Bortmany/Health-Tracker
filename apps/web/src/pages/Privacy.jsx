@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import ContactEmail from '../components/ContactEmail.jsx';
 import styles from './Legal.module.css';
 
 // Public page — no login needed. Everything stated here is matched to what
@@ -67,8 +68,8 @@ export default function Privacy() {
             <li>
               <strong>Plan and billing status:</strong> whether your account is
               free or Premium. If paid upgrades are switched on and you upgrade,
-              our payment provider Stripe gives us a customer reference — your
-              card details go to Stripe directly and never touch our servers.
+              our payment provider Paddle gives us a customer reference — your
+              card details go to Paddle directly and never touch our servers.
             </li>
             <li>
               <strong>Device health data:</strong> only if you later connect a
@@ -92,14 +93,44 @@ export default function Privacy() {
           <h2>Coaches and your data</h2>
           <p>
             Nobody sees your data unless you connect a coach, and connecting is
-            always your action: a coach gives you an invite code, and entering
-            it in the app is your consent. A connected coach can see your name,
+            always your action. A coach only sees your data after you connect
+            with them, and you can do that in one of four ways: by entering
+            their invite code, by sending them a request from the coach
+            directory (they must accept), by accepting an invite a coach sent
+            you inside the app, or by signing up through a coach's referral
+            link (which creates a request that coach must accept). We keep a
+            note of which coach's link you signed up through, and a record of
+            coaching connections that ended or were declined, so the history
+            stays honest; you can end a coaching connection at any time from
+            the More page. A connected coach can see your name,
             email, last 30 days of weigh-ins, recent training sessions
             (including any notes you write on those sessions), and
             your programs — and can create and edit programs in your account.
             A coach does not see your nutrition, habits, or injuries.
+            A coach can also keep private notes about you inside Cut — their
+            own reminders about your training — which you never see. Those
+            notes stop being readable by anyone, including that coach, the
+            moment the coaching connection ends.
             You can disconnect your coach at any time from the More page, which
             immediately ends their access.
+          </p>
+          <p>
+            If you apply to become a coach, we also store what you tell us in
+            the application — the name you want clients to see, your
+            credentials and experience, how you train people, and any link you
+            give us. The app owner reads these to decide on your application,
+            and they stay on file with the decision. Withdrawing a pending
+            application deletes it.
+          </p>
+          <p>
+            <strong>Public coach profiles:</strong> if you're a coach, you
+            control whether your profile is visible in Cut's public coach
+            directory — it's off by default. If you switch it on, your name,
+            headline, bio, specialties, credentials, years coaching, and any
+            link you added become visible to anyone on the internet, without
+            needing a Cut account. Your email address is never shown. You can
+            switch your profile back to private at any time from your coach
+            profile page.
           </p>
 
           <h2>Cookies</h2>
@@ -115,7 +146,7 @@ export default function Privacy() {
               Railway, a cloud hosting provider.
             </li>
             <li>
-              <strong>Payments:</strong> Stripe, only if you buy a Premium
+              <strong>Payments:</strong> Paddle, only if you buy a Premium
               upgrade.
             </li>
             <li>
@@ -154,8 +185,7 @@ export default function Privacy() {
 
           <h2>Contact</h2>
           <p>
-            Questions about your data: [owner — add your contact email here
-            before launch].
+            Questions about your data: <ContactEmail />.
           </p>
 
           <h2>Changes to this policy</h2>
@@ -166,7 +196,9 @@ export default function Privacy() {
         </div>
 
         <p className={styles.footerLinks}>
-          <Link to="/terms">Terms of Use</Link> · <Link to="/login">Back to Cut</Link>
+          <Link to="/terms">Terms of Use</Link> ·{' '}
+          <Link to="/refunds">Refund &amp; Cancellation Policy</Link> ·{' '}
+          <Link to="/login">Back to Cut</Link>
         </p>
       </div>
     </div>

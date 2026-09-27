@@ -2,12 +2,18 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { rankTemplates, weekTargets } from '../lib/planGenerator.js';
+import * as validate from '../lib/validate.js';
 import { withTransaction } from '../lib/withTransaction.js';
+import { FREE_WEEKS, PREMIUM_WEEKS } from '../lib/planLength.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// A malformed :id would otherwise reach Postgres as an invalid UUID and throw a
+// 500 — this turns it into a clean "not found".
+function planNotFound(res) {
+  return res.status(404).json({ error: { message: 'Plan not found', code: 'NOT_FOUND' } });
+}
 
 function toPublicTemplate(row) {
   return {
@@ -18,6 +24,8 @@ function toPublicTemplate(row) {
     experience: row.experience,
     equipment: row.equipment,
     daysPerWeek: row.days_per_week,
+    freeWeeks: FREE_WEEKS,
+    premiumWeeks: PREMIUM_WEEKS,
   };
 }
 
@@ -60,7 +68,10 @@ router.get('/templates', asyncHandler(async (req, res) => {
   const filters = [];
   const params = [];
   for (const key of ['goal', 'experience', 'equipment']) {
-    if (req.query[key]) {
+    // Only accept a plain string. A repeated param (?goal=a&goal=b) arrives as an
+    // array, which would bind as text[] and break the `key = $n` text comparison
+    // (a 500) — ignore anything that isn't a single string value.
+    if (typeof req.query[key] === 'string' && req.query[key]) {
       params.push(req.query[key]);
       filters.push(`${key} = $${params.length}`);
     }
@@ -78,55 +89,66 @@ router.get('/templates/recommended', asyncHandler(async (req, res) => {
 }));
 
 router.get('/templates/:id', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) return planNotFound(res);
+
   const { rows } = await pool.query('SELECT * FROM plan_templates WHERE id = $1', [req.params.id]);
   if (!rows[0]) {
-    return res.status(404).json({ error: { message: 'Plan not found', code: 'NOT_FOUND' } });
+    return planNotFound(res);
   }
   const days = await fetchTemplateDays(rows[0].id);
   res.json({ template: { ...toPublicTemplate(rows[0]), days } });
 }));
 
 router.post('/templates/:id/adopt', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) return planNotFound(res);
+
   const { rows: templateRows } = await pool.query('SELECT * FROM plan_templates WHERE id = $1', [
     req.params.id,
   ]);
   const template = templateRows[0];
   if (!template) {
-    return res.status(404).json({ error: { message: 'Plan not found', code: 'NOT_FOUND' } });
+    return planNotFound(res);
   }
 
   const { rows: userRows } = await pool.query('SELECT plan_tier FROM users WHERE id = $1', [req.userId]);
   const tier = userRows[0].plan_tier;
 
-  const requestedWeeks = req.body?.durationWeeks ?? (tier === 'premium' ? 52 : 4);
-  if (requestedWeeks > 4 && tier !== 'premium') {
+  const requestedWeeks = req.body?.durationWeeks ?? (tier === 'premium' ? PREMIUM_WEEKS : FREE_WEEKS);
+  if (requestedWeeks > FREE_WEEKS && tier !== 'premium') {
     return res.status(402).json({
       error: {
-        message: 'The full-year plan is part of Premium. Your free plan covers the first 4 weeks.',
+        message: `The full-year plan is part of Premium. Your free plan covers the first ${FREE_WEEKS} weeks.`,
         code: 'PREMIUM_REQUIRED',
       },
     });
   }
-  const durationWeeks = requestedWeeks > 4 ? 52 : 4;
+  const durationWeeks = requestedWeeks > FREE_WEEKS ? PREMIUM_WEEKS : FREE_WEEKS;
 
-  const startDate = DATE_RE.test(req.body?.startDate ?? '')
-    ? req.body.startDate
-    : new Date().toISOString().slice(0, 10);
+  // If no start date is given, default to today. If one IS given, run it through
+  // the real-calendar validator so an impossible-but-well-shaped date (e.g.
+  // 2026-13-45) fails with a clean 400 instead of a Postgres date error (a 500).
+  const rawStartDate = req.body?.startDate;
+  const startDate = rawStartDate == null || rawStartDate === ''
+    ? new Date().toISOString().slice(0, 10)
+    : validate.isoDate(rawStartDate, 'startDate');
 
   const days = await fetchTemplateDays(template.id);
 
-  const programId = await withTransaction(async (client) => {
+  const { programId, firstDayId } = await withTransaction(async (client) => {
     const { rows: programRows } = await client.query(
       'INSERT INTO programs (user_id, name, description) VALUES ($1, $2, $3) RETURNING id',
       [req.userId, template.name, template.description]
     );
     const programId = programRows[0].id;
+    // The day the app should open first — day 1 of the new program.
+    let firstDayId = null;
 
     for (const [dayIndex, day] of days.entries()) {
       const { rows: dayRows } = await client.query(
         'INSERT INTO program_days (program_id, name, sort_order) VALUES ($1, $2, $3) RETURNING id',
         [programId, day.name, dayIndex]
       );
+      if (dayIndex === 0) firstDayId = dayRows[0].id;
       for (const [exIndex, ex] of day.exercises.entries()) {
         await client.query(
           `INSERT INTO program_exercises (program_day_id, name, target_sets, target_reps, sort_order)
@@ -144,15 +166,15 @@ router.post('/templates/:id/adopt', asyncHandler(async (req, res) => {
       [req.userId, template.id, programId, startDate, durationWeeks]
     );
 
-    return programId;
+    return { programId, firstDayId };
   });
 
-  res.status(201).json({ programId, durationWeeks, startDate });
+  res.status(201).json({ programId, firstDayId, durationWeeks, startDate });
 }));
 
 router.get('/my-plan', asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT up.*, t.name, t.description, t.progression, t.phases
+    `SELECT up.*, up.start_date::text AS start_date, t.name, t.description, t.progression, t.phases
      FROM user_plans up
      LEFT JOIN plan_templates t ON t.id = up.plan_template_id
      WHERE up.user_id = $1`,
@@ -163,7 +185,8 @@ router.get('/my-plan', asyncHandler(async (req, res) => {
 
   // Compare calendar dates, not clock times, so week boundaries don't
   // drift by a day depending on what time of day someone opens the app.
-  const startDate = plan.start_date.toISOString().slice(0, 10);
+  // start_date comes back as plain "YYYY-MM-DD" text (see the query above).
+  const startDate = plan.start_date;
   const today = new Date().toISOString().slice(0, 10);
   const daysSinceStart = Math.round((Date.parse(today) - Date.parse(startDate)) / (1000 * 60 * 60 * 24));
   const rawWeek = Math.floor(Math.max(daysSinceStart, 0) / 7) + 1;

@@ -7,7 +7,6 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // Guard against a runaway request stuffing thousands of rows into one day.
 const MAX_MEALS = 50;
 
@@ -37,24 +36,23 @@ function toPublicMeal(row) {
 router.use(requireAuth);
 
 router.get('/', asyncHandler(async (req, res) => {
-  const from = DATE_RE.test(req.query.from) ? req.query.from : '1970-01-01';
-  const to = DATE_RE.test(req.query.to) ? req.query.to : '9999-12-31';
+  const from = validate.queryDate(req.query.from, 'from', '1970-01-01');
+  const to = validate.queryDate(req.query.to, 'to', '9999-12-31');
 
   const { rows } = await pool.query(
-    'SELECT * FROM nutrition_logs WHERE user_id = $1 AND date BETWEEN $2 AND $3 ORDER BY date',
+    'SELECT *, date::text AS date FROM nutrition_logs WHERE user_id = $1 AND date BETWEEN $2 AND $3 ORDER BY nutrition_logs.date',
     [req.userId, from, to]
   );
   res.json({ logs: rows.map(toPublicLog) });
 }));
 
 router.get('/:date', asyncHandler(async (req, res) => {
-  const { date } = req.params;
-  if (!DATE_RE.test(date)) {
-    return res.status(400).json({ error: { message: 'date must be YYYY-MM-DD', code: 'INVALID_INPUT' } });
-  }
+  // Rejects both wrong shapes and impossible-but-well-shaped dates (e.g.
+  // 2026-02-30) with a clean 400 instead of letting Postgres throw a 500.
+  const date = validate.isoDate(req.params.date);
 
   const { rows: logRows } = await pool.query(
-    'SELECT * FROM nutrition_logs WHERE user_id = $1 AND date = $2',
+    'SELECT *, date::text AS date FROM nutrition_logs WHERE user_id = $1 AND date = $2',
     [req.userId, date]
   );
   const log = logRows[0] ?? null;
@@ -67,10 +65,8 @@ router.get('/:date', asyncHandler(async (req, res) => {
 }));
 
 router.put('/:date', asyncHandler(async (req, res) => {
-  const { date } = req.params;
-  if (!DATE_RE.test(date)) {
-    return res.status(400).json({ error: { message: 'date must be YYYY-MM-DD', code: 'INVALID_INPUT' } });
-  }
+  // Rejects impossible dates (e.g. 2026-02-30) with a 400 before any query runs.
+  const date = validate.isoDate(req.params.date);
 
   const { calories, protein, carbs, fat, notes, meals = [] } = req.body ?? {};
 
@@ -109,7 +105,7 @@ router.put('/:date', asyncHandler(async (req, res) => {
        ON CONFLICT (user_id, date) DO UPDATE SET
          calories = EXCLUDED.calories, protein = EXCLUDED.protein, carbs = EXCLUDED.carbs,
          fat = EXCLUDED.fat, notes = EXCLUDED.notes
-       RETURNING *`,
+       RETURNING *, date::text AS date`,
       [req.userId, date, cleanCalories, cleanProtein, cleanCarbs, cleanFat, cleanNotes]
     );
     const log = rows[0];

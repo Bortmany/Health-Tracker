@@ -4,6 +4,8 @@ import {
   Button,
   Card,
   Chip,
+  ConfirmDialog,
+  EmptyState,
   ErrorText,
   Field,
   Input,
@@ -11,8 +13,11 @@ import {
   SectionTitle,
   Select,
   Skeleton,
+  Toast,
+  useToast,
 } from '../components/ui/index.js';
 import { useActivities } from '../hooks/useActivities.js';
+import { useCreateHabit, useDeleteHabit } from '../hooks/useHabits.js';
 import { useLog, usePutLog } from '../hooks/useLogs.js';
 import { useNutrition, usePutNutrition } from '../hooks/useNutrition.js';
 import styles from './Log.module.css';
@@ -96,12 +101,19 @@ function buildFormFromData(data, nutritionData) {
   };
 }
 
-// A collapsible section card: the title row is the expand/collapse tap target.
-function Group({ title, open, onToggle, children }) {
+// A collapsible section card: the title row is the expand/collapse tap
+// target. When a closed group already holds entries, a small accent dot
+// next to the title says so without opening it.
+function Group({ title, open, onToggle, hasData = false, children }) {
   return (
     <Card>
       <button type="button" className={styles.groupHeader} onClick={onToggle} aria-expanded={open}>
-        <SectionTitle>{title}</SectionTitle>
+        <span className={styles.groupTitleWrap}>
+          <SectionTitle>{title}</SectionTitle>
+          {!open && hasData && (
+            <span className={styles.groupDot} title="Already has entries" aria-hidden="true" />
+          )}
+        </span>
         <span className={styles.chevron} aria-hidden="true">
           {open ? '▾' : '▸'}
         </span>
@@ -119,8 +131,13 @@ export default function Log() {
   const { data: activityOptions = [] } = useActivities();
   const putLog = usePutLog(date);
   const putNutrition = usePutNutrition(date);
+  const createHabit = useCreateHabit();
+  const deleteHabit = useDeleteHabit();
   const [form, setForm] = useState(null);
+  const [newHabit, setNewHabit] = useState('');
+  const [habitToDelete, setHabitToDelete] = useState(null);
   const [searchParams] = useSearchParams();
+  const toast = useToast();
 
   // Which sections are expanded. Defaults re-evaluate when the date changes:
   // a section that already has data for that day starts open.
@@ -185,6 +202,43 @@ export default function Log() {
     }));
   }
 
+  // Creating a habit saves it straight away (it belongs to the account, not to
+  // this one day) and then drops it into today's checklist by hand. We update
+  // the list in place instead of re-loading the day so anything half-typed in
+  // the other boxes isn't wiped while you add a habit.
+  async function addHabit() {
+    const label = newHabit.trim();
+    if (!label) return;
+    try {
+      const { habit } = await createHabit.mutateAsync({ label });
+      setForm((f) => ({
+        ...f,
+        habits: [...f.habits, { habitId: habit.id, label: habit.label, completed: false }],
+      }));
+      setNewHabit('');
+    } catch {
+      // The red message under the box already says what went wrong.
+    }
+  }
+
+  // Enter inside the habit box adds the habit instead of saving the whole day.
+  function handleHabitKeyDown(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addHabit();
+    }
+  }
+
+  function removeHabit() {
+    const habitId = habitToDelete?.habitId;
+    if (!habitId) return;
+    deleteHabit.mutate(habitId, {
+      onSuccess: () =>
+        setForm((f) => ({ ...f, habits: f.habits.filter((h) => h.habitId !== habitId) })),
+      onSettled: () => setHabitToDelete(null),
+    });
+  }
+
   function addActivityRow() {
     setForm((f) => ({
       ...f,
@@ -247,11 +301,11 @@ export default function Log() {
     });
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (!form) return;
 
-    putLog.mutate({
+    const savingLog = putLog.mutateAsync({
       weight: form.weight === '' ? null : Number(form.weight),
       waist: form.waist === '' ? null : Number(form.waist),
       sleep: form.sleep === '' ? null : Number(form.sleep),
@@ -279,7 +333,7 @@ export default function Log() {
       })),
     });
 
-    putNutrition.mutate({
+    const savingNutrition = putNutrition.mutateAsync({
       calories: form.foodCalories === '' ? null : Number(form.foodCalories),
       protein: form.protein === '' ? null : Number(form.protein),
       carbs: form.carbs === '' ? null : Number(form.carbs),
@@ -292,9 +346,26 @@ export default function Log() {
           protein: m.protein === '' ? null : Number(m.protein),
         })),
     });
+
+    // "Saved" only appears once the day's numbers AND the food entries are
+    // both stored. If either fails, the red message below the form says so.
+    try {
+      await Promise.all([savingLog, savingNutrition]);
+      toast.show('Saved');
+    } catch {
+      // The failed mutation already shows its own message on screen.
+    }
   }
 
   const saving = putLog.isPending || putNutrition.isPending;
+
+  // Dots for collapsed groups that already hold entries for this day.
+  const metricsHaveData = Boolean(form) && MORE_FIELDS.some(({ key }) => form[key] !== '');
+  const injuriesHaveData =
+    Boolean(form) &&
+    form.injuryCheckins.some(
+      (c) => c.painPre !== '' || c.painDuring !== '' || c.painPost !== '' || c.swelling
+    );
 
   return (
     <Screen>
@@ -442,6 +513,7 @@ export default function Log() {
           <Group
             title="More metrics"
             open={open.metrics}
+            hasData={metricsHaveData}
             onToggle={() => setOpen((o) => ({ ...o, metrics: !o.metrics }))}
           >
             <div className={styles.fieldGrid}>
@@ -512,30 +584,83 @@ export default function Log() {
             </Button>
           </Group>
 
-          {form.habits.length > 0 && (
-            <Group
-              title="Habits"
-              open={open.habits}
-              onToggle={() => setOpen((o) => ({ ...o, habits: !o.habits }))}
-            >
-              {form.habits.map((h) => (
-                <label className={styles.habitRow} key={h.habitId}>
-                  <input
-                    className={styles.checkbox}
-                    type="checkbox"
-                    checked={h.completed}
-                    onChange={() => toggleHabit(h.habitId)}
+          <Group
+            title="Habits"
+            open={open.habits}
+            hasData={form.habits.some((h) => h.completed)}
+            onToggle={() => setOpen((o) => ({ ...o, habits: !o.habits }))}
+          >
+            {form.habits.length === 0 ? (
+              <EmptyState>No habits yet — add one below and it&apos;ll show up here every day.</EmptyState>
+            ) : (
+              <div>
+                {form.habits.map((h) => (
+                  <div className={styles.habitRow} key={h.habitId}>
+                    <label className={styles.habitLabel}>
+                      <input
+                        className={styles.checkbox}
+                        type="checkbox"
+                        checked={h.completed}
+                        onChange={() => toggleHabit(h.habitId)}
+                      />
+                      {h.label}
+                    </label>
+                    <button
+                      type="button"
+                      className={`${styles.removeButton} ${styles.habitRemove}`}
+                      onClick={() => setHabitToDelete(h)}
+                      disabled={deleteHabit.isPending}
+                      aria-label={`Remove habit ${h.label}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* The label stays visible; the greyed example only shows the kind
+                of habit that works, and disappears as soon as you type. */}
+            <div className={styles.addHabitRow}>
+              <div className={styles.addHabitField}>
+                <Field label="Add a habit">
+                  <Input
+                    type="text"
+                    aria-label="Add a habit"
+                    placeholder="Walk 10,000 steps"
+                    value={newHabit}
+                    maxLength={200}
+                    onChange={(e) => setNewHabit(e.target.value)}
+                    onKeyDown={handleHabitKeyDown}
                   />
-                  {h.label}
-                </label>
-              ))}
-            </Group>
-          )}
+                </Field>
+              </div>
+              <Button
+                size="sm"
+                onClick={addHabit}
+                disabled={newHabit.trim() === '' || createHabit.isPending}
+              >
+                {createHabit.isPending ? 'Adding...' : 'Add'}
+              </Button>
+            </div>
+            {createHabit.isError && <ErrorText>{createHabit.error.message}</ErrorText>}
+            {deleteHabit.isError && <ErrorText>{deleteHabit.error.message}</ErrorText>}
+
+            <ConfirmDialog
+              open={Boolean(habitToDelete)}
+              message={`Remove "${habitToDelete?.label ?? ''}"? Your past ticks for this habit go too.`}
+              confirmLabel="Remove habit"
+              busy={deleteHabit.isPending}
+              onConfirm={removeHabit}
+              onCancel={() => setHabitToDelete(null)}
+            />
+          </Group>
 
           {form.injuryCheckins.length > 0 && (
             <Group
               title="Injury check-in"
               open={open.injuries}
+              hasData={injuriesHaveData}
               onToggle={() => setOpen((o) => ({ ...o, injuries: !o.injuries }))}
             >
               {form.injuryCheckins.map((c) => (
@@ -604,6 +729,8 @@ export default function Log() {
           </Group>
         </form>
       )}
+
+      <Toast message={toast.message} />
     </Screen>
   );
 }

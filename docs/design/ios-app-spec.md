@@ -79,7 +79,7 @@ grouped list of PRs by exercise.
 **Muscle Heatmap (new screen — being built on the web now)** — a front/back
 human body diagram whose 16 regions (chest, front/side/rear delts, biceps,
 triceps, forearms, traps, lats, lower back, abs, obliques, glutes, quads,
-hamstrings, calves — the exact ids in migration 016) are colored by recent
+hamstrings, calves — the exact ids in migration 022) are colored by recent
 training volume: dark grey = untouched, warm lime gradient = trained, hottest
 = most volume in the chosen window (7 / 14 / 30-day toggle). Native version:
 draw the body as vector shapes (SwiftUI paths), animate color transitions,

@@ -1,4 +1,4 @@
--- 016: muscle heatmap — tag every library exercise with the body regions it
+-- 022: muscle heatmap — tag every library exercise with the body regions it
 -- works, so the app can colour a body map from a user's training logs.
 -- primary_muscles = the main movers (full credit), secondary_muscles = the
 -- helpers (half credit). Both arrays may only contain the 16 canonical
@@ -98,3 +98,85 @@ UPDATE exercise_library SET primary_muscles = '{}', secondary_muscles = '{quads,
 UPDATE exercise_library SET primary_muscles = '{}', secondary_muscles = '{quads,calves,glutes}' WHERE name = 'Elliptical';
 UPDATE exercise_library SET primary_muscles = '{}', secondary_muscles = '{quads,glutes,lats,lower-back}' WHERE name = 'Rowing machine';
 UPDATE exercise_library SET primary_muscles = '{}', secondary_muscles = '{calves}' WHERE name = 'Jump rope';
+
+-- The 14 seeded workout plans (migration 010) name 49 exercises that aren't in
+-- the 50-movement library, so a member following their plan would log them
+-- and see a dark map. They get their own muscle tags here, kept apart from
+-- the library so the library's search and instructions stay unchanged.
+CREATE TABLE exercise_muscle_tags (
+  name TEXT PRIMARY KEY,
+  primary_muscles TEXT[] NOT NULL DEFAULT '{}',
+  secondary_muscles TEXT[] NOT NULL DEFAULT '{}',
+  CONSTRAINT exercise_muscle_tags_muscles_valid CHECK (
+    primary_muscles <@ ARRAY[
+      'chest','front-delts','side-delts','rear-delts','biceps','triceps',
+      'forearms','traps','lats','lower-back','abs','obliques','glutes',
+      'quads','hamstrings','calves'
+    ]::TEXT[]
+    AND secondary_muscles <@ ARRAY[
+      'chest','front-delts','side-delts','rear-delts','biceps','triceps',
+      'forearms','traps','lats','lower-back','abs','obliques','glutes',
+      'quads','hamstrings','calves'
+    ]::TEXT[]
+  )
+);
+CREATE UNIQUE INDEX exercise_muscle_tags_lower_name_idx ON exercise_muscle_tags (LOWER(name));
+
+-- Same credit rules as the library above: main movers first, helpers second.
+INSERT INTO exercise_muscle_tags (name, primary_muscles, secondary_muscles) VALUES
+  -- Squats, lunges and leg machines
+  ('Barbell front squat', '{quads,glutes}', '{hamstrings,lower-back,abs}'),
+  ('Barbell pause squat', '{quads,glutes}', '{hamstrings,lower-back,abs}'),
+  ('Goblet squat to box', '{quads,glutes}', '{hamstrings}'),
+  ('Bulgarian split squat', '{quads,glutes}', '{hamstrings}'),
+  ('Dumbbell reverse lunge', '{quads,glutes}', '{hamstrings}'),
+  ('Reverse lunge', '{quads,glutes}', '{hamstrings}'),
+  ('Sit-to-stand', '{quads,glutes}', '{}'),
+  ('Leg press', '{quads,glutes}', '{hamstrings}'),
+  ('Leg extension', '{quads}', '{}'),
+  ('Leg curl', '{hamstrings}', '{calves}'),
+  ('Standing calf raise', '{calves}', '{}'),
+  ('Seated calf raise', '{calves}', '{}'),
+  -- Hinges and glutes
+  ('Barbell deadlift', '{hamstrings,glutes}', '{lower-back,forearms,traps}'),
+  ('Back extension', '{lower-back}', '{glutes,hamstrings}'),
+  ('Single-leg glute bridge', '{glutes}', '{hamstrings}'),
+  -- Pushing
+  ('Barbell bench press', '{chest}', '{front-delts,triceps}'),
+  ('Incline dumbbell press', '{chest}', '{front-delts,triceps}'),
+  ('Machine chest press', '{chest}', '{front-delts,triceps}'),
+  ('Dumbbell floor press', '{chest}', '{front-delts,triceps}'),
+  ('Wall push-up', '{chest}', '{front-delts,triceps}'),
+  ('Diamond push-up', '{triceps,chest}', '{front-delts}'),
+  ('Close grip bench press', '{triceps,chest}', '{front-delts}'),
+  ('Barbell overhead press', '{front-delts}', '{side-delts,triceps,traps}'),
+  ('Pike push-up', '{front-delts}', '{side-delts,triceps}'),
+  -- Pulling
+  ('Wide grip pull-up', '{lats}', '{biceps,forearms,rear-delts}'),
+  ('Scapular pull-up', '{lats}', '{traps,forearms}'),
+  ('Band row', '{lats,traps}', '{biceps,rear-delts}'),
+  ('Doorway row', '{lats,traps}', '{biceps,rear-delts}'),
+  ('Cable face pull', '{rear-delts}', '{traps}'),
+  ('Dumbbell rear delt fly', '{rear-delts}', '{traps}'),
+  -- Arms
+  ('Dumbbell curl', '{biceps}', '{forearms}'),
+  ('Band curl', '{biceps}', '{forearms}'),
+  ('Hammer curl', '{biceps,forearms}', '{}'),
+  ('Triceps pushdown', '{triceps}', '{}'),
+  ('Overhead triceps extension', '{triceps}', '{}'),
+  -- Core and carries
+  ('Crunch', '{abs}', '{}'),
+  ('Cable crunch', '{abs}', '{obliques}'),
+  ('Dead bug', '{abs}', '{obliques}'),
+  ('Hanging knee raise', '{abs}', '{obliques,forearms}'),
+  ('Hanging leg raise', '{abs}', '{obliques,forearms}'),
+  ('Plank shoulder tap', '{abs}', '{obliques,front-delts}'),
+  ('Suitcase carry', '{obliques}', '{forearms,traps,abs}'),
+  -- Runs and walks: light leg credit, like the library's cardio
+  ('Warm-up jog', '{}', '{quads,calves,glutes}'),
+  ('Cool-down jog', '{}', '{quads,calves,glutes}'),
+  ('Cool-down walk', '{}', '{quads,calves,glutes}'),
+  ('Easy run intervals', '{}', '{quads,calves,glutes}'),
+  ('Hard run intervals', '{}', '{quads,calves,glutes}'),
+  ('Tempo run', '{}', '{quads,calves,glutes}'),
+  ('Long run', '{}', '{quads,calves,glutes}');

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { readToken } from '../lib/theme.js';
+import { useTheme } from '../lib/useTheme.js';
 
 // The `color` prop accepts a CSS color value ('#c8f135') or a token name
 // starting with '--' (e.g. '--color-chart-line-2'), which is resolved via readToken.
@@ -8,6 +9,9 @@ import { readToken } from '../lib/theme.js';
 export default function LineChart({ labels, values, rawValues = null, color = '--color-chart-line', height = 160 }) {
   const canvasRef = useRef(null);
   const chartRef = useRef(null);
+  // Chart.js bakes its colours in when the chart is built, so switching
+  // between light and dark has to build the chart again.
+  const { resolved: theme } = useTheme();
   // Chart.js loads lazily, so remember the latest data to apply once it's ready.
   const dataRef = useRef({ labels, values, rawValues, color });
 
@@ -66,7 +70,9 @@ export default function LineChart({ labels, values, rawValues = null, color = '-
       chartRef.current?.destroy();
       chartRef.current = null;
     };
-  }, []);
+    // Rebuilt on a theme change so the axis, grid and line colours are read
+    // fresh from the tokens that are in force now.
+  }, [theme]);
 
   useEffect(() => {
     dataRef.current = { labels, values, rawValues, color };

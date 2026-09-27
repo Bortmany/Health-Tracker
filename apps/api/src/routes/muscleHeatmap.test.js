@@ -7,9 +7,19 @@ let server;
 let baseUrl;
 let cookie;
 
-// Days are computed relative to today so the decay/window math is stable no
-// matter when the suite runs.
-const dayISO = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString().slice(0, 10);
+// Days are counted back from one fixed "today" (the day on this computer's
+// clock), and every request sends that same day as ?today=, just as the app
+// does. That keeps the suite correct on Oman time and on UTC alike.
+const pad = (n) => String(n).padStart(2, '0');
+const localDay = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const NOW = new Date();
+const dayISO = (daysAgo) => {
+  const d = new Date(NOW);
+  d.setDate(d.getDate() - daysAgo);
+  return localDay(d);
+};
+// The UTC day, shifted by whole days (for testing the ?today= limits).
+const utcDayPlus = (n) => new Date(Date.UTC(NOW.getUTCFullYear(), NOW.getUTCMonth(), NOW.getUTCDate() + n)).toISOString().slice(0, 10);
 
 async function registerUser(label) {
   const email = `muscle-heatmap-${label}-${Date.now()}@example.com`;
@@ -31,7 +41,9 @@ async function postLog(userCookie, date, exercises) {
 }
 
 async function getHeatmap(userCookie, query = '') {
-  const res = await fetch(`${baseUrl}/muscle-heatmap${query}`, { headers: { Cookie: userCookie } });
+  let qs = query;
+  if (!qs.includes('today=')) qs += `${qs ? '&' : '?'}today=${dayISO(0)}`;
+  const res = await fetch(`${baseUrl}/muscle-heatmap${qs}`, { headers: { Cookie: userCookie } });
   return { status: res.status, body: await res.json() };
 }
 
@@ -159,4 +171,44 @@ test('invalid days values are rejected with a plain-English 400', async () => {
     assert.equal(body.error.code, 'VALIDATION');
     assert.equal(body.error.message, 'days must be a whole number between 1 and 90');
   }
+});
+
+test('the fading counts back from the day the device sends, not the server\'s UTC day', async () => {
+  const dayCookie = await registerUser('today');
+  // Logged "yesterday" in UTC terms.
+  await postLog(dayCookie, utcDayPlus(-1), [
+    { name: 'Pull-up', sets: [{ reps: 8 }, { reps: 7 }, { reps: 6 }] },
+  ]);
+  const sameDay = await getHeatmap(dayCookie, `?today=${utcDayPlus(-1)}`);
+  assert.equal(findMuscle(sameDay.body, 'lats').intensity, 33);
+  assert.equal(findMuscle(sameDay.body, 'lats').lastTrained, utcDayPlus(-1));
+
+  // Two days later on the device, the same work has faded.
+  const later = await getHeatmap(dayCookie, `?today=${utcDayPlus(1)}`);
+  assert.equal(later.status, 200);
+  assert.ok(findMuscle(later.body, 'lats').intensity < 33);
+
+  // A one-day window ending on the device's day leaves it out entirely.
+  const narrow = await getHeatmap(dayCookie, `?days=1&today=${utcDayPlus(1)}`);
+  assert.equal(findMuscle(narrow.body, 'lats'), undefined);
+});
+
+test('a today that is not a real date, or not today anywhere on Earth, is a plain-English 400', async () => {
+  for (const bad of ['yesterday', '2026-02-30', utcDayPlus(3), utcDayPlus(-3)]) {
+    const { status, body } = await getHeatmap(cookie, `?today=${bad}`);
+    assert.equal(status, 400, `today=${bad} should be rejected`);
+    assert.equal(typeof body.error.message, 'string');
+  }
+});
+
+test('exercises from the seeded workout plans light up the map too', async () => {
+  const planCookie = await registerUser('plan');
+  await postLog(planCookie, dayISO(0), [
+    { name: 'Barbell deadlift', sets: [{ weight: 100, reps: 5 }] },
+    { name: 'Hammer curl', sets: [{ weight: 12, reps: 10 }] },
+  ]);
+  const { body } = await getHeatmap(planCookie);
+  assert.ok(findMuscle(body, 'hamstrings'));
+  assert.ok(findMuscle(body, 'biceps'));
+  assert.deepEqual(body.unmatched, []);
 });

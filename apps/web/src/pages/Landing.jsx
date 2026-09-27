@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import ProgressRing from '../components/ui/ProgressRing.jsx';
+import { useSignupMode } from '../hooks/useAuth.js';
 import useReveal from '../hooks/useReveal.js';
 import styles from './Landing.module.css';
 
 // Public marketing page shown at "/" to signed-out visitors (see App.jsx's
 // RootRoute). Everything here is client-side only — no network calls — so
-// it collects no personal data and needs no privacy-page update.
+// it collects no personal data and needs no privacy-page update. The one
+// server call is the public sign-up mode, so the join buttons never promise
+// open sign-up while Cut is invitation-only or closed.
 
 const HABITS = [
   { id: 'water', label: 'Water' },
@@ -160,7 +163,35 @@ function Section({ className, children }) {
   );
 }
 
+// The join button follows the server's sign-up mode (the same check the
+// Register page uses; if the check fails we fall back to the form, like
+// Register does, and the server gives the real answer on submit).
+function useJoinCta() {
+  const signupMode = useSignupMode();
+  const mode = signupMode.isError ? 'open' : signupMode.data;
+  if (mode === 'closed') return { closed: true };
+  if (mode === 'invite') return { label: 'Join with your invite', note: 'Cut is invitation-only right now.' };
+  if (mode === 'open') return { label: 'Start free' };
+  return { label: 'Join Cut' };
+}
+
+function JoinCta({ className, showNote = false }) {
+  const cta = useJoinCta();
+  if (cta.closed) {
+    return <p className={styles.ctaNote}>Sign-up is closed for now. Check back soon.</p>;
+  }
+  return (
+    <>
+      <Link to="/register" className={className}>
+        {cta.label}
+      </Link>
+      {showNote && cta.note && <p className={styles.ctaNote}>{cta.note}</p>}
+    </>
+  );
+}
+
 export default function Landing() {
+  const joinCta = useJoinCta();
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -169,9 +200,11 @@ export default function Landing() {
           <Link to="/login" className={styles.headerLink}>
             Log in
           </Link>
-          <Link to="/register" className={styles.headerCta}>
-            Start free
-          </Link>
+          {!joinCta.closed && (
+            <Link to="/register" className={styles.headerCta}>
+              {joinCta.label}
+            </Link>
+          )}
         </nav>
       </header>
 
@@ -183,13 +216,17 @@ export default function Landing() {
             one place — so you stop guessing and start showing up.
           </p>
           <div className={styles.heroActions}>
-            <Link to="/register" className={styles.primaryCta}>
-              Start free
-            </Link>
+            {!joinCta.closed && (
+              <Link to="/register" className={styles.primaryCta}>
+                {joinCta.label}
+              </Link>
+            )}
             <Link to="/login" className={styles.secondaryCta}>
               Log in
             </Link>
           </div>
+          {joinCta.note && <p className={styles.ctaNote}>{joinCta.note} Ask whoever invited you for the code.</p>}
+          {joinCta.closed && <p className={styles.ctaNote}>Sign-up is closed for now. Check back soon.</p>}
         </div>
         <PhoneDemo />
       </Section>
@@ -232,9 +269,7 @@ export default function Landing() {
             <p className={styles.priceBody}>
               Full tracking — logs, nutrition, training, streaks — with 4-week workout plans.
             </p>
-            <Link to="/register" className={styles.priceCta}>
-              Start free
-            </Link>
+            <JoinCta className={styles.priceCta} />
           </div>
           <div className={`${styles.priceCard} ${styles.priceCardAccent}`}>
             <h3 className={styles.priceTitle}>Premium</h3>
@@ -243,18 +278,14 @@ export default function Landing() {
               Everything in Free, plus the complete 52-week progressions. Pricing is coming soon —
               contact us if you want early access.
             </p>
-            <Link to="/register" className={styles.priceCta}>
-              Get started
-            </Link>
+            <JoinCta className={styles.priceCta} />
           </div>
         </div>
       </Section>
 
       <Section className={styles.finalCta}>
         <h2 className={styles.finalCtaHeadline}>Stop guessing what to do at the gym.</h2>
-        <Link to="/register" className={styles.primaryCta}>
-          Start free
-        </Link>
+        <JoinCta className={styles.primaryCta} showNote />
       </Section>
 
       <footer className={styles.footer}>

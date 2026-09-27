@@ -25,7 +25,9 @@ router.use(requireAuth);
 // is never touched.
 router.delete('/', asyncHandler(async (req, res) => {
   const { password } = req.body ?? {};
-  if (!password) {
+  // Must be a string: a non-string (array/object) would throw inside bcrypt.compare
+  // and surface as a 500 instead of a clean 400.
+  if (typeof password !== 'string' || password === '') {
     return res.status(400).json({
       error: { message: 'Your current password is required to delete your account', code: 'INVALID_INPUT' },
     });

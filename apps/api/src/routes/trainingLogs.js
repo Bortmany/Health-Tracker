@@ -2,12 +2,17 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { normalizeExercises } from '../lib/trainingSets.js';
+import * as validate from '../lib/validate.js';
 import { Rollback, withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// A malformed :id in the URL would otherwise reach Postgres as an invalid UUID
+// and throw a 500 — this turns it into a clean "not found".
+function notFound(res) {
+  return res.status(404).json({ error: { message: 'Training log not found', code: 'NOT_FOUND' } });
+}
 
 function toPublicLog(row) {
   return {
@@ -17,6 +22,8 @@ function toPublicLog(row) {
     programDayId: row.program_day_id,
     notes: row.notes,
     createdAt: row.created_at,
+    // Only the list query computes this; other queries leave it out.
+    ...(row.exercise_count !== undefined && { exerciseCount: Number(row.exercise_count) }),
   };
 }
 
@@ -52,6 +59,32 @@ async function fetchNestedExercises(client, trainingLogId) {
   );
 }
 
+// A well-shaped but foreign/non-existent program or day id would otherwise reach
+// the INSERT and throw a foreign-key violation (a 500). Check ownership up front
+// so a bad id gets a clean 400 — mirrors how logs.js guards habit/activity ids.
+async function assertOwnedProgramRefs(userId, programId, programDayId) {
+  if (programId) {
+    const { rows } = await pool.query(
+      'SELECT id FROM programs WHERE id = $1 AND user_id = $2',
+      [programId, userId]
+    );
+    if (!rows[0]) {
+      throw new validate.ValidationError('program id must belong to your account');
+    }
+  }
+  if (programDayId) {
+    const { rows } = await pool.query(
+      `SELECT pd.id FROM program_days pd
+       JOIN programs p ON p.id = pd.program_id
+       WHERE pd.id = $1 AND p.user_id = $2`,
+      [programDayId, userId]
+    );
+    if (!rows[0]) {
+      throw new validate.ValidationError('program day id must belong to your account');
+    }
+  }
+}
+
 async function replaceExercises(client, trainingLogId, exercises) {
   await client.query('DELETE FROM training_log_exercises WHERE training_log_id = $1', [trainingLogId]);
   for (const ex of normalizeExercises(exercises)) {
@@ -73,11 +106,19 @@ async function replaceExercises(client, trainingLogId, exercises) {
 router.use(requireAuth);
 
 router.get('/', asyncHandler(async (req, res) => {
-  const from = DATE_RE.test(req.query.from) ? req.query.from : '1970-01-01';
-  const to = DATE_RE.test(req.query.to) ? req.query.to : '9999-12-31';
+  const from = validate.queryDate(req.query.from, 'from', '1970-01-01');
+  const to = validate.queryDate(req.query.to, 'to', '9999-12-31');
 
+  // Includes how many exercises each session holds, so the list can show
+  // "5 exercises" without loading every session's full detail.
   const { rows } = await pool.query(
-    'SELECT * FROM training_logs WHERE user_id = $1 AND date BETWEEN $2 AND $3 ORDER BY date DESC, created_at DESC',
+    // t.date::text keeps the calendar date as a plain string (no timezone shift).
+    `SELECT t.*, t.date::text AS date, COUNT(e.id)::integer AS exercise_count
+     FROM training_logs t
+     LEFT JOIN training_log_exercises e ON e.training_log_id = t.id
+     WHERE t.user_id = $1 AND t.date BETWEEN $2 AND $3
+     GROUP BY t.id
+     ORDER BY t.date DESC, t.created_at DESC`,
     [req.userId, from, to]
   );
   res.json({ trainingLogs: rows.map(toPublicLog) });
@@ -87,18 +128,20 @@ router.get('/', asyncHandler(async (req, res) => {
 // time" weight/reps before the user enters today's sets.
 router.get('/exercise-history', asyncHandler(async (req, res) => {
   const { name, before } = req.query;
-  if (!name) {
-    return res.status(400).json({ error: { message: 'name is required', code: 'INVALID_INPUT' } });
-  }
+  // name must be real text (an array/object here would break the `te.name = $2`
+  // text comparison), and `before` must be a well-shaped id or the `$3::uuid`
+  // cast throws a 500 — validate both before the query runs.
+  const cleanName = validate.stringLength(name, 'name', { max: 200 });
+  const cleanBefore = validate.uuid(before, 'before', { optional: true });
 
   const { rows } = await pool.query(
-    `SELECT tl.id AS training_log_id, tl.date, te.id AS exercise_id, te.name
+    `SELECT tl.id AS training_log_id, tl.date::text AS date, te.id AS exercise_id, te.name
      FROM training_log_exercises te
      JOIN training_logs tl ON tl.id = te.training_log_id
      WHERE tl.user_id = $1 AND te.name = $2 AND tl.id != COALESCE($3::uuid, '00000000-0000-0000-0000-000000000000')
      ORDER BY tl.date DESC, tl.created_at DESC
      LIMIT 1`,
-    [req.userId, name, before ?? null]
+    [req.userId, cleanName, cleanBefore]
   );
 
   const entry = rows[0];
@@ -126,7 +169,7 @@ router.get('/personal-records', asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT * FROM (
        SELECT DISTINCT ON (te.name)
-         te.name, s.weight, s.reps, tl.date
+         te.name, s.weight, s.reps, tl.date::text AS date
        FROM training_log_sets s
        JOIN training_log_exercises te ON te.id = s.training_log_exercise_id
        JOIN training_logs tl ON tl.id = te.training_log_id
@@ -144,12 +187,14 @@ router.get('/personal-records', asyncHandler(async (req, res) => {
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM training_logs WHERE id = $1 AND user_id = $2', [
+  if (!validate.isUuid(req.params.id)) return notFound(res);
+
+  const { rows } = await pool.query('SELECT *, date::text AS date FROM training_logs WHERE id = $1 AND user_id = $2', [
     req.params.id,
     req.userId,
   ]);
   if (!rows[0]) {
-    return res.status(404).json({ error: { message: 'Training log not found', code: 'NOT_FOUND' } });
+    return notFound(res);
   }
   const exercises = await fetchNestedExercises(pool, rows[0].id);
   res.json({ trainingLog: { ...toPublicLog(rows[0]), exercises } });
@@ -157,16 +202,25 @@ router.get('/:id', asyncHandler(async (req, res) => {
 
 router.post('/', asyncHandler(async (req, res) => {
   const { date, programId, programDayId, notes, exercises = [] } = req.body ?? {};
-  if (!DATE_RE.test(date ?? '')) {
-    return res.status(400).json({ error: { message: 'date must be YYYY-MM-DD', code: 'INVALID_INPUT' } });
-  }
+  // Reject wrong/impossible dates and mis-shaped program ids before any query.
+  const cleanDate = validate.isoDate(date);
+  const cleanProgramId = validate.uuid(programId, 'program id', { optional: true });
+  const cleanProgramDayId = validate.uuid(programDayId, 'program day id', { optional: true });
+  const cleanNotes = validate.stringLength(notes, 'notes', { optional: true, max: 2000 });
+  await assertOwnedProgramRefs(req.userId, cleanProgramId, cleanProgramDayId);
 
   const trainingLog = await withTransaction(async (client) => {
+    // ON CONFLICT keeps a double-tap on "Save" (or two devices saving the same
+    // session at once) from storing duplicate rows: one session per user per day.
     const { rows } = await client.query(
       `INSERT INTO training_logs (user_id, date, program_id, program_day_id, notes)
        VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [req.userId, date, programId ?? null, programDayId ?? null, notes ?? null]
+       ON CONFLICT (user_id, date) DO UPDATE SET
+         program_id = EXCLUDED.program_id,
+         program_day_id = EXCLUDED.program_day_id,
+         notes = EXCLUDED.notes
+       RETURNING *, date::text AS date`,
+      [req.userId, cleanDate, cleanProgramId, cleanProgramDayId, cleanNotes]
     );
     await replaceExercises(client, rows[0].id, exercises);
     return rows[0];
@@ -177,10 +231,14 @@ router.post('/', asyncHandler(async (req, res) => {
 }));
 
 router.put('/:id', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) return notFound(res);
+
   const { date, programId, programDayId, notes, exercises } = req.body ?? {};
-  if (date !== undefined && !DATE_RE.test(date)) {
-    return res.status(400).json({ error: { message: 'date must be YYYY-MM-DD', code: 'INVALID_INPUT' } });
-  }
+  const cleanDate = date === undefined ? null : validate.isoDate(date);
+  const cleanProgramId = validate.uuid(programId, 'program id', { optional: true });
+  const cleanProgramDayId = validate.uuid(programDayId, 'program day id', { optional: true });
+  const cleanNotes = validate.stringLength(notes, 'notes', { optional: true, max: 2000 });
+  await assertOwnedProgramRefs(req.userId, cleanProgramId, cleanProgramDayId);
 
   const trainingLog = await withTransaction(async (client) => {
     const { rows: ownedRows } = await client.query(
@@ -196,8 +254,8 @@ router.put('/:id', asyncHandler(async (req, res) => {
            program_day_id = COALESCE($4, program_day_id),
            notes = COALESCE($5, notes)
        WHERE id = $1
-       RETURNING *`,
-      [req.params.id, date ?? null, programId ?? null, programDayId ?? null, notes ?? null]
+       RETURNING *, date::text AS date`,
+      [req.params.id, cleanDate, cleanProgramId, cleanProgramDayId, cleanNotes]
     );
 
     if (exercises) {
@@ -208,19 +266,21 @@ router.put('/:id', asyncHandler(async (req, res) => {
   });
 
   if (!trainingLog) {
-    return res.status(404).json({ error: { message: 'Training log not found', code: 'NOT_FOUND' } });
+    return notFound(res);
   }
   const fullExercises = await fetchNestedExercises(pool, trainingLog.id);
   res.json({ trainingLog: { ...toPublicLog(trainingLog), exercises: fullExercises } });
 }));
 
 router.delete('/:id', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) return notFound(res);
+
   const { rowCount } = await pool.query('DELETE FROM training_logs WHERE id = $1 AND user_id = $2', [
     req.params.id,
     req.userId,
   ]);
   if (!rowCount) {
-    return res.status(404).json({ error: { message: 'Training log not found', code: 'NOT_FOUND' } });
+    return notFound(res);
   }
   res.status(204).end();
 }));

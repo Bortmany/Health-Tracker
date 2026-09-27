@@ -10,17 +10,22 @@ import { pool } from './db/pool.js';
 import { verifyToken } from './lib/jwt.js';
 import { logger } from './lib/logger.js';
 import { captureException, initSentry } from './lib/sentry.js';
+import { getSignupMode } from './lib/signupMode.js';
 import accountRouter from './routes/account.js';
+import adminRouter from './routes/admin.js';
 import activitiesRouter from './routes/activities.js';
 import authRouter from './routes/auth.js';
 import billingRouter from './routes/billing.js';
 import coachRouter from './routes/coach.js';
 import coachLinkRouter from './routes/coachLink.js';
+import coachesRouter from './routes/coaches.js';
+import coachApplicationsRouter from './routes/coachApplications.js';
 import exercisesRouter from './routes/exercises.js';
 import exportRouter from './routes/export.js';
 import habitsRouter from './routes/habits.js';
 import healthSyncRouter from './routes/healthSync.js';
 import injuriesRouter from './routes/injuries.js';
+import legalRouter from './routes/legal.js';
 import logsRouter from './routes/logs.js';
 import muscleHeatmapRouter from './routes/muscleHeatmap.js';
 import nutritionRouter from './routes/nutrition.js';
@@ -29,16 +34,31 @@ import programsRouter from './routes/programs.js';
 import settingsRouter from './routes/settings.js';
 import trainingLogsRouter from './routes/trainingLogs.js';
 
+// Fail fast on a missing or weak JWT secret: a short/absent secret would make
+// login tokens trivially forgeable, so refuse to start rather than run insecure.
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  throw new Error('JWT_SECRET must be set and at least 32 characters long — refusing to start.');
+}
+
 export const app = express();
 
-// Railway (like most hosts) puts a proxy in front of the app. Trusting it means
-// the rate limiter sees each visitor's real address instead of the proxy's.
-app.set('trust proxy', 1);
+// Only trust the X-Forwarded-For header from a proxy we've explicitly configured
+// as trusted. Railway (like most hosts) puts a proxy in front of the app; set
+// TRUSTED_PROXY to the number of proxy hops (e.g. "1") so the rate limiter sees
+// each visitor's real address. Without it we trust nothing and use the direct
+// socket address — otherwise a visitor could spoof X-Forwarded-For to dodge the
+// per-IP rate limits.
+const trustedProxy = process.env.TRUSTED_PROXY;
+if (trustedProxy) {
+  app.set('trust proxy', /^\d+$/.test(trustedProxy) ? Number(trustedProxy) : trustedProxy);
+} else {
+  app.set('trust proxy', false);
+}
 
 // Content-Security-Policy: tells the browser exactly which sources it may load
 // from, which blocks most injected-script attacks. These values are scoped to
 // what the Cut frontend actually uses: its own scripts/styles (same origin),
-// Google Fonts, and same-origin API calls. Stripe checkout is a full-page
+// Google Fonts, and same-origin API calls. Paddle checkout is a full-page
 // redirect (no embedded script), so it needs nothing extra here.
 app.use(helmet({
   contentSecurityPolicy: {
@@ -60,29 +80,145 @@ app.use(helmet({
   },
 }));
 app.use(compression());
-// Stripe's webhook signature is checked against the raw request bytes, so
+// Paddle's webhook signature is checked against the raw request bytes, so
 // that one path must skip JSON parsing. It's registered before express.json.
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
-app.use(express.json());
+// Cap the request body so a huge (or malicious) payload can't tie up memory.
+// 1 MB is far more than any real form here sends; going over it makes the JSON
+// parser throw, which the error handler below turns into a clean 413.
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }));
+// Which browser origin may call the API: an explicit CORS_ORIGIN wins; otherwise
+// the app's own public address (APP_URL, set on Railway) so production never
+// silently falls back to the local dev address; otherwise the Vite dev server.
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || process.env.APP_URL || 'http://localhost:5173',
+  credentials: true,
+}));
 
-// Slow down password-guessing: 20 login/register attempts per 15 minutes per IP.
-// Off outside production so local dev and the test suite aren't throttled.
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => process.env.NODE_ENV !== 'production',
-  message: { error: { message: 'Too many attempts. Please wait 15 minutes and try again.', code: 'RATE_LIMITED' } },
+// Rate limits run in every environment (dev, staging, production). Only the
+// automated test runner turns them off, by setting DISABLE_RATE_LIMIT=true, so
+// the suite isn't throttled — normal dev and staging stay protected.
+const rateLimitDisabled = () => process.env.DISABLE_RATE_LIMIT === 'true';
+
+// Slow down password-guessing: 20 attempts per 15 minutes per IP. Login and
+// register each get their OWN budget (separate limiter instances, so separate
+// counters) — sharing one bucket meant flooding /login could exhaust the
+// budget for /register too (and vice versa), denying both to everyone else
+// behind the same IP (e.g. shared office wifi or CGNAT). The per-account
+// login lock below still caps guesses against any one email regardless of IP.
+function makeAuthLimiter(message) {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: rateLimitDisabled,
+    message: { error: { message, code: 'RATE_LIMITED' } },
+  });
+}
+const registerLimiter = makeAuthLimiter('Too many attempts. Please wait 15 minutes and try again.');
+// The other password/code-guessing surfaces (logout, me, invite-code redeem,
+// account deletion) share their own separate bucket.
+const authLimiter = makeAuthLimiter('Too many attempts. Please wait 15 minutes and try again.');
+
+// Per-IP login throttle that only counts FAILED logins — and, crucially, lets a
+// correct-credential login through even when the bucket is full. A plain
+// per-IP limiter counts every attempt, so many people on one shared IP (office
+// wifi, CGNAT) logging in normally would exhaust the budget and lock each other
+// out. Here we let the password be checked first: a correct login always
+// succeeds and clears the IP's failure streak; only wrong guesses accumulate,
+// and once an IP is over its budget, further WRONG guesses get a 429. The
+// per-account limiter below still hard-caps guesses against any single email.
+//
+// The same failure-only mechanism guards signup invite codes on /register: a
+// wrong or missing code answers 403, and after 10 of those in 15 minutes an IP
+// gets a 429. Successful registrations (201) clear the streak.
+const FAILURE_WINDOW_MS = 15 * 60 * 1000;
+
+function makeIpFailureThrottle({ successStatus, failureStatus, maxFailures, message }) {
+  const failuresByIp = new Map();
+
+  return function ipFailureThrottle(req, res, next) {
+    if (rateLimitDisabled()) return next();
+
+    const key = req.ip;
+    const now = Date.now();
+    const originalJson = res.json.bind(res);
+
+    res.json = (body) => {
+      const status = res.statusCode;
+      if (status === successStatus) {
+        // A success clears this IP's failure streak.
+        failuresByIp.delete(key);
+      } else if (status === failureStatus) {
+        // A failure counts against this IP's budget.
+        const existing = failuresByIp.get(key);
+        const entry = existing && existing.resetAt > now
+          ? existing
+          : { count: 0, resetAt: now + FAILURE_WINDOW_MS };
+        entry.count += 1;
+        failuresByIp.set(key, entry);
+        if (entry.count > maxFailures) {
+          res.status(429);
+          return originalJson({ error: { message, code: 'RATE_LIMITED' } });
+        }
+      }
+      return originalJson(body);
+    };
+
+    next();
+  };
+}
+
+const loginIpFailureThrottle = makeIpFailureThrottle({
+  successStatus: 200,
+  failureStatus: 401,
+  maxFailures: 20,
+  message: 'Too many login attempts. Please wait 15 minutes and try again.',
 });
-app.use('/api/auth', authLimiter);
+const registerInviteFailureThrottle = makeIpFailureThrottle({
+  successStatus: 201,
+  failureStatus: 403,
+  maxFailures: 10,
+  message: 'Too many invite code attempts. Please wait 15 minutes and try again.',
+});
+
+// Registered as exact/literal paths (not the whole '/api/auth' prefix) so a
+// login or register request only ever counts against its own limiter, never
+// falling through into the shared authLimiter below as well.
+app.use('/api/auth/login', loginIpFailureThrottle);
+app.use('/api/auth/register', registerLimiter, registerInviteFailureThrottle);
+app.use('/api/auth/logout', authLimiter);
+app.use('/api/auth/me', authLimiter);
 // Invite codes get the same guessing protection as passwords.
 app.use('/api/coach-link/redeem', authLimiter);
+// So do coach referral codes (the public "who invited me" lookup).
+app.use('/api/coaches/referral', authLimiter);
 // Deleting an account asks for your password first, so it gets the same
 // guessing protection as the login screen.
 app.use('/api/account', authLimiter);
+
+// A second login guard keyed on the EMAIL being tried, not just the IP. The
+// per-IP limit above can be dodged by rotating X-Forwarded-For / IP addresses;
+// this one caps attempts against any single account (10 per 15 minutes) so one
+// account can't be brute-forced by an attacker spreading tries across many IPs.
+// `validate: false` turns off the library's IP-format checks so the custom key
+// is safe across versions; the limit still applies.
+const loginEmailLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: (req) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    return email ? `email:${email}` : `ip:${req.ip}`;
+  },
+  skip: rateLimitDisabled,
+  message: { error: { message: 'Too many attempts for this account. Please wait 15 minutes and try again.', code: 'RATE_LIMITED' } },
+});
+app.use('/api/auth/login', loginEmailLimiter);
 
 // Start Sentry error tracking if (and only if) SENTRY_DSN is configured.
 // With no DSN this returns immediately and nothing is imported or sent.
@@ -91,8 +227,8 @@ initSentry();
 // A second, gentler limiter for the everyday data-writing routes. It keys by the
 // signed-in user when we can read their session cookie (so one user's activity
 // can't use up another's budget), and falls back to the visitor's IP otherwise.
-// Read-only GETs are skipped, and — like the auth limiter — the whole thing is
-// off outside production so local dev and the test suite aren't throttled.
+// Read-only GETs are skipped; otherwise it runs in every environment (only the
+// test runner turns it off via DISABLE_RATE_LIMIT).
 // `validate: false` turns off express-rate-limit's own IP-format checks so the
 // custom key function is safe across library versions; the limits still apply.
 function writeLimiterKey(req) {
@@ -114,12 +250,42 @@ const writeLimiter = rateLimit({
   legacyHeaders: false,
   validate: false,
   keyGenerator: writeLimiterKey,
-  skip: (req) => process.env.NODE_ENV !== 'production' || req.method === 'GET',
+  skip: (req) => rateLimitDisabled() || req.method === 'GET',
   message: { error: { message: 'You are saving changes too quickly. Please slow down and try again shortly.', code: 'RATE_LIMITED' } },
 });
-for (const path of ['/api/logs', '/api/nutrition', '/api/training-logs', '/api/programs', '/api/health-sync']) {
+for (const path of ['/api/logs', '/api/nutrition', '/api/training-logs', '/api/programs', '/api/health-sync', '/api/coach', '/api/coach-link']) {
   app.use(path, writeLimiter);
 }
+
+// A coach's "Invite by email": 20 per coach per rolling 24 hours, on its own
+// counter. The reply never says whether an address has an account, and this
+// cap stops a coach from probing many addresses to work it out from patterns.
+const inviteEmailLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: writeLimiterKey,
+  skip: (req) => rateLimitDisabled() || req.method !== 'POST',
+  message: { error: { message: 'You have sent the most email invites allowed for today. Please try again tomorrow.', code: 'RATE_LIMITED' } },
+});
+app.use('/api/coach/invites/email', inviteEmailLimiter);
+
+// "Become a coach" applications: 3 per person per rolling 24 hours, on its
+// own counter so it never eats into the everyday save budget above. Only the
+// POST (submit) counts — reading your own status or withdrawing is free.
+const applicationLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  limit: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: writeLimiterKey,
+  skip: (req) => rateLimitDisabled() || req.method !== 'POST',
+  message: { error: { message: 'You have sent the most applications allowed for today. Please try again tomorrow.', code: 'RATE_LIMITED' } },
+});
+app.use('/api/coach-applications', applicationLimiter);
 
 app.get('/api/health', async (_req, res) => {
   try {
@@ -128,13 +294,21 @@ app.get('/api/health', async (_req, res) => {
       status: 'ok',
       db: 'connected',
       sentry: process.env.SENTRY_DSN ? 'configured' : 'dormant',
+      // "open" | "invite" | "closed" — who can create an account right now.
+      signups: getSignupMode(),
+      // Whether ADMIN_EMAIL is set — the switch for the coach-application review screen.
+      admin: process.env.ADMIN_EMAIL ? 'configured' : 'dormant',
     });
   } catch (err) {
-    res.status(503).json({ status: 'error', db: 'disconnected', message: err.message });
+    // Log the real reason for us; the public response stays a fixed message so
+    // database host names, credentials or driver internals never leak out.
+    logger.error('Health check failed', { error: err });
+    res.status(503).json({ status: 'error', db: 'disconnected', message: 'database unavailable' });
   }
 });
 
 app.use('/api/account', accountRouter);
+app.use('/api/admin', adminRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/export', exportRouter);
@@ -143,9 +317,12 @@ app.use('/api/habits', habitsRouter);
 app.use('/api/activities', activitiesRouter);
 app.use('/api/coach', coachRouter);
 app.use('/api/coach-link', coachLinkRouter);
+app.use('/api/coaches', coachesRouter); // public — the coach directory and profile pages
+app.use('/api/coach-applications', coachApplicationsRouter);
 app.use('/api/exercises', exercisesRouter);
 app.use('/api/health-sync', healthSyncRouter);
 app.use('/api/injuries', injuriesRouter);
+app.use('/api/legal', legalRouter); // public — contact address for the legal pages
 app.use('/api/logs', logsRouter);
 app.use('/api/muscle-heatmap', muscleHeatmapRouter);
 app.use('/api/nutrition', nutritionRouter);
@@ -166,11 +343,30 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 app.use((err, req, res, _next) => {
+  // Malformed JSON (bad syntax the client sent) throws a body-parser SyntaxError
+  // — checked first because body-parser also sets `.status` and `.body` on it
+  // (the raw offending text, for debugging), which would otherwise match the
+  // "already has a clean body" check just below and echo that raw text back to
+  // the client as if it were the response body.
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    logger.warn('Malformed JSON body', { method: req.method, path: req.path });
+    return res.status(400).json({
+      error: { message: 'That request could not be read. Please try again.', code: 'INVALID_JSON' },
+    });
+  }
   // Validation helpers throw an error that already carries a 400 and a
   // plain-English body — surface that to the client instead of a generic 500.
   if (err && err.status && err.body) {
     logger.warn('Request rejected', { method: req.method, path: req.path, code: err.code });
     return res.status(err.status).json(err.body);
+  }
+  // An oversized request body (past the 1 MB JSON limit) throws a body-parser
+  // error — return a clean 413 with a plain-English message instead of a 500.
+  if (err && (err.type === 'entity.too.large' || err.status === 413 || err.statusCode === 413)) {
+    logger.warn('Request body too large', { method: req.method, path: req.path });
+    return res.status(413).json({
+      error: { message: 'That request is too large. Please send less data at once.', code: 'PAYLOAD_TOO_LARGE' },
+    });
   }
   // Anything else is a real server error: log it (secrets redacted) and, if
   // Sentry is switched on, report it — then return the standard shape.

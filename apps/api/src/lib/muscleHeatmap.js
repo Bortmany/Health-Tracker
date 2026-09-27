@@ -31,19 +31,13 @@ const HALF_LIFE_DAYS = 3;
 // days) maps to a full-brightness score of 100.
 const FULL_SCORE_RAW = 9;
 
-// Accepts either a 'YYYY-MM-DD...' string or a JS Date and returns the plain
-// day part.
-function toDay(value) {
-  if (typeof value === 'string') return value.slice(0, 10);
-  return value.toISOString().slice(0, 10);
-}
-
-// Whole days between a row's date and "now", never negative.
-function ageInDays(day, now) {
-  const [y, m, d] = day.split('-').map(Number);
-  const nowDay = toDay(now);
-  const [ny, nm, nd] = nowDay.split('-').map(Number);
-  const diff = (Date.UTC(ny, nm - 1, nd) - Date.UTC(y, m - 1, d)) / 86400000;
+// Whole days between a row's date and today (both plain 'YYYY-MM-DD'
+// strings), never negative. Dates come from Postgres as text (date::text), so
+// no time zone can shift them.
+function ageInDays(day, today) {
+  const [y, m, d] = day.slice(0, 10).split('-').map(Number);
+  const [ty, tm, td] = today.slice(0, 10).split('-').map(Number);
+  const diff = (Date.UTC(ty, tm - 1, td) - Date.UTC(y, m - 1, d)) / 86400000;
   return Math.max(0, diff);
 }
 
@@ -51,10 +45,11 @@ function ageInDays(day, now) {
  * rows: one entry per (muscle, role, exercise name, workout date) with:
  *   muscle, role_weight (1.0 primary / 0.5 secondary), name, date,
  *   sets (count), volume (sum of weight * reps, 0 when bodyweight-only).
+ * today: the user's own day as 'YYYY-MM-DD' (see lib/userToday.js).
  * Returns an array (canonical muscle order, only muscles with data):
  *   { muscle, intensity, totalSets, totalVolume, lastTrained, topExercises }
  */
-export function computeHeatmap(rows, now = new Date()) {
+export function computeHeatmap(rows, today) {
   const byMuscle = new Map();
 
   for (const row of rows) {
@@ -70,10 +65,10 @@ export function computeHeatmap(rows, now = new Date()) {
     }
     const entry = byMuscle.get(muscle);
 
-    const day = toDay(row.date);
+    const day = String(row.date).slice(0, 10);
     const sets = Number(row.sets);
     const roleWeight = Number(row.role_weight);
-    const decay = Math.pow(0.5, ageInDays(day, now) / HALF_LIFE_DAYS);
+    const decay = Math.pow(0.5, ageInDays(day, today) / HALF_LIFE_DAYS);
 
     entry.raw += roleWeight * sets * decay;
     // A set counts toward every muscle it touches (a pull-up set counts for
