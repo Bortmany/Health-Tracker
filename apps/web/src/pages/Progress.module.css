@@ -11,6 +11,32 @@
   margin: var(--space-3) 0 0;
 }
 
+/* ---- This week (streak + seven-day strip) ---- */
+
+.streakLine {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.streakNumber {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  color: var(--color-text);
+  margin-right: var(--space-2);
+}
+
+.weekStrip {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--space-1);
+}
+
+.weekDay {
+  display: grid;
+  gap: var(--space-1);
+}
+
 /* ---- Consistency calendar ---- */
 
 .calHeader {

@@ -43,6 +43,9 @@ test('billing status reports switched off when no Paddle keys are set', async ()
   const body = await res.json();
   assert.equal(body.enabled, false);
   assert.equal(body.planTier, 'free');
+  // The Premium panel's wording comes from these, so they must be sent.
+  assert.equal(body.freeWeeks, 4);
+  assert.equal(body.premiumWeeks, 52);
 });
 
 test('checkout gives a friendly message while payments are switched off', async () => {

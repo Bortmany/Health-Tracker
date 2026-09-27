@@ -10,6 +10,7 @@ import {
   readWebhookEvent,
 } from '../lib/billing.js';
 import { logger } from '../lib/logger.js';
+import { FREE_WEEKS, PREMIUM_WEEKS } from '../lib/planLength.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -90,7 +91,14 @@ router.use(requireAuth);
 
 router.get('/status', asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT plan_tier FROM users WHERE id = $1', [req.userId]);
-  res.json({ enabled: isBillingEnabled(), planTier: rows[0]?.plan_tier ?? 'free' });
+  res.json({
+    enabled: isBillingEnabled(),
+    planTier: rows[0]?.plan_tier ?? 'free',
+    // Sent here too so the Premium panel can say how long each plan runs
+    // without keeping its own copy of the numbers.
+    freeWeeks: FREE_WEEKS,
+    premiumWeeks: PREMIUM_WEEKS,
+  });
 }));
 
 router.post('/checkout', asyncHandler(async (req, res) => {

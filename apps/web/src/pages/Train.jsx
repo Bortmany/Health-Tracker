@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import PlanSection from '../components/PlanSection.jsx';
 import RestTimer from '../components/RestTimer.jsx';
+import WorkoutSummary from '../components/WorkoutSummary.jsx';
 import {
   Button,
   Card,
@@ -19,6 +21,7 @@ import {
 import { useExercises } from '../hooks/useExercises.js';
 import { useActivePrograms, useCreateProgram, useUpdateProgram } from '../hooks/usePrograms.js';
 import {
+  personalRecordsQuery,
   useCreateTrainingLog,
   useExerciseHistory,
   useTrainingLog,
@@ -293,9 +296,15 @@ export default function Train() {
   // never saved — ticking one auto-starts the rest timer.
   const [doneSets, setDoneSets] = useState({});
   const [showSaveChoice, setShowSaveChoice] = useState(false);
+  // Set when a brand-new session is saved: what to show on the wrap-up card.
+  const [summary, setSummary] = useState(null);
+  // True for the moment we spend loading the current bests before a save.
+  const [preparingSave, setPreparingSave] = useState(false);
   const toast = useToast();
   const restTimerRef = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Deep links from the Today screen: ?edit=<sessionId> opens that session,
   // ?program=<id>&day=<id> pre-selects the next program day.
@@ -408,23 +417,52 @@ export default function Train() {
     };
   }
 
+  // The day after this one in the same program — what to train next time.
+  function nextDayName() {
+    if (!selectedProgram || !selectedDay) return null;
+    const days = selectedProgram.days;
+    if (days.length < 2) return null;
+    const index = days.findIndex((d) => d.id === selectedDay.id);
+    return days[(index + 1) % days.length].name;
+  }
+
   function saveSession() {
     const payload = buildPayload();
     if (editingId) {
+      // Editing an old session is a correction, not a workout — a quiet
+      // confirmation is all it needs.
       updateTrainingLog.mutate(
         { id: editingId, ...payload },
         { onSuccess: () => toast.show('Session saved') }
       );
     } else {
-      createTrainingLog.mutate(payload, {
-        onSuccess: () => {
-          // Confirm first, so the form clearing reads as success, not loss.
-          toast.show('Session saved');
-          setForm(blankForm());
-          setDoneSets({});
-        },
-      });
+      createWithSummary(payload);
     }
+  }
+
+  // Load the bests as they stand right now, straight from the server, before
+  // the new session is saved — the wrap-up card compares against these to
+  // tell which ones this session just beat. If they can't be loaded, the card
+  // shows no "new best" badges at all rather than guessing.
+  async function createWithSummary(payload) {
+    const nextName = nextDayName();
+    setPreparingSave(true);
+    let previousRecords = null;
+    try {
+      previousRecords = await queryClient.fetchQuery({ ...personalRecordsQuery, staleTime: 0 });
+    } catch {
+      previousRecords = null;
+    } finally {
+      setPreparingSave(false);
+    }
+    const savedAt = Date.now();
+    createTrainingLog.mutate(payload, {
+      onSuccess: () => {
+        setSummary({ session: payload, previousRecords, savedAt, nextDayName: nextName });
+        setForm(blankForm());
+        setDoneSets({});
+      },
+    });
   }
 
   // "Update my program too": save the session first and only then replace the
@@ -485,6 +523,8 @@ export default function Train() {
 
   function handleSubmit(e) {
     e.preventDefault();
+    // Already saving (or loading the bests just before a save) — ignore a second press.
+    if (preparingSave || createTrainingLog.isPending || updateTrainingLog.isPending) return;
     // Editing a session tied to a program day: ask whether the change is
     // just for today or should update the program itself.
     if (editingId && form.programDayId && selectedProgram && selectedDay) {
@@ -494,7 +534,7 @@ export default function Train() {
     saveSession();
   }
 
-  const saving = createTrainingLog.isPending || updateTrainingLog.isPending;
+  const saving = preparingSave || createTrainingLog.isPending || updateTrainingLog.isPending;
   const mutationError = createTrainingLog.error ?? updateTrainingLog.error ?? updateProgram.error;
 
   return (
@@ -673,6 +713,19 @@ export default function Train() {
           ))
         )}
       </Card>
+
+      {summary && (
+        <WorkoutSummary
+          session={summary.session}
+          previousRecords={summary.previousRecords}
+          savedAt={summary.savedAt}
+          nextDayName={summary.nextDayName}
+          onDone={() => {
+            setSummary(null);
+            navigate('/');
+          }}
+        />
+      )}
 
       <Toast message={toast.message} />
     </Screen>
