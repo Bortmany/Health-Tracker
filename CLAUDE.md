@@ -12,16 +12,18 @@ All planned phases are built, tested, reviewed, and merged to `main`. 141/141 ba
 - Onboarding quiz → matched against 14 seeded workout plans (progression rules + 52-week phases); free tier = 4-week plans, premium = 52-week; `plan_tier` on users
 - Daily logs (weight/sleep/steps/habits/activities/injuries), nutrition (macros + meals), training logs (programs, sessions, sets), rest timer, personal records, streaks, 50-exercise library with autocomplete
 - Coach accounts: invite codes (redeem = consent), client summaries, assign/edit programs in the client's account
+- Coach journey (Sep 2026, plan in `Agents/docs/specs/cut/coach-journey.md`): members apply to coach from the More page and the owner approves at `/admin/coaches` (the `ADMIN_EMAIL` account, granted once at first sign-in); approved coaches get a profile and referral link, a public directory at `/coaches`, student requests and in-app invites; the Clients tab shows quiet days, weekly adherence, a weight trend and private notes. Billing for coaches is specced (`coach-billing.md`) but not built.
 - Charts (Chart.js, lazy-loaded), PWA manifest + service worker, weekly habit summary endpoint
 - `POST /api/health-sync` for future native apps (device data fills blanks, never overwrites manual entries)
 
 **Dormant switches** (code shipped, asleep until env vars are set on Railway):
+- `ADMIN_EMAIL` → the one account that can review coach applications (granted once, at first sign-in)
 - `ANTHROPIC_API_KEY` → AI plan writer (`apps/api/src/lib/aiPlanGenerator.js`)
 - `PADDLE_API_KEY` + `PADDLE_WEBHOOK_SECRET` + `PADDLE_PRICE_ID` + `PADDLE_ENV` + `APP_URL` → paid Premium upgrades through Paddle (`apps/api/src/lib/billing.js` is the only file that knows the provider; `apps/api/src/routes/billing.js` uses it; the webhook signature is checked against the raw body, wired in `app.js` before `express.json`)
 
 ## Conventions (non-negotiable)
 
-- **Migrations:** numbered SQL files in `apps/api/src/db/migrations/` (next is 019). Always append the same DDL to `docs/schema.sql`.
+- **Migrations:** numbered SQL files in `apps/api/src/db/migrations/` (next is 022). Always append the same DDL to `docs/schema.sql`.
 - **Routes:** `router.use(requireAuth)` first; every query parameterized (`$1…`); user-scoped queries filter `user_id = req.userId`; `asyncHandler` wrapper; snake_case → camelCase via `toPublicX(row)` mappers; errors `{ error: { message, code } }` in plain English; literal paths registered before `/:id`.
 - **Nested writes:** transaction — BEGIN, upsert parent, DELETE children, re-INSERT, COMMIT; ROLLBACK in catch; `client.release()` in finally (see `routes/programs.js` `replaceDays`).
 - **Postgres trap:** placeholders in `COALESCE($n, …)` or typed comparisons need explicit casts (`::uuid`, `::boolean`, `::integer`) or you get runtime 42883 errors.
@@ -59,4 +61,4 @@ Possible future work: Paddle customer portal (manage/cancel), password reset via
 | `docs/mobile.md` | Step-by-step for App Store / Play Store |
 | `railway.json` | Railway deploy config (build, migrate, start, health check) |
 | `Agents` repo, `.claude/agents/` | The generic dev crew (builder, researcher, content-curator in `development/`; verifier, code-reviewer in `quality/` — full roster in that repo's CLAUDE.md) — works on any repo by reading this file's conventions; include the Agents repo in the session |
-| `apps/api/src/db/migrations/` | 18 migrations so far; runner is `src/db/migrate.js` |
+| `apps/api/src/db/migrations/` | 21 migrations so far; runner is `src/db/migrate.js` |

@@ -146,6 +146,15 @@ test('approve: the applicant becomes a coach and appears in the coaches list', a
   const me = await (await fetch(`${baseUrl}/auth/me`, { headers: { Cookie: applicant.cookie } })).json();
   assert.equal(me.user.role, 'coach');
 
+  // Approval also creates the coach's profile (private by default), with the
+  // credentials and years carried over from the application for display.
+  const profile = (await (await json(applicant.cookie, 'GET', '/coach/profile')).json()).profile;
+  assert.match(profile.slug, /^coach-sam-[a-z0-9]{4}$/);
+  assert.match(profile.referralCode, /^[A-HJ-NP-Z2-9]{10}$/);
+  assert.equal(profile.isPublic, false);
+  assert.equal(profile.credentials, application.credentials);
+  assert.equal(profile.yearsCoaching, application.yearsCoaching);
+
   const coaches = (await (await json(admin.cookie, 'GET', '/admin/coaches')).json()).coaches;
   const coach = coaches.find((c) => c.userId === applicant.user.id);
   assert.ok(coach);
@@ -256,4 +265,36 @@ test('revoke: the coach loses access, the client keeps every log and program', a
   assert.equal(again.status, 404);
   const coaches = (await (await json(admin.cookie, 'GET', '/admin/coaches')).json()).coaches;
   assert.ok(!coaches.some((c) => c.userId === coach.user.id));
+});
+
+test('revoke also closes the coach\'s open invites and student requests', async () => {
+  const coach = await register('revoke-open-coach');
+  const invited = await register('revoke-open-invited');
+  const asker = await register('revoke-open-asker');
+  const application = await applyAs(coach.cookie);
+  assert.equal((await json(admin.cookie, 'POST', `/admin/coach-applications/${application.id}/approve`, {})).status, 200);
+
+  // The coach invites one person by email; another person has asked for them.
+  assert.equal((await json(coach.cookie, 'POST', '/coach/invites/email', { email: invited.email })).status, 202);
+  await pool.query(
+    `INSERT INTO coach_clients (coach_id, client_id, status, requested_by) VALUES ($1, $2, 'requested', 'client')`,
+    [coach.user.id, asker.user.id]
+  );
+  const { coachInvites } = await (await json(invited.cookie, 'GET', '/coach-link')).json();
+  assert.equal(coachInvites.length, 1);
+
+  assert.equal((await json(admin.cookie, 'POST', `/admin/coaches/${coach.user.id}/revoke`, {})).status, 200);
+
+  // Both waiting rows are marked revoked.
+  const { rows } = await pool.query('SELECT status FROM coach_clients WHERE coach_id = $1', [coach.user.id]);
+  assert.equal(rows.length, 2);
+  assert.ok(rows.every((row) => row.status === 'revoked'));
+
+  // Neither person sees them any more, and the invite can't be accepted.
+  const invitedView = await (await json(invited.cookie, 'GET', '/coach-link')).json();
+  assert.deepEqual(invitedView.coachInvites, []);
+  const askerView = await (await json(asker.cookie, 'GET', '/coach-link')).json();
+  assert.equal(askerView.pendingRequest, null);
+  const accept = await json(invited.cookie, 'POST', `/coach-link/invites/${coachInvites[0].id}/accept`);
+  assert.equal(accept.status, 404);
 });

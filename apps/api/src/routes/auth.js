@@ -43,6 +43,23 @@ function toPublicUser(row) {
   };
 }
 
+// Looks up which coach a referral code belongs to, or null when the code is
+// missing, malformed or unknown. Codes are random 10-character strings and
+// the register route's failure throttle limits guessing, so a plain lookup
+// is enough here.
+async function findReferringCoach(referralCode) {
+  if (typeof referralCode !== 'string') return null;
+  const code = referralCode.trim().toUpperCase();
+  if (code === '' || code.length > 100) return null;
+  const { rows } = await pool.query(
+    `SELECT p.user_id FROM coach_profiles p
+     JOIN users u ON u.id = p.user_id AND u.role = 'coach'
+     WHERE p.referral_code = $1`,
+    [code]
+  );
+  return rows[0] ? { userId: rows[0].user_id } : null;
+}
+
 // Public: tells the sign-up screen whether anyone can join ("open"), a signup
 // invite code is needed ("invite"), or sign-up is switched off ("closed").
 // Never returns the codes themselves. (Unrelated to coach invite codes.)
@@ -53,7 +70,7 @@ router.get('/signup-mode', (_req, res) => {
 router.post('/register', asyncHandler(async (req, res) => {
   // Note: `role` is deliberately NOT read from the request. New accounts are
   // always regular ('consumer') accounts — see below.
-  const { email, password, displayName, inviteCode } = req.body ?? {};
+  const { email, password, displayName, inviteCode, referralCode } = req.body ?? {};
 
   // Signup gate (see lib/signupMode.js). Checked before anything else so a
   // closed or invite-only app does no work — and leaks nothing — for
@@ -65,7 +82,12 @@ router.post('/register', asyncHandler(async (req, res) => {
       error: { message: 'Sign-up is closed for now.', code: 'SIGNUPS_CLOSED' },
     });
   }
-  if (signupMode === 'invite' && !isValidInviteCode(inviteCode)) {
+  // A coach's referral link carries their referral code. In invite-only mode
+  // it stands in for a signup invite code; in open mode it still records
+  // which coach brought this person in. Only a current coach's code counts —
+  // a revoked coach's link stops working the moment their role changes.
+  const referringCoach = await findReferringCoach(referralCode);
+  if (signupMode === 'invite' && !isValidInviteCode(inviteCode) && !referringCoach) {
     return res.status(403).json({
       error: { message: 'Sign-up is by invitation. Enter a valid invite code.', code: 'INVITE_REQUIRED' },
     });
@@ -87,21 +109,30 @@ router.post('/register', asyncHandler(async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
 
-  // Security: every new account is a regular ('consumer') account. The route no
-  // longer lets a client ask to be created as a 'coach' — that let anyone grant
-  // themselves coach access, which can read and edit other people's data.
-  // TODO(coach onboarding): add a verified promotion path (e.g. an admin action
-  // or redeeming a coach invite) so genuine coaches can be created safely.
+  // Security: every new account is a regular ('consumer') account. The route
+  // never lets a client ask to be created as a 'coach' — that would let anyone
+  // grant themselves coach access, which can read and edit other people's
+  // data. The only way to become a coach is the "Become a coach" application
+  // approved by the owner (routes/coachApplications.js + routes/admin.js).
   let user;
   try {
     user = await withTransaction(async (client) => {
       const { rows } = await client.query(
-        `INSERT INTO users (email, password_hash, display_name, role)
-         VALUES ($1, $2, $3, 'consumer')
+        `INSERT INTO users (email, password_hash, display_name, role, referred_by_coach_id)
+         VALUES ($1, $2, $3, 'consumer', $4::uuid)
          RETURNING id, email, display_name, plan_tier, role, created_at, token_version`,
-        [normalizedEmail, passwordHash, cleanDisplayName]
+        [normalizedEmail, passwordHash, cleanDisplayName, referringCoach?.userId ?? null]
       );
       await client.query('INSERT INTO user_settings (user_id) VALUES ($1)', [rows[0].id]);
+      // Arriving through a referral link also asks that coach to take them on:
+      // the coach sees it under Requests and accepts or declines.
+      if (referringCoach) {
+        await client.query(
+          `INSERT INTO coach_clients (coach_id, client_id, status, requested_by)
+           VALUES ($1, $2, 'requested', 'referral')`,
+          [referringCoach.userId, rows[0].id]
+        );
+      }
       return rows[0];
     });
   } catch (err) {

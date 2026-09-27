@@ -18,6 +18,7 @@ import authRouter from './routes/auth.js';
 import billingRouter from './routes/billing.js';
 import coachRouter from './routes/coach.js';
 import coachLinkRouter from './routes/coachLink.js';
+import coachesRouter from './routes/coaches.js';
 import coachApplicationsRouter from './routes/coachApplications.js';
 import exercisesRouter from './routes/exercises.js';
 import exportRouter from './routes/export.js';
@@ -191,6 +192,8 @@ app.use('/api/auth/logout', authLimiter);
 app.use('/api/auth/me', authLimiter);
 // Invite codes get the same guessing protection as passwords.
 app.use('/api/coach-link/redeem', authLimiter);
+// So do coach referral codes (the public "who invited me" lookup).
+app.use('/api/coaches/referral', authLimiter);
 // Deleting an account asks for your password first, so it gets the same
 // guessing protection as the login screen.
 app.use('/api/account', authLimiter);
@@ -249,9 +252,24 @@ const writeLimiter = rateLimit({
   skip: (req) => rateLimitDisabled() || req.method === 'GET',
   message: { error: { message: 'You are saving changes too quickly. Please slow down and try again shortly.', code: 'RATE_LIMITED' } },
 });
-for (const path of ['/api/logs', '/api/nutrition', '/api/training-logs', '/api/programs', '/api/health-sync']) {
+for (const path of ['/api/logs', '/api/nutrition', '/api/training-logs', '/api/programs', '/api/health-sync', '/api/coach', '/api/coach-link']) {
   app.use(path, writeLimiter);
 }
+
+// A coach's "Invite by email": 20 per coach per rolling 24 hours, on its own
+// counter. The reply never says whether an address has an account, and this
+// cap stops a coach from probing many addresses to work it out from patterns.
+const inviteEmailLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: writeLimiterKey,
+  skip: (req) => rateLimitDisabled() || req.method !== 'POST',
+  message: { error: { message: 'You have sent the most email invites allowed for today. Please try again tomorrow.', code: 'RATE_LIMITED' } },
+});
+app.use('/api/coach/invites/email', inviteEmailLimiter);
 
 // "Become a coach" applications: 3 per person per rolling 24 hours, on its
 // own counter so it never eats into the everyday save budget above. Only the
@@ -298,6 +316,7 @@ app.use('/api/habits', habitsRouter);
 app.use('/api/activities', activitiesRouter);
 app.use('/api/coach', coachRouter);
 app.use('/api/coach-link', coachLinkRouter);
+app.use('/api/coaches', coachesRouter); // public — the coach directory and profile pages
 app.use('/api/coach-applications', coachApplicationsRouter);
 app.use('/api/exercises', exercisesRouter);
 app.use('/api/health-sync', healthSyncRouter);

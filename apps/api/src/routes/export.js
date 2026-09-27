@@ -180,12 +180,22 @@ router.get('/', asyncHandler(async (req, res) => {
     cursor.setUTCDate(cursor.getUTCDate() - 1);
   }
 
-  // The coach connected to this account, if any.
-  const { rows: coachRows } = await pool.query(
-    `SELECT u.display_name FROM coach_clients cc
+  // Every coaching link this account has had as a client — current, waiting,
+  // declined or ended — and, separately, which coach's referral link (if any)
+  // the account was created through. Only rows where this user is the client.
+  const { rows: coachLinkRows } = await pool.query(
+    `SELECT u.display_name, cc.status, cc.requested_by, cc.created_at, cc.ended_at
+     FROM coach_clients cc
      JOIN users u ON u.id = cc.coach_id
-     WHERE cc.client_id = $1 AND cc.status = 'active'
-     LIMIT 1`,
+     WHERE cc.client_id = $1
+     ORDER BY cc.created_at`,
+    [req.userId]
+  );
+  const coachRows = coachLinkRows.filter((row) => row.status === 'active');
+  const { rows: referrerRows } = await pool.query(
+    `SELECT r.display_name FROM users u
+     JOIN users r ON r.id = u.referred_by_coach_id
+     WHERE u.id = $1`,
     [req.userId]
   );
 
@@ -294,6 +304,14 @@ router.get('/', asyncHandler(async (req, res) => {
       : null,
     streak,
     coach: coachRows[0] ? { displayName: coachRows[0].display_name } : null,
+    coachLinks: coachLinkRows.map((row) => ({
+      coachName: row.display_name,
+      status: row.status,
+      requestedBy: row.requested_by,
+      createdAt: row.created_at,
+      endedAt: row.ended_at,
+    })),
+    referredByCoach: referrerRows[0] ? referrerRows[0].display_name : null,
   });
 }));
 
