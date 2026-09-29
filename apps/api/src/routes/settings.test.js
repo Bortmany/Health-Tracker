@@ -75,3 +75,29 @@ test('PUT /settings never stored a bad value', async () => {
   const { settings } = await res.json();
   assert.equal(Number(settings.age), 35);
 });
+
+test('the target date comes back exactly as saved, and can be saved again unchanged', async () => {
+  // The user-testing bug: the date came back as a full timestamp, so the date
+  // box went blank, Today showed "NaN days", and sending it back was refused.
+  const saved = await put({ targetWeight: 72, targetDate: '2026-12-01' });
+  assert.equal(saved.status, 200);
+  assert.equal((await saved.json()).settings.targetDate, '2026-12-01');
+
+  const reread = await fetch(`${baseUrl}/settings`, { headers: { Cookie: cookie } });
+  const { settings } = await reread.json();
+  assert.equal(settings.targetDate, '2026-12-01'); // exact string, no slicing
+
+  // The quiz retake and the goals form send the value straight back.
+  const echoed = await put({ targetWeight: settings.targetWeight, targetDate: settings.targetDate });
+  assert.equal(echoed.status, 200);
+  assert.equal((await echoed.json()).settings.targetDate, '2026-12-01');
+
+  // The data export carries the same plain day.
+  const exported = await fetch(`${baseUrl}/export`, { headers: { Cookie: cookie } });
+  assert.equal(exported.status, 200);
+  assert.equal((await exported.json()).settings.targetDate, '2026-12-01');
+
+  // Clearing it works too.
+  const cleared = await put({ targetWeight: 72, targetDate: null });
+  assert.equal((await cleared.json()).settings.targetDate, null);
+});

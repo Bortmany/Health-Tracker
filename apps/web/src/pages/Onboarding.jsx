@@ -7,7 +7,7 @@ import { useMe } from '../hooks/useAuth.js';
 import { useAdoptTemplate, useRecommendedTemplates } from '../hooks/usePlans.js';
 import { useSettings, useUpdateSettings } from '../hooks/useSettings.js';
 import styles from './Onboarding.module.css';
-import { localToday } from '../lib/localDate.js';
+import { localToday, toCalendarDay } from '../lib/localDate.js';
 
 const STEPS = [
   {
@@ -91,7 +91,7 @@ function RevealStep() {
         // Keep every other goal the person already had — only add the weight.
         startWeight: Number(weight),
         targetWeight: settings?.targetWeight ?? null,
-        targetDate: settings?.targetDate ?? null,
+        targetDate: toCalendarDay(settings?.targetDate),
         height: settings?.height ?? null,
         age: settings?.age ?? null,
         stepGoal: settings?.stepGoal ?? null,
@@ -218,7 +218,7 @@ export default function Onboarding() {
         // Keep whatever the person already had in settings.
         startWeight: settings?.startWeight ?? null,
         targetWeight: settings?.targetWeight ?? null,
-        targetDate: settings?.targetDate ?? null,
+        targetDate: toCalendarDay(settings?.targetDate),
         height: settings?.height ?? null,
         stepGoal: settings?.stepGoal ?? null,
         sleepGoal: settings?.sleepGoal ?? null,

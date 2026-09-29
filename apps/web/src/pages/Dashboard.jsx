@@ -19,12 +19,7 @@ import { useSettings } from '../hooks/useSettings.js';
 import { useTrainingLog, useTrainingLogs } from '../hooks/useTrainingLogs.js';
 import { smoothSeries, trendCaption } from '../lib/trend.js';
 import styles from './Dashboard.module.css';
-import { localDaysAgo, localToday } from '../lib/localDate.js';
-
-function diffDays(a, b) {
-  const ms = new Date(`${a}T00:00:00`) - new Date(`${b}T00:00:00`);
-  return Math.round(ms / (1000 * 60 * 60 * 24));
-}
+import { daysBetween, localDaysAgo, localToday } from '../lib/localDate.js';
 
 // Quick-log shortcuts: each lands on the Log screen with that field focused.
 const QUICK_LOGS = [
@@ -64,7 +59,8 @@ export default function Dashboard() {
   const smoothed = smoothSeries(weighIns.map((w) => w.weight));
   const caption = trendCaption(weighIns, smoothed);
 
-  const daysToTarget = settings?.targetDate ? diffDays(settings.targetDate, today) : null;
+  // null (shown as "—") when there's no target date or it can't be read.
+  const daysToTarget = daysBetween(today, settings?.targetDate);
 
   // Every active habit counts for all 7 days, so days you didn't log count as misses.
   const completed = habitDays.reduce((sum, d) => sum + d.completed, 0);

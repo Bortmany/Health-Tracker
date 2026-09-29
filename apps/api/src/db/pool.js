@@ -2,6 +2,16 @@ import pg from 'pg';
 
 const { Pool } = pg;
 
+// Calendar dates (Postgres DATE columns: target date, log dates, plan start)
+// come back as the plain 'YYYY-MM-DD' text Postgres stores, never as a
+// JavaScript date-and-time. By default the database driver turns '2026-12-01'
+// into midnight on the server's own clock, which the API then sends out as a
+// full timestamp ("2026-11-30T20:00:00.000Z" on Oman time) — the date box
+// can't show it, the countdown turns into "NaN", and the day can slip by one.
+// Doing it here covers every query, including ones that forget `::text`.
+export const DATE_TYPE_ID = 1082; // Postgres's built-in number for DATE
+pg.types.setTypeParser(DATE_TYPE_ID, (value) => value);
+
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   // Hosted Postgres (e.g. Railway) requires SSL; local Postgres doesn't support it.
