@@ -28,6 +28,7 @@ import {
 import { useMyApplication } from '../hooks/useCoachApplications.js';
 import { useCoachProfile } from '../hooks/useCoachProfile.js';
 import { useSettings, useUpdateSettings } from '../hooks/useSettings.js';
+import { toCalendarDay } from '../lib/localDate.js';
 import { THEME_OPTIONS, useTheme } from '../lib/useTheme.js';
 import styles from './More.module.css';
 
@@ -45,7 +46,7 @@ function buildForm(settings) {
   return {
     startWeight: settings?.startWeight ?? '',
     targetWeight: settings?.targetWeight ?? '',
-    targetDate: settings?.targetDate ?? '',
+    targetDate: toCalendarDay(settings?.targetDate) ?? '',
     height: settings?.height ?? '',
     age: settings?.age ?? '',
     stepGoal: settings?.stepGoal ?? '',
