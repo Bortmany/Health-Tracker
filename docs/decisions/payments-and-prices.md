@@ -4,7 +4,13 @@ Written 30 Sep 2026 for the October alignment round (branch `align-2026-10`). Re
 
 ## Owner's answers
 
-_(Not answered yet. The answers get pasted here, and then Step 2 starts.)_
+Answered 30 Sep 2026. The owner's words: "1 research other option if nothing possible then paypal 2 coach set their own price 3 use your suggestion 4 keep 5 aprove"
+
+1. **Provider:** look for another option first, and use PayPal if nothing better is possible. A second research pass runs now; the result gets added below before Step 5.
+2. **Prices:** each coach sets their own student monthly price, with a safety floor of $10 so fees are always covered. Everything else uses the suggestions: $49 coach startup fee, 15% commission (10% once a coach has 20+ students), and $12.99 a month or $89.99 a year for the solo AI plan.
+3. **Photos and email:** the suggestions. Photos go in a Railway Storage Bucket, email goes through Resend, and all seven small questions in section 4 take their suggested defaults.
+4. **"Calories burned" is KEPT** (screens, Apple Health sync and export). Step 8 will drop only the two nutrition tables, not `daily_logs.calories`.
+5. **All three specs are approved.**
 
 ---
 
