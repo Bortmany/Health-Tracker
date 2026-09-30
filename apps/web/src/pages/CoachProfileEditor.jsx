@@ -15,7 +15,7 @@ import {
   useToast,
 } from '../components/ui/index.js';
 import { useCoachProfile, useUpdateCoachProfile } from '../hooks/useCoachProfile.js';
-import { SPECIALTIES } from '../lib/specialties.js';
+import { SPECIALTIES, hasVisibleSpecialty } from '../lib/specialties.js';
 import styles from './CoachProfileEditor.module.css';
 
 const HEADLINE_MAX = 80;
@@ -48,6 +48,7 @@ function selectText(el) {
 function ProfileForm({ profile, onSaved }) {
   const update = useUpdateCoachProfile();
   const [form, setForm] = useState(buildForm(profile));
+  const [needsSpecialty, setNeedsSpecialty] = useState(false);
 
   // Server-loaded values win over a stale draft when the profile refreshes
   // (e.g. after a save), same as the Goals form on More.
@@ -60,6 +61,7 @@ function ProfileForm({ profile, onSaved }) {
   }
 
   function toggleSpecialty(code) {
+    setNeedsSpecialty(false);
     setForm((f) => ({
       ...f,
       specialties: f.specialties.includes(code)
@@ -70,6 +72,14 @@ function ProfileForm({ profile, onSaved }) {
 
   function handleSubmit(e) {
     e.preventDefault();
+    // Only current specialties count: a coach whose sole saved code is a
+    // retired one (e.g. nutrition) shows no chips, so they must pick a real
+    // one before going public. Retired codes stay in the saved list.
+    if (form.isPublic && !hasVisibleSpecialty(form.specialties)) {
+      setNeedsSpecialty(true);
+      return;
+    }
+    setNeedsSpecialty(false);
     update.mutate(
       {
         headline: form.headline.trim(),
@@ -82,7 +92,8 @@ function ProfileForm({ profile, onSaved }) {
     );
   }
 
-  const incomplete = update.isError && update.error?.code === 'PROFILE_INCOMPLETE';
+  const incomplete = needsSpecialty || (update.isError && update.error?.code === 'PROFILE_INCOMPLETE');
+  const noSpecialtyPicked = !hasVisibleSpecialty(form.specialties);
   const otherError = update.isError && !incomplete;
   const years = profile.yearsCoaching;
 
@@ -133,7 +144,13 @@ function ProfileForm({ profile, onSaved }) {
               </ChipToggle>
             ))}
           </div>
-          <div className={styles.hint}>Pick at least one to go public.</div>
+          {form.isPublic && noSpecialtyPicked ? (
+            <div className={styles.hint} aria-live="polite">
+              No specialty picked yet — choose at least one so your profile can be public.
+            </div>
+          ) : (
+            <div className={styles.hint}>Pick at least one to go public.</div>
+          )}
         </div>
 
         <Checkbox checked={form.acceptingClients} onChange={(e) => set('acceptingClients', e.target.checked)}>
@@ -141,7 +158,13 @@ function ProfileForm({ profile, onSaved }) {
         </Checkbox>
 
         <div>
-          <Checkbox checked={form.isPublic} onChange={(e) => set('isPublic', e.target.checked)}>
+          <Checkbox
+            checked={form.isPublic}
+            onChange={(e) => {
+              setNeedsSpecialty(false);
+              set('isPublic', e.target.checked);
+            }}
+          >
             Show my profile in the public directory
           </Checkbox>
           <div className={styles.hint}>

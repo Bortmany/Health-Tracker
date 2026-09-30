@@ -284,8 +284,8 @@ async function fetchClientSignals(coachId, clientIds, today) {
   const empty = { lastActive: new Map(), done: new Map(), planned: new Map(), weights: new Map() };
   if (clientIds.length === 0) return empty;
 
-  // Last day the client logged anything (a daily log, a training session or a
-  // meal), and how many whole days ago that was.
+  // Last day the client logged anything (a daily log or a training session),
+  // and how many whole days ago that was.
   const { rows: activeRows } = await pool.query(
     `SELECT user_id, MAX(date)::text AS last_active,
             GREATEST(0, $2::date - MAX(date))::integer AS quiet_days
@@ -293,8 +293,6 @@ async function fetchClientSignals(coachId, clientIds, today) {
        SELECT user_id, date FROM daily_logs WHERE user_id = ANY($1::uuid[])
        UNION ALL
        SELECT user_id, date FROM training_logs WHERE user_id = ANY($1::uuid[])
-       UNION ALL
-       SELECT user_id, date FROM nutrition_logs WHERE user_id = ANY($1::uuid[])
      ) logged
      GROUP BY user_id`,
     [clientIds, today]

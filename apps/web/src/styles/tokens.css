@@ -28,7 +28,7 @@
 
   /* ---- Color: charts ---- */
   --color-chart-line: #c8f135;     /* primary series (trend) */
-  --color-chart-line-2: #8fa926;   /* secondary series (calories) */
+  --color-chart-line-2: #8fa926;   /* secondary chart series */
   --color-chart-raw: #4a4a54;      /* pale raw-data line under a trend line */
   --color-chart-grid: #1c1c21;
   --color-chart-tick: #7c7c86;

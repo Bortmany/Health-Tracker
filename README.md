@@ -7,7 +7,7 @@ A fat-loss and training tracker for people who aren't sure what to train — and
 **For regular users**
 - A short quiz (age, experience, goal, equipment, days per week) matches you to one of 14 professionally structured workout plans — calisthenics, powerlifting, muscle building, cardio, general fitness, including an over-50 joint-friendly plan.
 - The app tells you what week of your plan you're on, in plain English, with easy (deload) weeks scheduled where they belong. Free accounts get 4-week plans; Premium unlocks the 52-week periodized versions.
-- Daily log: weight, waist, sleep, HRV, recovery, strain, steps, habits, activities, injury check-ins, and food (calories, macros, meals).
+- Daily log: weight, waist, sleep, HRV, recovery, strain, steps, habits, activities, injury check-ins, and calories burned.
 - Training log with rest timer, exercise autocomplete backed by a 50-exercise guide with form cues, personal-record tracking, and per-exercise "last time" hints.
 - Dashboard with weight trend chart, weekly habit ring, and logging streak; Progress page with charts and personal records.
 

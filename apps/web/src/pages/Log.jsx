@@ -19,7 +19,6 @@ import {
 import { useActivities } from '../hooks/useActivities.js';
 import { useCreateHabit, useDeleteHabit } from '../hooks/useHabits.js';
 import { useLog, usePutLog } from '../hooks/useLogs.js';
-import { useNutrition, usePutNutrition } from '../hooks/useNutrition.js';
 import styles from './Log.module.css';
 import { addDays, localToday } from '../lib/localDate.js';
 
@@ -52,19 +51,9 @@ const MORE_FIELDS = [
 // All metric keys "Use yesterday's numbers" is allowed to fill.
 const METRIC_KEYS = ['weight', 'waist', 'sleep', 'hrv', 'recovery', 'strain', 'steps', 'calories'];
 
-function buildFormFromData(data, nutritionData) {
+function buildFormFromData(data) {
   return {
     weight: data.log?.weight ?? '',
-    foodCalories: nutritionData?.log?.calories ?? '',
-    protein: nutritionData?.log?.protein ?? '',
-    carbs: nutritionData?.log?.carbs ?? '',
-    fat: nutritionData?.log?.fat ?? '',
-    meals: (nutritionData?.meals ?? []).map((m, i) => ({
-      key: m.id ?? `new-${i}`,
-      name: m.name ?? '',
-      calories: m.calories ?? '',
-      protein: m.protein ?? '',
-    })),
     waist: data.log?.waist ?? '',
     sleep: data.log?.sleep ?? '',
     hrv: data.log?.hrv ?? '',
@@ -117,11 +106,9 @@ function Group({ title, open, onToggle, hasData = false, children }) {
 export default function Log() {
   const [date, setDate] = useState(localToday());
   const { data, isLoading } = useLog(date);
-  const { data: nutritionData, isLoading: nutritionLoading } = useNutrition(date);
   const { data: yesterdayData } = useLog(addDays(date, -1));
   const { data: activityOptions = [] } = useActivities();
   const putLog = usePutLog(date);
-  const putNutrition = usePutNutrition(date);
   const createHabit = useCreateHabit();
   const deleteHabit = useDeleteHabit();
   const [form, setForm] = useState(null);
@@ -133,7 +120,6 @@ export default function Log() {
   // Which sections are expanded. Defaults re-evaluate when the date changes:
   // a section that already has data for that day starts open.
   const [open, setOpen] = useState({
-    nutrition: true,
     metrics: false,
     activities: false,
     habits: true,
@@ -145,17 +131,14 @@ export default function Log() {
   const focusParam = searchParams.get('focus');
   const focusHandledRef = useRef(false);
   const quickRef = useRef(null);
-  const nutritionRef = useRef(null);
-  const addMealRef = useRef(null);
 
   useEffect(() => {
-    if (data && nutritionData) {
-      const built = buildFormFromData(data, nutritionData);
+    if (data) {
+      const built = buildFormFromData(data);
       setForm(built);
       if (openInitRef.current !== date) {
         openInitRef.current = date;
         setOpen({
-          nutrition: true,
           metrics: MORE_FIELDS.some(({ key }) => built[key] !== ''),
           activities: built.activities.length > 0,
           habits: true,
@@ -164,19 +147,13 @@ export default function Log() {
         });
       }
     }
-  }, [date, data, nutritionData]);
+  }, [date, data]);
 
   // Deep-link focus from the Today screen's quick-log chips (/log?focus=...).
   useEffect(() => {
     if (!form || !focusParam || focusHandledRef.current) return;
     focusHandledRef.current = true;
-    if (focusParam === 'meal') {
-      setOpen((o) => ({ ...o, nutrition: true }));
-      setTimeout(() => {
-        nutritionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        addMealRef.current?.querySelector('button')?.focus();
-      }, 0);
-    } else if (QUICK_FIELDS.some(({ key }) => key === focusParam)) {
+    if (QUICK_FIELDS.some(({ key }) => key === focusParam)) {
       window.scrollTo({ top: 0 });
       quickRef.current?.querySelector(`input[name="${focusParam}"]`)?.focus();
     }
@@ -248,24 +225,6 @@ export default function Log() {
     setForm((f) => ({ ...f, activities: f.activities.filter((a) => a.key !== key) }));
   }
 
-  function addMealRow() {
-    setForm((f) => ({
-      ...f,
-      meals: [...f.meals, { key: `new-${Date.now()}`, name: '', calories: '', protein: '' }],
-    }));
-  }
-
-  function updateMealRow(key, patch) {
-    setForm((f) => ({
-      ...f,
-      meals: f.meals.map((m) => (m.key === key ? { ...m, ...patch } : m)),
-    }));
-  }
-
-  function removeMealRow(key) {
-    setForm((f) => ({ ...f, meals: f.meals.filter((m) => m.key !== key) }));
-  }
-
   function updateInjuryField(injuryId, key, value) {
     setForm((f) => ({
       ...f,
@@ -324,31 +283,17 @@ export default function Log() {
       })),
     });
 
-    const savingNutrition = putNutrition.mutateAsync({
-      calories: form.foodCalories === '' ? null : Number(form.foodCalories),
-      protein: form.protein === '' ? null : Number(form.protein),
-      carbs: form.carbs === '' ? null : Number(form.carbs),
-      fat: form.fat === '' ? null : Number(form.fat),
-      meals: form.meals
-        .filter((m) => m.name)
-        .map((m) => ({
-          name: m.name,
-          calories: m.calories === '' ? null : Number(m.calories),
-          protein: m.protein === '' ? null : Number(m.protein),
-        })),
-    });
-
-    // "Saved" only appears once the day's numbers AND the food entries are
-    // both stored. If either fails, the red message below the form says so.
+    // "Saved" only appears once the day is stored. If it fails, the red
+    // message below the form says so.
     try {
-      await Promise.all([savingLog, savingNutrition]);
+      await savingLog;
       toast.show('Saved');
     } catch {
       // The failed mutation already shows its own message on screen.
     }
   }
 
-  const saving = putLog.isPending || putNutrition.isPending;
+  const saving = putLog.isPending;
 
   // Dots for collapsed groups that already hold entries for this day.
   const metricsHaveData = Boolean(form) && MORE_FIELDS.some(({ key }) => form[key] !== '');
@@ -389,9 +334,8 @@ export default function Log() {
       </div>
 
       {putLog.isError && <ErrorText>{putLog.error.message}</ErrorText>}
-      {putNutrition.isError && <ErrorText>{putNutrition.error.message}</ErrorText>}
 
-      {isLoading || nutritionLoading || !form ? (
+      {isLoading || !form ? (
         <div className={styles.stack}>
           <Skeleton height={110} />
           <Skeleton height={160} />
@@ -422,84 +366,6 @@ export default function Log() {
               </div>
             )}
           </Card>
-
-          <div ref={nutritionRef}>
-            <Group
-              title="Nutrition"
-              open={open.nutrition}
-              onToggle={() => setOpen((o) => ({ ...o, nutrition: !o.nutrition }))}
-            >
-              <div className={styles.fieldGrid}>
-                <Field label="Calories eaten">
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="1"
-                    value={form.foodCalories}
-                    onChange={(e) => updateField('foodCalories', e.target.value)}
-                  />
-                </Field>
-                <Field label="Protein (g)">
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="1"
-                    value={form.protein}
-                    onChange={(e) => updateField('protein', e.target.value)}
-                  />
-                </Field>
-                <Field label="Carbs (g)">
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="1"
-                    value={form.carbs}
-                    onChange={(e) => updateField('carbs', e.target.value)}
-                  />
-                </Field>
-                <Field label="Fat (g)">
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="1"
-                    value={form.fat}
-                    onChange={(e) => updateField('fat', e.target.value)}
-                  />
-                </Field>
-              </div>
-
-              {form.meals.map((m) => (
-                <div className={styles.rowGrid} key={m.key}>
-                  <Input
-                    type="text"
-                    placeholder="Meal name"
-                    value={m.name}
-                    onChange={(e) => updateMealRow(m.key, { name: e.target.value })}
-                  />
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    placeholder="kcal"
-                    value={m.calories}
-                    onChange={(e) => updateMealRow(m.key, { calories: e.target.value })}
-                  />
-                  <button
-                    type="button"
-                    className={styles.removeButton}
-                    onClick={() => removeMealRow(m.key)}
-                    aria-label="Remove meal"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-              <div ref={addMealRef}>
-                <Button variant="ghost" size="sm" onClick={addMealRow}>
-                  + Add meal
-                </Button>
-              </div>
-            </Group>
-          </div>
 
           <Group
             title="More metrics"

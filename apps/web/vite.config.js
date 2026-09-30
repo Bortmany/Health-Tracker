@@ -10,7 +10,7 @@ export default defineConfig({
       manifest: {
         name: 'Cut',
         short_name: 'Cut',
-        description: 'Track your weight, workouts, food, and habits.',
+        description: 'Track your weight, workouts, sleep, and habits.',
         theme_color: '#0b0b0d',
         background_color: '#0b0b0d',
         display: 'standalone',
@@ -30,7 +30,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: `http://localhost:${process.env.API_PORT || 3001}`,
         changeOrigin: true,
       },
     },

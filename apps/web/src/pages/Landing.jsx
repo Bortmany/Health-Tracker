@@ -14,7 +14,7 @@ import styles from './Landing.module.css';
 const HABITS = [
   { id: 'water', label: 'Water' },
   { id: 'steps', label: 'Steps' },
-  { id: 'protein', label: 'Protein' },
+  { id: 'stretch', label: 'Stretch' },
   { id: 'sleep', label: 'Sleep' },
 ];
 
@@ -31,10 +31,6 @@ const FEATURES = [
   {
     title: 'Training programs & rest timer',
     body: 'Follow a real program with a built-in timer between sets, not a blank notebook.',
-  },
-  {
-    title: 'Nutrition & macros',
-    body: 'Log meals and macros without spreadsheets or guesswork.',
   },
   {
     title: 'Charts & personal records',
@@ -62,7 +58,7 @@ function matchPlan(goal, days, equipment) {
 }
 
 function PhoneDemo() {
-  const [done, setDone] = useState({ water: true, steps: false, protein: true, sleep: false });
+  const [done, setDone] = useState({ water: true, steps: false, stretch: true, sleep: false });
   const [sets, setSets] = useState(0);
   const doneCount = Object.values(done).filter(Boolean).length;
   const percent = Math.round((doneCount / HABITS.length) * 100);
@@ -212,7 +208,7 @@ export default function Landing() {
         <div className={styles.heroCopy}>
           <h1 className={styles.heroHeadline}>Know what to train. Every day.</h1>
           <p className={styles.heroSub}>
-            Cut matches you to a real workout plan, then tracks your weight, food, sleep and streaks in
+            Cut matches you to a real workout plan, then tracks your weight, sleep, training and streaks in
             one place — so you stop guessing and start showing up.
           </p>
           <div className={styles.heroActions}>
@@ -267,7 +263,7 @@ export default function Landing() {
             <h3 className={styles.priceTitle}>Free</h3>
             <p className={styles.pricePoint}>4-week plans</p>
             <p className={styles.priceBody}>
-              Full tracking — logs, nutrition, training, streaks — with 4-week workout plans.
+              Full tracking — logs, training, habits, streaks — with 4-week workout plans.
             </p>
             <JoinCta className={styles.priceCta} />
           </div>

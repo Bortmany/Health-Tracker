@@ -82,6 +82,36 @@ test('a coach can read and edit their profile; the slug and referral link are re
   assert.equal(kept.acceptingClients, false);
 });
 
+// Food tracking was removed from the app and the screens no longer offer
+// "nutrition" as a specialty, but coaches who picked it before must still be
+// able to save their profile, and the old value stays put.
+test("a coach who already lists 'nutrition' can still save their profile, and it is kept", async () => {
+  const coach = await register('coach', 'legacyspec');
+  const getRes = await json(coach.cookie, 'GET', '/coach/profile');
+  assert.equal(getRes.status, 200);
+  await pool.query(
+    "UPDATE coach_profiles SET specialties = ARRAY['nutrition', 'strength'] WHERE user_id = $1",
+    [coach.user.id]
+  );
+
+  // Saving other fields leaves the specialties alone.
+  const other = await json(coach.cookie, 'PUT', '/coach/profile', { headline: 'Strength and food habits' });
+  assert.equal(other.status, 200);
+  assert.deepEqual((await other.json()).profile.specialties, ['nutrition', 'strength']);
+
+  // Sending the list back unchanged (what the profile screen does) is accepted too.
+  const resend = await json(coach.cookie, 'PUT', '/coach/profile', {
+    headline: 'Strength coach',
+    bio: LONG_BIO,
+    specialties: ['nutrition', 'strength'],
+    isPublic: true,
+  });
+  assert.equal(resend.status, 200);
+  const saved = (await resend.json()).profile;
+  assert.deepEqual(saved.specialties, ['nutrition', 'strength']);
+  assert.equal(saved.isPublic, true);
+});
+
 test('a profile cannot go public until it is complete, and the message names what is missing', async () => {
   const coach = await register('coach', 'incomplete');
 

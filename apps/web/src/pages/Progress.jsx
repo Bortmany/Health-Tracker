@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import LineChart from '../components/LineChart.jsx';
 import { Card, EmptyState, Screen, Skeleton } from '../components/ui/index.js';
 import { useHabitSummary, useLogsRange, useStreak } from '../hooks/useLogs.js';
-import { useNutritionRange } from '../hooks/useNutrition.js';
 import { usePersonalRecords, useTrainingLogs } from '../hooks/useTrainingLogs.js';
 import { smoothSeries, trendCaption } from '../lib/trend.js';
 import styles from './Progress.module.css';
@@ -199,7 +198,6 @@ export default function Progress() {
   const today = localToday();
   const from = localDaysAgo(59);
   const { data: logs = [], isLoading: logsLoading } = useLogsRange({ from, to: today });
-  const { data: nutritionLogs = [], isLoading: nutritionLoading } = useNutritionRange({ from, to: today });
   const { data: records = [], isLoading: recordsLoading } = usePersonalRecords();
 
   const weighIns = logs
@@ -207,7 +205,6 @@ export default function Progress() {
     .map((l) => ({ date: l.date, weight: Number(l.weight) }));
   const smoothed = smoothSeries(weighIns.map((w) => w.weight));
   const caption = trendCaption(weighIns, smoothed);
-  const calorieDays = nutritionLogs.filter((l) => l.calories != null);
 
   return (
     <Screen title="Progress">
@@ -228,22 +225,6 @@ export default function Progress() {
             </>
           ) : (
             <EmptyState>Nothing to chart yet — weigh-ins you log will show up here.</EmptyState>
-          )}
-        </Card>
-
-        <Card title="Calories eaten — last 60 days">
-          {nutritionLoading ? (
-            <Skeleton height={160} />
-          ) : calorieDays.length > 0 ? (
-            <LineChart
-              labels={calorieDays.map((l) => l.date.slice(5, 10))}
-              values={calorieDays.map((l) => l.calories)}
-              color="--color-chart-line-2"
-            />
-          ) : (
-            <EmptyState>
-              No food logged yet — log a few days and your calorie trend will appear here.
-            </EmptyState>
           )}
         </Card>
 

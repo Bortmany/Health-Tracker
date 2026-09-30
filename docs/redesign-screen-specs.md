@@ -9,7 +9,7 @@ Design at **~390px wide**; every screen must also read well up to the `--screen-
 ## Voice reminder (bakes into every empty state and micro-copy below)
 
 Cut talks like a knowledgeable friend, not a drill sergeant: encouraging, plain, never shaming. Concretely:
-- No red text or red icons for a missed target, a skipped day, or an over-target calorie number. `--color-danger` is reserved for destructive actions (delete/remove/stop, with a confirm) and genuine errors (a save failed).
+- No red text or red icons for a missed target, a skipped day, or an over-target number. `--color-danger` is reserved for destructive actions (delete/remove/stop, with a confirm) and genuine errors (a save failed).
 - Empty states say "not yet" and point to the next small action, never "you haven't."
 - Weight/number fluctuation gets a normalizing caption, not silence and not alarm.
 
@@ -65,7 +65,7 @@ The dashboard/progress weight charts require a **pale raw line + a bold smooth t
 
 1. **Greeting** — plain text, not a card: *"Hey, {displayName}"* in `--font-display`, `--text-xl`.
 2. **Hero — Today's session `Card`.** This is the hero element. Wired to the user's active plan (`useMyPlan`), not a placeholder.
-3. **Quick-log row** — a horizontal row of small `Button ghost` chips: **+ Weight · + Sleep · + Meal · + Steps**. Each navigates to `/log?focus=<field>` (see Log screen's focus handling below). Scrollable horizontally if it overflows on the narrowest phones; otherwise wraps to a second line rather than shrinking below tap-target size.
+3. **Quick-log row** — a horizontal row of small `Button ghost` chips: **+ Weight · + Sleep · + Steps**. Each navigates to `/log?focus=<field>` (see Log screen's focus handling below). Scrollable horizontally if it overflows on the narrowest phones; otherwise wraps to a second line rather than shrinking below tap-target size.
 4. **Stat row** — three `StatCard`s side by side (`Current weight`, `Streak`, `Days to target`), same three metrics as today's dashboard, restyled:
    - *Current weight*: big value = latest raw weigh-in (people want to see today's actual number, not a smoothed one). Sub-line = the trend caption rule above (e.g. "Trending down — about 0.3 kg/week"), not a raw day-over-day diff — this is the fix for "scale anxiety" the research calls out. If fewer than 2 weigh-ins: sub-line reads *"Log a couple more weigh-ins to see a trend"*.
    - *Streak*: big value = `{n} days`, sub-line = "days in a row with a log" (unchanged wording, already good).
@@ -98,17 +98,16 @@ States:
 2. **Quick strip** — always visible, not collapsible: three `Field`s side by side for **Weight (kg)**, **Sleep (h)**, **Steps** — the three most logged metrics, surfaced without opening anything (this directly answers "calmer form density" — most days a person only needs these three).
 3. **"Use yesterday's numbers" `Button ghost`** — shown only when yesterday's log has at least one value the current form doesn't already have. Tapping fills every *currently-blank* metric field (weight, waist, sleep, hrv, recovery, strain, steps, calories) from yesterday's entry — it never overwrites a field the person has already typed into today, same "fill blanks, don't clobber" rule the backend already uses for device sync. Implementation: fetch yesterday's log with the existing `useLog(shiftDate(date, -1))` hook (already supports arbitrary dates) — no new endpoint.
 4. **Collapsible sections** (accordion `Card`s — `SectionTitle` header doubles as the expand/collapse tap target, with a chevron that flips). Default open/closed state:
-   - **Nutrition** — *open by default* (core to a fat-loss tracker, alongside weight). Calories eaten / protein / carbs / fat fields, plus the meals list (add/remove rows), unchanged fields and behavior from today.
    - **More metrics** — *collapsed by default* unless any of its fields already have a value today. Contains waist, HRV, recovery %, strain, calories burned (everything from today's `METRIC_FIELDS` not already in the quick strip).
    - **Activities** — *collapsed by default* unless rows already exist. Unchanged behavior (activity picker + custom name fallback + duration + add/remove row).
    - **Habits** — *rendered only if the person has active habits* (unchanged conditional — if `form.habits.length === 0`, the section doesn't exist at all, not just collapsed). When present, open by default (checking off habits is a fast one-tap action, no reason to hide it).
    - **Injury check-in** — *rendered only if there are active injury check-ins* (unchanged conditional). Open by default when present (it's there because it matters today).
    - **Notes** — *collapsed by default*, plain textarea, unchanged.
-5. Bottom `ErrorText` if either the log or nutrition save fails (unchanged — both mutations can fail independently, show both messages if both fail).
+5. Bottom `ErrorText` if the log save fails.
 
 ### Deep-link focus (from Today's quick-log chips)
 
-`/log?focus=weight` → quick strip's Weight field gets focus + the screen scrolls to top (it's already visible). `/log?focus=sleep`/`?focus=steps` → same, those live in the quick strip too. `/log?focus=meal` → the Nutrition section expands (it's open by default already) and scrolls into view, focus lands on "+ Add meal". This is a small addition to Log's mount logic (read `searchParams`, no new API).
+`/log?focus=weight` → quick strip's Weight field gets focus + the screen scrolls to top (it's already visible). `/log?focus=sleep`/`?focus=steps` → same, those live in the quick strip too. This is a small addition to Log's mount logic (read `searchParams`, no new API).
 
 ### States
 
@@ -169,9 +168,8 @@ Copy: *"Save this change for just today, or update your program so it applies ev
 
 1. **Title** — "Progress" (`--text-xl`).
 2. **Weight trend `Card`** — dual-line chart (last 60 days, same raw+trend rule as Today), trend caption underneath. Loading: chart `Skeleton`. Empty: `EmptyState` — *"Nothing to chart yet — weigh-ins you log will show up here."*
-3. **Calories trend `Card`** — single-line chart (`--color-chart-line-2`, unchanged data source), no dual-line needed here (calories don't need the same noise-smoothing framing weight does — the research calls out weight specifically). Loading: chart `Skeleton`. Empty: *"No food logged yet — log a few days and your calorie trend will appear here."*
-4. **Consistency calendar `Card`** — new. A simple month grid (7 columns × up to 6 rows, one cell per calendar day) for the current month, each day's cell filled (`--color-accent`, low-opacity fill is fine, e.g. background at reduced alpha, text `--color-text`) if that date has a daily log, and empty (`--color-surface-2` or `--color-border` outline only) if not. Small back/forward arrows to move between months (mirrors the date-nav pattern already used in Log). Data source: `useLogsRange({ from: firstOfMonth, to: lastOfMonth })` — a day counts as "logged" if it appears in the returned array (same definition the streak endpoint already uses: a `daily_logs` row exists for that date). Optional secondary marker: a small dot on cells that also have a training session that day (from `useTrainingLogs({ from, to })` over the same range) — purely additive, both queries already exist, no new endpoint. Loading: a grid-shaped `Skeleton` (7×6 blocks). Empty (no logs this month): cells simply render unfilled — no separate empty-state message needed, the grid itself communicates it; optionally a small caption under the grid: *"No days logged this month yet — every log fills in a square."*
-5. **Personal records `Card`** — unchanged list (name, date, weight × reps, top 10), restyled as simple rows. Empty: *"Log some weighted sets and your best lifts will land here."*
+3. **Consistency calendar `Card`** — new. A simple month grid (7 columns × up to 6 rows, one cell per calendar day) for the current month, each day's cell filled (`--color-accent`, low-opacity fill is fine, e.g. background at reduced alpha, text `--color-text`) if that date has a daily log, and empty (`--color-surface-2` or `--color-border` outline only) if not. Small back/forward arrows to move between months (mirrors the date-nav pattern already used in Log). Data source: `useLogsRange({ from: firstOfMonth, to: lastOfMonth })` — a day counts as "logged" if it appears in the returned array (same definition the streak endpoint already uses: a `daily_logs` row exists for that date). Optional secondary marker: a small dot on cells that also have a training session that day (from `useTrainingLogs({ from, to })` over the same range) — purely additive, both queries already exist, no new endpoint. Loading: a grid-shaped `Skeleton` (7×6 blocks). Empty (no logs this month): cells simply render unfilled — no separate empty-state message needed, the grid itself communicates it; optionally a small caption under the grid: *"No days logged this month yet — every log fills in a square."*
+4. **Personal records `Card`** — unchanged list (name, date, weight × reps, top 10), restyled as simple rows. Empty: *"Log some weighted sets and your best lifts will land here."*
 
 ### States
 

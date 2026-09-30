@@ -25,7 +25,6 @@ import { daysBetween, localDaysAgo, localToday } from '../lib/localDate.js';
 const QUICK_LOGS = [
   { label: '+ Weight', focus: 'weight' },
   { label: '+ Sleep', focus: 'sleep' },
-  { label: '+ Meal', focus: 'meal' },
   { label: '+ Steps', focus: 'steps' },
 ];
 

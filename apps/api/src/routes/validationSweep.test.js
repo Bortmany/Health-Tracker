@@ -171,11 +171,6 @@ test('GET /logs/habit-summary rejects a calendar-impossible to date with 400, no
   assert.equal(res.status, 400);
 });
 
-test('GET /nutrition rejects a calendar-impossible from date with 400, not 500', async () => {
-  const res = await get('/nutrition?from=2026-13-01');
-  assert.equal(res.status, 400);
-});
-
 test('GET /training-logs rejects a calendar-impossible from date with 400, not 500', async () => {
   const res = await get('/training-logs?from=2026-00-10');
   assert.equal(res.status, 400);

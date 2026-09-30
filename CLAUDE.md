@@ -6,11 +6,11 @@ Cut is a fat-loss and training tracker for people who aren't sure what to train,
 
 ## Current state (roadmap complete)
 
-All planned phases are built, tested, reviewed, and merged to `main`. 141/141 backend tests passing (older counts in this file were out of date — re-run `npm test` rather than trusting a number). Features live:
+All planned phases are built, tested, reviewed, and merged to `main`. 227/227 backend tests passing (older counts in this file were out of date — re-run `npm test` rather than trusting a number). Features live:
 
 - Auth (JWT httpOnly cookie), consumer/coach roles, rate-limited login, 8+ char passwords
 - Onboarding quiz → matched against 14 seeded workout plans (progression rules + 52-week phases); free tier = 4-week plans, premium = 52-week; `plan_tier` on users
-- Daily logs (weight/sleep/steps/habits/activities/injuries), nutrition (macros + meals), training logs (programs, sessions, sets), rest timer, personal records, streaks, 50-exercise library with autocomplete
+- Daily logs (weight/sleep/steps/habits/activities/injuries/calories burned), training logs (programs, sessions, sets), rest timer, personal records, streaks, 50-exercise library with autocomplete
 - Coach accounts: invite codes (redeem = consent), client summaries, assign/edit programs in the client's account
 - Coach journey (Sep 2026, plan in `Agents/docs/specs/cut/coach-journey.md`): members apply to coach from the More page and the owner approves at `/admin/coaches` (the `ADMIN_EMAIL` account, granted once at first sign-in); approved coaches get a profile and referral link, a public directory at `/coaches`, student requests and in-app invites; the Clients tab shows quiet days, weekly adherence, a weight trend and private notes. Billing for coaches is specced (`coach-billing.md`) but not built.
 - Muscle heat map (`/heatmap`, `GET /api/muscle-heatmap`): library exercises and the seeded plans' exercises carry muscle tags (migration 022, `exercise_muscle_tags` for the plan names); the screen sends its own day as `?today=` so the fading counts from the user's day, not UTC. The same `?today=` (validated in `lib/userToday.js`, falling back to Oman's day) drives the logging streak, the plan's week number, the data export's streak and the coach's quiet-days / this-week signals. Public front page at `/` for signed-out visitors; its join buttons follow the sign-up mode.

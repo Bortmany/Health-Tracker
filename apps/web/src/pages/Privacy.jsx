@@ -13,7 +13,7 @@ export default function Privacy() {
           <Link to="/">Cut</Link>
         </h1>
         <h2 className={styles.title}>Privacy Policy</h2>
-        <p className={styles.updated}>Last updated: 18 July 2026</p>
+        <p className={styles.updated}>Last updated: 30 September 2026</p>
 
         <div className={styles.reviewNotice}>
           This policy is a plain-language template prepared for Cut and has not
@@ -45,7 +45,7 @@ export default function Privacy() {
             </li>
             <li>
               <strong>Daily health logs:</strong> weight, waist, sleep, heart
-              rate variability, recovery, strain, steps, calories, and any notes
+              rate variability, recovery, strain, steps, calories burned, and any notes
               you write.
             </li>
             <li>
@@ -56,10 +56,6 @@ export default function Privacy() {
             <li>
               <strong>Injuries:</strong> injuries you record and your daily
               pain, swelling, and can-I-train check-ins for them.
-            </li>
-            <li>
-              <strong>Nutrition:</strong> daily calories, protein, carbs, fat,
-              meals, and notes.
             </li>
             <li>
               <strong>Training:</strong> workout programs, logged sessions,
@@ -74,7 +70,7 @@ export default function Privacy() {
             <li>
               <strong>Device health data:</strong> only if you later connect a
               Cut phone app to Apple Health or Health Connect, it can send
-              weight, steps, calories, and sleep readings. Device data only
+              weight, steps, calories burned, and sleep readings. Device data only
               fills in blanks — it never overwrites something you typed.
             </li>
           </ul>
@@ -106,7 +102,7 @@ export default function Privacy() {
             email, last 30 days of weigh-ins, recent training sessions
             (including any notes you write on those sessions), and
             your programs — and can create and edit programs in your account.
-            A coach does not see your nutrition, habits, or injuries.
+            A coach does not see your habits or injuries.
             A coach can also keep private notes about you inside Cut — their
             own reminders about your training — which you never see. Those
             notes stop being readable by anyone, including that coach, the

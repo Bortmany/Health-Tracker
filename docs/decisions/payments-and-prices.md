@@ -91,3 +91,31 @@ Checked on the companies' own pricing pages: [Trainerize](https://www.trainerize
 - `~/claude/Agents/docs/specs/cut/remove-food-tracking.md`
 - `~/claude/Agents/docs/specs/cut/solo-ai-plan.md`
 - `~/claude/Agents/docs/specs/cut/coach-tools.md`
+
+## 6. Second provider search (30 Sep 2026): Whop found
+
+**Better than PayPal: Whop, using its "Whop for Platforms" feature.**
+- An individual in Oman can sign up. Fitness coaching is allowed (Whop bans therapy and supplements, not coaching).
+- Each coach gets their own Whop account and passes Whop's identity check. Whop pays coaches in 200+ countries.
+- Each coach can have their own monthly price.
+- Fees: 2.7% + 30¢ per card payment, plus 1.5% for foreign cards. Whop can also collect and pay US, EU and UK sales tax for 2% extra.
+- Free test mode today at sandbox.whop.com.
+- Sources: [banned countries](https://docs.whop.com/trust-and-safety/trust-safety-overview/sanctioned-countries), [banned businesses](https://docs.whop.com/trust-and-safety/trust-safety-overview/what-is-not-allowed-on-whop), [collecting for coaches](https://docs.whop.com/developer/platforms/collect-payments-for-connected-accounts), [fees](https://docs.whop.com/fees), [sandbox](https://docs.whop.com/developer/guides/sandbox).
+
+**Still to confirm:**
+- Is Cut's cut taken automatically on every monthly renewal? Test this in the sandbox. If not, Cut collects the payment and sends each coach their share.
+- Do payouts reach Omani banks?
+
+**Checked and ruled out:**
+- Tap: needs an Omani company, and paying coaches worldwide is unconfirmed.
+- Stripe through a UAE company: cannot pay coaches worldwide.
+- Dodo Payments: bans coaching.
+- Several others could only be checked lightly, because the web tools hit their limit.
+
+**Owner to-dos if Whop is chosen:**
+1. Create a sandbox.whop.com account and share its test keys.
+2. Create the real account and add an Omani bank account.
+3. Ask Whop support two things: is "Whop for Platforms" switched on for your account, and is Cut's cut taken again on every renewal?
+4. Choose the sales-tax option.
+
+The provider becomes final at the Step 5 gate.

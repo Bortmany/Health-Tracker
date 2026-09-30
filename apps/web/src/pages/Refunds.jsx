@@ -28,7 +28,7 @@ export default function Refunds() {
           <h2>Try before you pay</h2>
           <p>
             Cut has no trial to keep track of, because the free tier needs no
-            card details and never expires. You can log your weight, food,
+            card details and never expires. You can log your weight, sleep,
             habits and training, and follow a 4-week plan, without paying
             anything. Premium unlocks year-long plans, and you only pay once you
             have decided the app is worth it. Nothing is ever charged

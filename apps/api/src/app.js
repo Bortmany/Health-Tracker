@@ -28,7 +28,6 @@ import injuriesRouter from './routes/injuries.js';
 import legalRouter from './routes/legal.js';
 import logsRouter from './routes/logs.js';
 import muscleHeatmapRouter from './routes/muscleHeatmap.js';
-import nutritionRouter from './routes/nutrition.js';
 import plansRouter from './routes/plans.js';
 import programsRouter from './routes/programs.js';
 import settingsRouter from './routes/settings.js';
@@ -253,7 +252,7 @@ const writeLimiter = rateLimit({
   skip: (req) => rateLimitDisabled() || req.method === 'GET',
   message: { error: { message: 'You are saving changes too quickly. Please slow down and try again shortly.', code: 'RATE_LIMITED' } },
 });
-for (const path of ['/api/logs', '/api/nutrition', '/api/training-logs', '/api/programs', '/api/health-sync', '/api/coach', '/api/coach-link']) {
+for (const path of ['/api/logs', '/api/training-logs', '/api/programs', '/api/health-sync', '/api/coach', '/api/coach-link']) {
   app.use(path, writeLimiter);
 }
 
@@ -325,7 +324,6 @@ app.use('/api/injuries', injuriesRouter);
 app.use('/api/legal', legalRouter); // public — contact address for the legal pages
 app.use('/api/logs', logsRouter);
 app.use('/api/muscle-heatmap', muscleHeatmapRouter);
-app.use('/api/nutrition', nutritionRouter);
 app.use('/api/plans', plansRouter);
 app.use('/api/programs', programsRouter);
 app.use('/api/training-logs', trainingLogsRouter);

@@ -158,7 +158,7 @@ export default function CoachApplication() {
 
           <Field label="How do you train people?" error={shownError('approach')}>
             <TextArea
-              placeholder="e.g. Simple strength programs with a food plan people can actually stick to"
+              placeholder="e.g. Simple strength programs people can actually stick to"
               maxLength={APPROACH_MAX}
               rows={4}
               value={form.approach}

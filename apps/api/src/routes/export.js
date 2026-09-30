@@ -89,20 +89,6 @@ router.get('/', asyncHandler(async (req, res) => {
   const activitiesByLog = groupBy(logActivityRows, 'daily_log_id');
   const checkinsByLog = groupBy(checkinRows, 'daily_log_id');
 
-  // Nutrition days with their meals.
-  const { rows: nutritionRows } = await pool.query(
-    'SELECT *, date::text AS date FROM nutrition_logs WHERE user_id = $1 ORDER BY nutrition_logs.date',
-    [req.userId]
-  );
-  const { rows: mealRows } = await pool.query(
-    `SELECT m.* FROM nutrition_log_meals m
-     JOIN nutrition_logs nl ON nl.id = m.nutrition_log_id
-     WHERE nl.user_id = $1
-     ORDER BY m.sort_order`,
-    [req.userId]
-  );
-  const mealsByLog = groupBy(mealRows, 'nutrition_log_id');
-
   // Programs with their days and exercises (same nested shape the app uses).
   const { rows: programRows } = await pool.query(
     'SELECT * FROM programs WHERE user_id = $1 ORDER BY created_at',
@@ -262,21 +248,6 @@ router.get('/', asyncHandler(async (req, res) => {
         painPost: c.pain_post,
         swelling: c.swelling,
         canTrainTomorrow: c.can_train_tomorrow,
-      })),
-    })),
-    nutritionLogs: nutritionRows.map((row) => ({
-      date: row.date,
-      calories: row.calories,
-      protein: row.protein,
-      carbs: row.carbs,
-      fat: row.fat,
-      notes: row.notes,
-      meals: (mealsByLog.get(row.id) ?? []).map((m) => ({
-        name: m.name,
-        calories: m.calories,
-        protein: m.protein,
-        carbs: m.carbs,
-        fat: m.fat,
       })),
     })),
     programs,

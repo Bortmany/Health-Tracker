@@ -21,7 +21,7 @@ import {
 } from '../hooks/useCoach.js';
 import { useCoachProfile } from '../hooks/useCoachProfile.js';
 import { usePublicCoach, useReferralCoach } from '../hooks/useCoachDirectory.js';
-import { specialtyLabel } from '../lib/specialties.js';
+import { specialtyLabel, visibleSpecialties } from '../lib/specialties.js';
 import NotFound from './NotFound.jsx';
 import styles from './CoachPublicProfile.module.css';
 
@@ -335,9 +335,9 @@ export default function CoachPublicProfile() {
       <Card>
         <div className={styles.stack}>
           {coach.bio && <p className={styles.bio}>{coach.bio}</p>}
-          {coach.specialties?.length > 0 && (
+          {visibleSpecialties(coach.specialties).length > 0 && (
             <div className={styles.chipRow}>
-              {coach.specialties.map((code) => (
+              {visibleSpecialties(coach.specialties).map((code) => (
                 <Chip key={code}>{specialtyLabel(code)}</Chip>
               ))}
             </div>

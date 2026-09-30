@@ -117,24 +117,41 @@ test('quiet days and last active: today → 0, never → null (sorted first), 5 
   assert.deepEqual(neverRow.weightSeries, []);
 });
 
-test('a training session or a meal also counts as being active', async () => {
+test('a training session counts as being active', async () => {
   const coach = await makeCoach('anycoach');
   const lifter = await register('lifter');
-  const eater = await register('eater');
+  const walker = await register('walker');
   await link(coach, lifter);
-  await link(coach, eater);
+  await link(coach, walker);
 
   const twoAgo = await dbDate(-2);
   const threeAgo = await dbDate(-3);
   await pool.query('INSERT INTO training_logs (user_id, date) VALUES ($1, $2)', [lifter.user.id, twoAgo]);
-  await pool.query('INSERT INTO nutrition_logs (user_id, date, calories) VALUES ($1, $2, 2000)', [eater.user.id, threeAgo]);
+  await pool.query('INSERT INTO daily_logs (user_id, date, steps) VALUES ($1, $2, 5000)', [walker.user.id, threeAgo]);
 
   const clients = await listClients(coach);
   const byName = Object.fromEntries(clients.map((c) => [c.displayName, c]));
   assert.equal(byName['lifter User'].quietDays, 2);
-  assert.equal(byName['eater User'].quietDays, 3);
+  assert.equal(byName['lifter User'].lastActiveAt, twoAgo);
+  assert.equal(byName['walker User'].quietDays, 3);
   // Quietest first.
-  assert.deepEqual(clients.map((c) => c.displayName), ['eater User', 'lifter User']);
+  assert.deepEqual(clients.map((c) => c.displayName), ['walker User', 'lifter User']);
+});
+
+// Food tracking was removed from the app. Old meal rows can still sit in the
+// database, but they no longer count as the client being active.
+test('a client who only ever logged meals reads as "never logged"', async () => {
+  const coach = await makeCoach('oldmealcoach');
+  const eater = await register('eater');
+  await link(coach, eater);
+
+  const today = await dbDate(0);
+  await pool.query('INSERT INTO nutrition_logs (user_id, date, calories) VALUES ($1, $2, 2000)', [eater.user.id, today]);
+
+  const [row] = await listClients(coach);
+  assert.equal(row.displayName, 'eater User');
+  assert.equal(row.lastActiveAt, null);
+  assert.equal(row.quietDays, null);
 });
 
 test('adherence: sessions this week out of the days in my newest assigned program', async () => {
