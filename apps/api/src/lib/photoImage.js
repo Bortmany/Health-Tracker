@@ -9,6 +9,7 @@
 // notes — while keeping the picture itself untouched. Small and hand-written so
 // there's nothing native to install:
 //   - JPEG: drops APP1 (EXIF and XMP), APP13 (Photoshop/IPTC) and comments.
+//     Anything after the end-of-image marker (motion-photo trailers) is cut off.
 //     The one EXIF detail kept is which way up the photo is (orientation),
 //     rebuilt as a tiny fresh block, so phone photos don't turn sideways.
 //   - PNG: drops eXIf, tEXt, zTXt, iTXt and tIME chunks.
@@ -93,6 +94,7 @@ function stripJpeg(bytes) {
   const kept = [];
   let orientation = null;
   let sawScan = false;
+  let sawEnd = false;
   let pos = 2;
   while (pos < bytes.length) {
     if (bytes[pos] !== 0xff) throw new BadImageError();
@@ -104,7 +106,11 @@ function stripJpeg(bytes) {
     const segStart = markerPos - 1;
 
     if (marker === 0xd9) {
+      // End of image: anything after this (a phone's motion-photo video, a
+      // second JPEG, leftover bytes) is dropped, since it can carry its own
+      // location data.
       kept.push(bytes.subarray(segStart, markerPos + 1));
+      sawEnd = true;
       pos = markerPos + 1;
       break;
     }
@@ -119,11 +125,27 @@ function stripJpeg(bytes) {
     if (length < 2 || end > bytes.length) throw new BadImageError();
 
     if (marker === 0xda) {
-      // Start of the picture data: everything from here on is image, kept as is.
-      kept.push(bytes.subarray(segStart));
+      // Start of the picture data. Keep the scan header and the coded data
+      // after it as is. Inside that data a 0xFF is always followed by 0x00
+      // (a stuffed byte), 0xD0-0xD7 (a restart marker) or another 0xFF; the
+      // first other marker is the next header (progressive photos have
+      // several scans) or the real end of image.
+      let scanEnd = end;
+      while (scanEnd < bytes.length) {
+        if (bytes[scanEnd] === 0xff) {
+          const next = bytes[scanEnd + 1];
+          if (next === undefined) break;
+          if (next !== 0x00 && next !== 0xff && !(next >= 0xd0 && next <= 0xd7)) break;
+          scanEnd += next === 0xff ? 1 : 2;
+        } else {
+          scanEnd += 1;
+        }
+      }
+      if (scanEnd >= bytes.length) throw new BadImageError();
+      kept.push(bytes.subarray(segStart, scanEnd));
       sawScan = true;
-      pos = bytes.length;
-      break;
+      pos = scanEnd;
+      continue;
     }
 
     const body = bytes.subarray(markerPos + 3, end);
@@ -135,7 +157,7 @@ function stripJpeg(bytes) {
     pos = end;
   }
   // A JPEG with no picture data in it isn't a photo.
-  if (!sawScan) throw new BadImageError();
+  if (!sawScan || !sawEnd) throw new BadImageError();
 
   const head = [bytes.subarray(0, 2)];
   if (orientation && orientation !== 1) head.push(orientationSegment(orientation));

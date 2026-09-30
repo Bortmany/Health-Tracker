@@ -9,7 +9,8 @@ export function getCurrentCheckin(today) {
   return request(`/checkins/current?today=${today}`);
 }
 
-// body { mood, answers, notes } -> { checkin }
+// body { mood, answers, notes, questions } (questions = the list the form showed;
+// a 409 QUESTIONS_CHANGED means the coach edited them) -> { checkin }
 export function saveCurrentCheckin(today, body) {
   return request(`/checkins/current?today=${today}`, { method: 'PUT', body: JSON.stringify(body) });
 }

@@ -75,3 +75,24 @@ test('a file with the right first bytes but a broken inside is refused', () => {
   // A JPEG with no picture data in it.
   assert.throws(() => stripImageMetadata(Buffer.from([0xff, 0xd8, 0xff, 0xd9, 0, 0, 0, 0, 0, 0, 0, 0]), 'image/jpeg'), BadImageError);
 });
+
+test('JPEG: a trailer after the end of the picture (with its own EXIF/GPS) is cut off', () => {
+  const input = makeJpeg({ orientation: 1 });
+  const trailer = Buffer.concat([
+    Buffer.from([0xff, 0xd8, 0xff, 0xe1, 0x00, 0x30]),
+    Buffer.from(`Exif\0\0GPS ${SECRET}`, 'latin1'),
+    Buffer.alloc(16, 7),
+    Buffer.from([0xff, 0xd9]),
+  ]);
+  const withTrailer = Buffer.concat([input, trailer]);
+  assert.ok(has(withTrailer, SECRET));
+  const out = stripImageMetadata(withTrailer, 'image/jpeg');
+  assert.equal(has(out, SECRET), false);
+  assert.equal(has(out, 'Exif'), false);
+  assert.equal(has(out, 'GPS'), false);
+  // The output is the clean picture ending at its own end marker.
+  assert.ok(out.subarray(out.length - 2).equals(Buffer.from([0xff, 0xd9])));
+  assert.ok(out.equals(stripImageMetadata(input, 'image/jpeg')));
+  // A picture that never ends is refused.
+  assert.throws(() => stripImageMetadata(input.subarray(0, input.length - 2), 'image/jpeg'), BadImageError);
+});

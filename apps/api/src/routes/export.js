@@ -240,7 +240,8 @@ router.get('/', asyncHandler(async (req, res) => {
   }
 
   // Progress photos: the list only (date, shared or not). The pictures
-  // themselves stay in the app; each can be opened and saved from Progress.
+  // themselves are not in this export (no download exists yet); owners who
+  // want copies are told to email the contact address on the privacy page.
   const { rows: photoRows } = await pool.query(
     `SELECT id, taken_on::text AS taken_on, shared_with_coach, created_at
      FROM progress_photos WHERE user_id = $1

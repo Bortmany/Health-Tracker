@@ -58,10 +58,11 @@ test('the form only counts as changed when something real changed', () => {
 });
 
 test('what gets sent keeps one answer per question, blanks included', () => {
-  assert.deepEqual(toCheckinBody({ mood: 5, answers: [' Great ', ''], notes: '  ' }), {
+  assert.deepEqual(toCheckinBody({ mood: 5, answers: [' Great ', ''], notes: '  ' }, ['Q1?', 'Q2?']), {
     mood: 5,
     answers: ['Great', ''],
     notes: null,
+    questions: ['Q1?', 'Q2?'],
   });
   assert.equal(toCheckinBody({ mood: 2, answers: [], notes: ' Knee ' }).notes, 'Knee');
 });

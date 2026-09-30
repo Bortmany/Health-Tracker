@@ -105,7 +105,7 @@ function MoodPicker({ value, onChange }) {
 }
 
 // The form itself, started fresh from this week's saved check-in (if any).
-function CheckinForm({ data }) {
+function CheckinForm({ data, notice, onQuestionsChanged }) {
   const navigate = useNavigate();
   const save = useSaveCheckin();
   const questions = data.questions ?? [];
@@ -126,10 +126,11 @@ function CheckinForm({ data }) {
 
   function submit() {
     if (!canSend) return;
-    save.mutate(toCheckinBody(draft), {
+    save.mutate(toCheckinBody(draft, questions), {
       onSuccess: () => navigate('/', { state: { toast: editing ? 'Check-in updated' : 'Sent to your coach' } }),
       onError: (error) => {
         if (error?.code === 'NO_COACH') setLinkEnded(true);
+        if (error?.code === 'QUESTIONS_CHANGED') onQuestionsChanged?.();
       },
     });
   }
@@ -199,7 +200,8 @@ function CheckinForm({ data }) {
       </Card>
 
       <div className={styles.submitBlock}>
-        {save.isError &&
+        {notice && <ErrorText>{notice}</ErrorText>}
+        {save.isError && save.error?.code !== 'QUESTIONS_CHANGED' &&
           (isRateLimited(save.error) ? (
             <ErrorText>You&apos;re sending a lot right now. Please wait a minute and try again.</ErrorText>
           ) : (
@@ -217,6 +219,7 @@ function CheckinForm({ data }) {
 
 export default function CheckIn() {
   const current = useCurrentCheckin();
+  const [notice, setNotice] = useState('');
 
   let body;
   if (current.isLoading) {
@@ -241,7 +244,18 @@ export default function CheckIn() {
   } else {
     const data = current.data;
     // A fresh form whenever the saved check-in or the week changes underneath it.
-    body = <CheckinForm key={`${data.weekStart}-${data.checkin?.updatedAt ?? 'new'}`} data={data} />;
+    // The questions are part of the key too, so a coach's edit gives a form
+    // built on the new list (answers are filed by position).
+    body = (
+      <CheckinForm
+        key={`${data.weekStart}-${data.checkin?.updatedAt ?? 'new'}-${JSON.stringify(data.questions ?? [])}`}
+        data={data}
+        notice={notice}
+        onQuestionsChanged={() =>
+          setNotice('Your coach just changed their questions. Please check the form and send again.')
+        }
+      />
+    );
   }
 
   return (

@@ -97,12 +97,27 @@ const localDriver = {
 // ---- S3-compatible bucket --------------------------------------------------
 
 let s3Cache = null;
+let s3SdkOverride = null;
+
+// Test-only: hands the S3 driver a stand-in for @aws-sdk/client-s3 so tests
+// never touch a real bucket. Pass null to go back to the real one.
+export function setS3SdkForTests(sdk) {
+  s3SdkOverride = sdk;
+  s3Cache = null;
+}
+
+// Bucket keys get the same refusal of path tricks as the local folder.
+function checkS3Key(key) {
+  if (typeof key !== 'string' || key === '' || key.includes('\0') || !/^[A-Za-z0-9._-]+$/.test(key) || key === '.' || key === '..') {
+    throw new Error('Invalid file key');
+  }
+}
 
 async function s3() {
   const settings = S3_SETTINGS.map((name) => process.env[name]).join('\n');
   if (s3Cache && s3Cache.settings === settings) return s3Cache;
   // Loaded only when a bucket is configured, so dev and tests never need it.
-  const sdk = await import('@aws-sdk/client-s3');
+  const sdk = s3SdkOverride || await import('@aws-sdk/client-s3');
   const client = new sdk.S3Client({
     endpoint: process.env.S3_ENDPOINT,
     region: process.env.S3_REGION,
@@ -117,6 +132,7 @@ async function s3() {
 
 const s3Driver = {
   async save(key, bytes, contentType) {
+    checkS3Key(key);
     const { sdk, client, bucket } = await s3();
     await client.send(new sdk.PutObjectCommand({
       Bucket: bucket,
@@ -128,6 +144,7 @@ const s3Driver = {
     }));
   },
   async read(key) {
+    checkS3Key(key);
     const { sdk, client, bucket } = await s3();
     try {
       const out = await client.send(new sdk.GetObjectCommand({ Bucket: bucket, Key: key }));
@@ -138,6 +155,7 @@ const s3Driver = {
     }
   },
   async remove(key) {
+    checkS3Key(key);
     const { sdk, client, bucket } = await s3();
     // Deleting a file that is already gone is not an error in S3.
     await client.send(new sdk.DeleteObjectCommand({ Bucket: bucket, Key: key }));

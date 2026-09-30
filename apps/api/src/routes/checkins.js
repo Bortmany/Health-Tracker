@@ -66,7 +66,7 @@ router.get('/current', asyncHandler(async (req, res) => {
 // the same week replaces the answers and keeps the first sent time.
 router.put('/current', asyncHandler(async (req, res) => {
   const weekStart = weekStartOf(resolveToday(req.query.today));
-  const { mood, answers, notes } = req.body ?? {};
+  const { mood, answers, notes, questions: seenQuestions } = req.body ?? {};
 
   if (!Number.isInteger(mood) || mood < 1 || mood > 5) {
     throw invalid('Pick how your week felt, from 1 to 5.');
@@ -75,14 +75,17 @@ router.put('/current', asyncHandler(async (req, res) => {
     throw invalid('Your answers must be a list of text.');
   }
   const cleanAnswers = answers.map((a) => a.trim());
-  if (cleanAnswers.some((a) => a.length > MAX_ANSWER_LENGTH)) {
+  if (cleanAnswers.some((a) => [...a].length > MAX_ANSWER_LENGTH)) {
     throw invalid(`Each answer must be no more than ${MAX_ANSWER_LENGTH} characters long.`);
+  }
+  if (!Array.isArray(seenQuestions) || seenQuestions.some((q) => typeof q !== 'string')) {
+    throw invalid('Your form is out of date. Please reload the page and try again.');
   }
   if (notes != null && typeof notes !== 'string') {
     throw invalid('Your note must be text.');
   }
   const cleanNotes = (notes ?? '').trim();
-  if (cleanNotes.length > MAX_CHECKIN_NOTES_LENGTH) {
+  if ([...cleanNotes].length > MAX_CHECKIN_NOTES_LENGTH) {
     throw invalid(`Your note must be no more than ${MAX_CHECKIN_NOTES_LENGTH} characters long.`);
   }
 
@@ -94,6 +97,17 @@ router.put('/current', asyncHandler(async (req, res) => {
   }
 
   const questions = await loadCoachQuestions(coach.coach_id);
+  // Answers are filed by position, so the form must have been answering the
+  // coach's questions as they are right now. If the coach edited them in the
+  // meantime, nothing is saved and the student is asked to look again.
+  if (seenQuestions.length !== questions.length || seenQuestions.some((q, i) => q !== questions[i])) {
+    return res.status(409).json({
+      error: {
+        message: 'Your coach just changed their questions. Please check the form and send again.',
+        code: 'QUESTIONS_CHANGED',
+      },
+    });
+  }
   if (cleanAnswers.length !== questions.length) {
     throw invalid(
       `Your coach's questions have changed. Please answer all ${questions.length} and send again.`

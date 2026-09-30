@@ -162,3 +162,9 @@ test('a linked coach sees the measurements with no switch, and loses them on unl
   assert.equal(after.status, 404);
   assert.equal((await after.json()).measurements, undefined);
 });
+
+test('signed-out visitors are refused (401) on the student and coach measurement routes', async () => {
+  const someId = '00000000-0000-0000-0000-000000000000';
+  assert.equal((await api('/measurements', null)).status, 401);
+  assert.equal((await api(`/coach/clients/${someId}/measurements`, null)).status, 401);
+});

@@ -37,6 +37,11 @@ export function useSaveCheckin() {
     onError: (error) => {
       // The coaching link ended while the form was open: refresh who the
       // coach is, so every screen stops offering the check-in.
+      // The coach changed their questions while the form was open: fetch the
+      // new list so the form shows what will actually be asked.
+      if (error?.code === 'QUESTIONS_CHANGED') {
+        queryClient.invalidateQueries({ queryKey: CHECKIN_CURRENT_KEY });
+      }
       if (error?.code === 'NO_COACH') {
         queryClient.invalidateQueries({ queryKey: MY_COACH_KEY });
         queryClient.invalidateQueries({ queryKey: CHECKIN_CURRENT_KEY });

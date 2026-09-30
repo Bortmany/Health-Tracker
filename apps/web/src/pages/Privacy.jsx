@@ -49,6 +49,19 @@ export default function Privacy() {
               you write.
             </li>
             <li>
+              <strong>Body measurements:</strong> chest, arms, hips, thighs
+              and neck, if you choose to log them.
+            </li>
+            <li>
+              <strong>Progress photos:</strong> photos you choose to upload,
+              with the date and an optional note. See "Progress photos" below.
+            </li>
+            <li>
+              <strong>Check-ins and messages:</strong> weekly check-ins you send
+              your coach (mood, answers and a note) and messages between you and
+              your connected coach.
+            </li>
+            <li>
               <strong>Habits and activities:</strong> the habits you track and
               whether you ticked them each day, plus activities and how long
               they took.
@@ -81,8 +94,9 @@ export default function Privacy() {
             </li>
           </ul>
           <p>
-            We do not collect your location, contacts, or photos, and there are
-            no advertising or analytics trackers in the app.
+            We do not collect your location or contacts. The only photos we
+            hold are progress photos you upload yourself. There are no
+            advertising or analytics trackers in the app.
           </p>
 
           <h2>Why we collect it</h2>
@@ -123,6 +137,9 @@ export default function Privacy() {
             messages stop being visible to both of you. Your messages are
             deleted when you delete your account, and they are included in your
             data export.
+            A connected coach also sees your body measurements (chest, arms,
+            hips, thighs and neck, alongside your weight and waist) with no
+            extra switch, and stops seeing them the moment the connection ends.
             A coach does not see your habit names or your injuries.
             A coach can also keep private notes about you inside Cut — their
             own reminders about your training — which you never see. Those
@@ -148,6 +165,26 @@ export default function Privacy() {
             needing a Cut account. Your email address is never shown. You can
             switch your profile back to private at any time from your coach
             profile page.
+          </p>
+
+          <h2>Progress photos</h2>
+          <p>
+            Photos are private by default. Only you can see a photo until you
+            switch on "Share with my coach" for that one photo. A connected
+            coach then sees only the photos you have shared, and only while you
+            are connected. Turning sharing off, or ending the coaching
+            connection, hides them from your coach at once. Deleting a photo
+            removes the file for good.
+          </p>
+          <p>
+            Photo files are kept in private storage (a private bucket), never
+            at a public address, and are only handed to you or, if shared, to
+            your connected coach. We strip location data from the file when you
+            upload it. Your photos are deleted with your account. Your data
+            export lists your photos (the date and whether each is shared) but
+            not the image files themselves. To get copies of the files, email
+            us at the address under Contact below. If photo storage has not been switched on yet,
+            photos can't be added.
           </p>
 
           <h2>Cookies</h2>

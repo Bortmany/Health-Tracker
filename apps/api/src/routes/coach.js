@@ -204,7 +204,7 @@ router.put('/checkin-questions', asyncHandler(async (req, res) => {
     );
   }
   const clean = questions.map((q) => (typeof q === 'string' ? q.trim() : null));
-  if (clean.some((q) => q === null || q.length < 1 || q.length > MAX_QUESTION_LENGTH)) {
+  if (clean.some((q) => q === null || [...q].length < 1 || [...q].length > MAX_QUESTION_LENGTH)) {
     throw new validate.ValidationError(
       `Each question needs some text, up to ${MAX_QUESTION_LENGTH} characters.`,
       'VALIDATION_ERROR'

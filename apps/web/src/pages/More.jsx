@@ -414,7 +414,7 @@ function DataSection() {
   return (
     <Card className={styles.stackCard} title="Your data">
       <div className={styles.row}>
-        <div className={styles.mutedLine}>Download a copy of everything you&apos;ve logged, as one file.</div>
+        <div className={styles.mutedLine}>Download a copy of everything you&apos;ve logged, as one file. It lists your photos (date and whether shared) but not the image files themselves; to get copies of the files, contact us (details on the Privacy page).</div>
         <Button variant="secondary" onClick={() => exportData.mutate()} disabled={exportData.isPending}>
           {exportData.isPending ? 'Preparing...' : 'Download my data'}
         </Button>

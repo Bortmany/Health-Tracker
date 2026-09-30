@@ -331,3 +331,23 @@ test('the data export includes each thread, and account deletion removes the mes
   assert.deepEqual((await (await api('/export', coach)).json()).messageThreads, []);
   assert.equal(await unread(coach), false);
 });
+
+test('signed-out visitors are refused (401) on the student and coach message routes', async () => {
+  const someId = '00000000-0000-0000-0000-000000000000';
+  for (const [method, path] of [
+    ['GET', '/messages'],
+    ['POST', '/messages'],
+    ['POST', '/messages/read'],
+    ['GET', '/messages/unread'],
+    ['GET', `/coach/clients/${someId}/messages`],
+    ['POST', `/coach/clients/${someId}/messages`],
+    ['POST', `/coach/clients/${someId}/messages/read`],
+  ]) {
+    const res = await fetch(`${baseUrl}${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: method === 'GET' ? undefined : '{"body":"hi"}',
+    });
+    assert.equal(res.status, 401, `${method} ${path}`);
+  }
+});

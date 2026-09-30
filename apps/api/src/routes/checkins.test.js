@@ -69,7 +69,10 @@ async function clientRow(coach, clientId, today = utcToday()) {
   return clients.find((c) => c.clientId === clientId);
 }
 
+// The form sends back the questions it saw; unless a test says otherwise,
+// that is the four standard ones.
 async function send(student, body, today = utcToday()) {
+  if (!('questions' in body)) body = { ...body, questions: [...DEFAULT_CHECKIN_QUESTIONS] };
   return api(`/checkins/current?today=${today}`, student, { method: 'PUT', body });
 }
 
@@ -237,6 +240,41 @@ test('bad check-ins are refused with a plain message', async () => {
   assert.equal(rows[0].n, 1);
 });
 
+test('a check-in built on out-of-date questions is refused with 409 and nothing is saved', async () => {
+  const coach = await register('coach', 'coach-stale');
+  const student = await register('consumer', 'student-stale');
+  await link(coach, student);
+  const seen = [...DEFAULT_CHECKIN_QUESTIONS];
+  // The form loaded the standard four; then the coach reworded one (same count).
+  const edited = [...seen];
+  edited[1] = 'How was your mood?';
+  const putRes = await api('/coach/checkin-questions', coach, { method: 'PUT', body: { questions: edited } });
+  assert.equal(putRes.status, 200);
+
+  const res = await send(student, { mood: 3, answers: fourAnswers(), notes: null, questions: seen });
+  assert.equal(res.status, 409);
+  const { error } = await res.json();
+  assert.equal(error.code, 'QUESTIONS_CHANGED');
+  assert.equal(error.message, 'Your coach just changed their questions. Please check the form and send again.');
+  const { rows } = await pool.query('SELECT COUNT(*)::integer AS n FROM checkins WHERE user_id = $1', [student.user.id]);
+  assert.equal(rows[0].n, 0);
+
+  // A form that says nothing about its questions is refused too.
+  const noList = await api(`/checkins/current?today=${utcToday()}`, student, {
+    method: 'PUT',
+    body: { mood: 3, answers: fourAnswers(), notes: null },
+  });
+  assert.equal(noList.status, 400);
+
+  // Sending against the current list works.
+  assert.equal((await send(student, { mood: 3, answers: fourAnswers(), notes: null, questions: edited })).status, 200);
+
+  // Length counts whole characters: 500 emoji is fine, 501 is not.
+  const emoji500 = '😀'.repeat(500);
+  assert.equal((await send(student, { mood: 3, answers: [emoji500, '', '', ''], notes: null, questions: edited })).status, 200);
+  assert.equal((await send(student, { mood: 3, answers: [emoji500 + '😀', '', '', ''], notes: null, questions: edited })).status, 400);
+});
+
 test('coach question editor: 1 to 8 questions; new questions apply from the next check-in', async () => {
   const coach = await register('coach', 'coach-questions');
   const student = await register('consumer', 'student-questions');
@@ -308,8 +346,10 @@ test('coach question editor: 1 to 8 questions; new questions apply from the next
 
   // Answering against the old count is refused; the new count is accepted.
   const staleRes = await send(student, { mood: 3, answers: fourAnswers(), notes: null }, today);
-  assert.equal(staleRes.status, 400);
-  const newRes = await send(student, { mood: 3, answers: ['Yes', 'No'], notes: null }, today);
+  assert.equal(staleRes.status, 409);
+  assert.equal((await staleRes.json()).error.code, 'QUESTIONS_CHANGED');
+  const newQuestions = ['Did you hit your steps?', 'Any pain?'];
+  const newRes = await send(student, { mood: 3, answers: ['Yes', 'No'], notes: null, questions: newQuestions }, today);
   assert.equal(newRes.status, 200);
   const { checkin: updated } = await newRes.json();
   assert.deepEqual(updated.answers, [
@@ -458,7 +498,7 @@ test('the data export includes check-ins, and deleting the account removes them'
   // sent them stay with the students.
   const student2 = await register('consumer', 'student-export-2');
   await link(coach, student2);
-  assert.equal((await send(student2, { mood: 3, answers: ['x'], notes: null }, today)).status, 200);
+  assert.equal((await send(student2, { mood: 3, answers: ['x'], notes: null, questions: ['Coach export question?'] }, today)).status, 200);
   const coachDel = await api('/account', coach, { method: 'DELETE', body: { password: PASSWORD } });
   assert.equal(coachDel.status, 204);
   const { rows: templateRows } = await pool.query(
@@ -468,4 +508,22 @@ test('the data export includes check-ins, and deleting the account removes them'
   assert.equal(templateRows[0].n, 0);
   const history = await (await api('/checkins', student2)).json();
   assert.equal(history.checkins.length, 1);
+});
+
+test('signed-out visitors are refused (401) on the student and coach check-in routes', async () => {
+  const someId = '00000000-0000-0000-0000-000000000000';
+  for (const [method, path] of [
+    ['GET', '/checkins/current'],
+    ['PUT', '/checkins/current'],
+    ['GET', '/checkins'],
+    ['GET', `/coach/clients/${someId}/checkins`],
+    ['GET', '/coach/checkin-questions'],
+  ]) {
+    const res = await fetch(`${baseUrl}${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: method === 'GET' ? undefined : '{}',
+    });
+    assert.equal(res.status, 401, `${method} ${path}`);
+  }
 });

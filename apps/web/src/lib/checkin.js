@@ -72,13 +72,17 @@ export function isFormDirty(start, draft) {
   return start.answers.some((a, i) => a.trim() !== (draft.answers[i] ?? '').trim());
 }
 
-// What the server expects: same number of answers as questions, in order.
-export function toCheckinBody(draft) {
+// What the server expects: same number of answers as questions, in order,
+// plus the questions themselves.
+// `questions` is the list the form was showing, so the server can tell if the
+// coach changed them while the student was typing.
+export function toCheckinBody(draft, questions = []) {
   const notes = (draft.notes ?? '').trim();
   return {
     mood: draft.mood,
     answers: draft.answers.map((a) => a.trim().slice(0, ANSWER_MAX)),
     notes: notes === '' ? null : notes.slice(0, NOTE_MAX),
+    questions: [...questions],
   };
 }
 
