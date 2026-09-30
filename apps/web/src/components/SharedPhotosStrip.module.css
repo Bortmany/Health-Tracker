@@ -1,0 +1,30 @@
+.intro {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* One row of 96 x 128 tiles that scrolls sideways. */
+.strip {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+}
+
+.tile {
+  flex-shrink: 0;
+  width: 96px;
+  height: 128px;
+}
+
+.errorBlock {
+  display: grid;
+  gap: var(--space-2);
+}

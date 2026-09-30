@@ -1,0 +1,169 @@
+/* Weekly check-in form: one centered column of cards, then the send button. */
+
+.stack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+/* "← Today": a small raised box like the date arrows on Log, 44px tall.
+   It sits in the Screen's label slot, so undo that slot's label styling. */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  margin-bottom: var(--space-2);
+  background: var(--color-surface-2);
+  border: var(--surface-outline);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  letter-spacing: normal;
+  text-transform: none;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  border-color: var(--color-text-faint);
+}
+
+.backLink:active {
+  background: var(--color-border);
+}
+
+.backLink:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.sentBlock {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+/* Mood: five round buttons spread evenly, a word under each. */
+.moodRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.moodOption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.moodButton,
+.moodSelected {
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-full);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-lg);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.moodButton {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.moodButton:hover {
+  border-color: var(--color-text-faint);
+}
+
+.moodSelected {
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.moodButton:active,
+.moodSelected:active {
+  transform: scale(0.96);
+}
+
+.moodButton:focus-visible,
+.moodSelected:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.moodWord {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+@media (min-width: 1024px) {
+  .moodButton,
+  .moodSelected {
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+}
+
+.questions {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* Live "460/500" under a box once it's nearly full (same as coach notes). */
+.counter,
+.counterOver {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-align: right;
+  margin-top: var(--space-1);
+  color: var(--color-text-faint);
+}
+
+.counterOver {
+  color: var(--color-danger);
+}
+
+.submitBlock {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.errorBlock {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+/* Empty-state link styled like a raised secondary button (same as Clients). */
+.linkAsButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-2);
+  border: var(--surface-outline);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-4);
+  min-height: 2.75rem;
+  text-decoration: none;
+}
+
+.linkAsButton:hover {
+  border-color: var(--color-text-faint);
+}

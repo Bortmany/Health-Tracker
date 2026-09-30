@@ -1,0 +1,56 @@
+.body {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* One row of chips that scrolls sideways on a narrow phone. */
+.chips {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+  scrollbar-width: none;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chips > * {
+  flex-shrink: 0;
+  min-height: 36px;
+}
+
+.latestRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.latestDate {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.latestValue {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  color: var(--color-text);
+  text-align: right;
+}
+
+.caption,
+.muted {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.logLink {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-label);
+  color: var(--color-accent);
+  text-decoration: none;
+}

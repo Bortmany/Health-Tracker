@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { normalizeCheckins } from '../lib/injuryCheckins.js';
+import { cleanMeasurements, measurementsFromRow } from '../lib/measurements.js';
 import { countStreak } from '../lib/streak.js';
 import { resolveToday } from '../lib/userToday.js';
 import * as validate from '../lib/validate.js';
@@ -26,6 +27,8 @@ function toPublicLog(row) {
     steps: row.steps,
     calories: row.calories,
     notes: row.notes,
+    // Body measurements in cm (number or null).
+    ...measurementsFromRow(row),
   };
 }
 
@@ -155,6 +158,8 @@ router.put('/:date', asyncHandler(async (req, res) => {
   const cleanSteps = validate.nonNegativeNumber(steps, 'steps', { optional: true, integer: true, max: 1000000 });
   const cleanCalories = validate.nonNegativeNumber(calories, 'calories', { optional: true, integer: true, max: 100000 });
   const cleanNotes = validate.stringLength(notes, 'notes', { optional: true, max: 2000 });
+  // Chest, arms, hips, thighs and neck: each optional, each inside a sensible range.
+  const m = cleanMeasurements(req.body);
 
   if (!Array.isArray(habits) || !Array.isArray(activities)) {
     throw new validate.ValidationError('habits and activities must be lists');
@@ -236,15 +241,18 @@ router.put('/:date', asyncHandler(async (req, res) => {
 
   const log = await withTransaction(async (client) => {
     const { rows } = await client.query(
-      `INSERT INTO daily_logs (user_id, date, weight, waist, sleep, hrv, recovery, strain, steps, calories, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO daily_logs (user_id, date, weight, waist, sleep, hrv, recovery, strain, steps, calories, notes,
+                               chest, arms, hips, thighs, neck)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        ON CONFLICT (user_id, date) DO UPDATE SET
          weight = EXCLUDED.weight, waist = EXCLUDED.waist, sleep = EXCLUDED.sleep, hrv = EXCLUDED.hrv,
          recovery = EXCLUDED.recovery, strain = EXCLUDED.strain, steps = EXCLUDED.steps,
-         calories = EXCLUDED.calories, notes = EXCLUDED.notes
+         calories = EXCLUDED.calories, notes = EXCLUDED.notes,
+         chest = EXCLUDED.chest, arms = EXCLUDED.arms, hips = EXCLUDED.hips,
+         thighs = EXCLUDED.thighs, neck = EXCLUDED.neck
        RETURNING *, date::text AS date`,
       [req.userId, date, cleanWeight, cleanWaist, cleanSleep, cleanHrv, cleanRecovery,
-        cleanStrain, cleanSteps, cleanCalories, cleanNotes]
+        cleanStrain, cleanSteps, cleanCalories, cleanNotes, m.chest, m.arms, m.hips, m.thighs, m.neck]
     );
     const log = rows[0];
 

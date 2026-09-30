@@ -51,6 +51,8 @@ Tests: `npm test` (integration tests against the local Postgres). Build check: `
 | `PADDLE_API_KEY` + `PADDLE_WEBHOOK_SECRET` + `PADDLE_PRICE_ID` + `APP_URL` | Optional switch | Wakes paid Premium upgrades (Paddle checkout + webhook). Until all of them are set, the upgrade button shows "coming soon" and Premium can be granted manually: `UPDATE users SET plan_tier = 'premium' WHERE email = '...';` |
 | `PADDLE_ENV` | Optional | `sandbox` (the default, and what anything unrecognised falls back to) or `production` for real money. Decides which Paddle address the server talks to. |
 | `ADMIN_EMAIL` | Optional switch | The one account allowed to review coach applications at `/admin/coaches`. The first time that email signs in while no admin exists yet, it becomes the admin — once, ever. `/api/health` reports it as `admin`. |
+| `S3_BUCKET` + `S3_ENDPOINT` + `S3_ACCESS_KEY_ID` + `S3_SECRET_ACCESS_KEY` + `S3_REGION` | Optional switch | Wakes progress photo uploads: files go to a private S3-compatible bucket (a Railway Storage Bucket). In production, until all five are set, photos are switched off ("Photo uploads are coming soon"). `/api/health` reports it as `photos` (`s3`, `local` or `dormant`). |
+| `UPLOAD_DIR` | No | Local development only: the folder photos are saved in when no bucket is set (default `apps/api/uploads`, ignored by git). A relative path counts from the folder the server is started in. |
 | `PRIVACY_CONTACT_EMAIL` | Optional | The contact address shown as a mailto link on the `/terms`, `/privacy` and `/refunds` pages (served by the public `GET /api/legal/contact`). Defaults to the owner's address, `naeljam@hotmail.com`. |
 
 ## Repo structure

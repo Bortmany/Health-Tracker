@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import LineChart from '../components/LineChart.jsx';
-import { Card, EmptyState, Screen, Skeleton } from '../components/ui/index.js';
+import MeasurementsChart from '../components/MeasurementsChart.jsx';
+import PhotoGallery from '../components/PhotoGallery.jsx';
+import { Card, EmptyState, Screen, Skeleton, Toast, useToast } from '../components/ui/index.js';
 import { useHabitSummary, useLogsRange, useStreak } from '../hooks/useLogs.js';
+import { useMyMeasurements } from '../hooks/useMeasurements.js';
 import { usePersonalRecords, useTrainingLogs } from '../hooks/useTrainingLogs.js';
 import { smoothSeries, trendCaption } from '../lib/trend.js';
 import styles from './Progress.module.css';
@@ -194,6 +197,21 @@ function ConsistencyCalendar() {
   );
 }
 
+// The student's own body measurements, under the weight chart.
+function MeasurementsCard() {
+  const measurements = useMyMeasurements();
+  return (
+    <Card title="Measurements">
+      <MeasurementsChart
+        measurements={measurements.data}
+        isLoading={measurements.isLoading}
+        isError={measurements.isError}
+        onRetry={() => measurements.refetch()}
+      />
+    </Card>
+  );
+}
+
 export default function Progress() {
   const today = localToday();
   const from = localDaysAgo(59);
@@ -205,6 +223,7 @@ export default function Progress() {
     .map((l) => ({ date: l.date, weight: Number(l.weight) }));
   const smoothed = smoothSeries(weighIns.map((w) => w.weight));
   const caption = trendCaption(weighIns, smoothed);
+  const toast = useToast();
 
   return (
     <Screen title="Progress">
@@ -227,6 +246,10 @@ export default function Progress() {
             <EmptyState>Nothing to chart yet — weigh-ins you log will show up here.</EmptyState>
           )}
         </Card>
+
+        <MeasurementsCard />
+
+        <PhotoGallery onToast={toast.show} />
 
         <ConsistencyCalendar />
 
@@ -259,6 +282,7 @@ export default function Progress() {
           )}
         </Card>
       </div>
+      <Toast message={toast.message} />
     </Screen>
   );
 }

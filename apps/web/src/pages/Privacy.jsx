@@ -108,7 +108,22 @@ export default function Privacy() {
             email, last 30 days of weigh-ins, recent training sessions
             (including any notes you write on those sessions), and
             your programs — and can create and edit programs in your account.
-            A coach does not see your habits or injuries.
+            For the current week, a connected coach also sees your average
+            sleep and steps, how many sessions you logged, the day you last
+            logged, and how many habit ticks you made (a count only — not
+            which habits they are).
+            If you send a weekly check-in, only your connected coach sees it:
+            your mood (1 to 5), your answers to their questions and your note.
+            You can change it until the end of that Sunday. Your check-ins
+            stay in your account, and a coach can no longer see them once the
+            coaching connection ends.
+            If you message your coach in Cut, only you and your coach can read
+            those messages. We also note when a message has been read, so the
+            sender can see it was seen. Once the coaching connection ends, the
+            messages stop being visible to both of you. Your messages are
+            deleted when you delete your account, and they are included in your
+            data export.
+            A coach does not see your habit names or your injuries.
             A coach can also keep private notes about you inside Cut — their
             own reminders about your training — which you never see. Those
             notes stop being readable by anyone, including that coach, the

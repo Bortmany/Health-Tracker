@@ -3,14 +3,32 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import {
+  CHECKIN_COLUMNS,
+  MAX_CHECKIN_QUESTIONS,
+  MAX_QUESTION_LENGTH,
+  loadCoachQuestions,
+  toPublicCheckin,
+} from '../lib/checkins.js';
+import {
   COACH_PROFILE_COLUMNS,
   COACH_PROFILE_FROM,
   SPECIALTIES,
   ensureCoachProfile,
   referralLink,
 } from '../lib/coachProfiles.js';
+import {
+  addMessage,
+  cleanMessageBody,
+  clientsWithUnread,
+  findCoachThread,
+  loadMessages,
+  markThreadRead,
+} from '../lib/messages.js';
+import { cleanDays, loadMeasurements } from '../lib/measurements.js';
+import { PHOTO_COLUMNS, sendPhotoFile, toCoachPhoto } from '../lib/photos.js';
+import { photosEnabled } from '../lib/photoStorage.js';
 import * as validate from '../lib/validate.js';
-import { resolveToday, weekStartOf } from '../lib/userToday.js';
+import { daysBetween, resolveToday, weekStartOf } from '../lib/userToday.js';
 import { Rollback, withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireCoach } from '../middleware/requireCoach.js';
@@ -170,6 +188,39 @@ router.put('/profile', asyncHandler(async (req, res) => {
   res.json({ profile: toOwnProfile(await fetchOwnProfile(req.userId)) });
 }));
 
+// The coach's weekly check-in questions (1 to 8). Every coach starts from the
+// four defaults; saving replaces the whole list. Check-ins already sent keep
+// the questions they were answered against.
+router.get('/checkin-questions', asyncHandler(async (req, res) => {
+  res.json({ questions: await loadCoachQuestions(req.userId) });
+}));
+
+router.put('/checkin-questions', asyncHandler(async (req, res) => {
+  const { questions } = req.body ?? {};
+  if (!Array.isArray(questions) || questions.length < 1 || questions.length > MAX_CHECKIN_QUESTIONS) {
+    throw new validate.ValidationError(
+      `Add between 1 and ${MAX_CHECKIN_QUESTIONS} questions.`,
+      'VALIDATION_ERROR'
+    );
+  }
+  const clean = questions.map((q) => (typeof q === 'string' ? q.trim() : null));
+  if (clean.some((q) => q === null || q.length < 1 || q.length > MAX_QUESTION_LENGTH)) {
+    throw new validate.ValidationError(
+      `Each question needs some text, up to ${MAX_QUESTION_LENGTH} characters.`,
+      'VALIDATION_ERROR'
+    );
+  }
+
+  const { rows } = await pool.query(
+    `INSERT INTO checkin_templates (coach_id, questions)
+     VALUES ($1, $2::jsonb)
+     ON CONFLICT (coach_id) DO UPDATE SET questions = EXCLUDED.questions, updated_at = now()
+     RETURNING questions`,
+    [req.userId, JSON.stringify(clean)]
+  );
+  res.json({ questions: rows[0].questions });
+}));
+
 // Students who asked to work with this coach (from the directory or by
 // signing up through the referral link) and are waiting on an answer.
 router.get('/requests', asyncHandler(async (req, res) => {
@@ -281,7 +332,9 @@ router.post('/invites/email', asyncHandler(async (req, res) => {
 // "Today" is the coach's own day (see lib/userToday.js), and "this week" is
 // the Monday–Sunday week it falls in, never the server's UTC day.
 async function fetchClientSignals(coachId, clientIds, today) {
-  const empty = { lastActive: new Map(), done: new Map(), planned: new Map(), weights: new Map() };
+  const empty = {
+    lastActive: new Map(), done: new Map(), planned: new Map(), weights: new Map(), checkedIn: new Map(),
+  };
   if (clientIds.length === 0) return empty;
 
   // Last day the client logged anything (a daily log or a training session),
@@ -330,7 +383,16 @@ async function fetchClientSignals(coachId, clientIds, today) {
     [clientIds, today]
   );
 
+  // Who has sent THIS coach a check-in for this week, and when (one query for
+  // everyone).
+  const { rows: checkinRows } = await pool.query(
+    `SELECT user_id, submitted_at FROM checkins
+     WHERE user_id = ANY($1::uuid[]) AND coach_id = $2 AND week_start = $3::date`,
+    [clientIds, coachId, weekStartOf(today)]
+  );
+
   const signals = empty;
+  for (const row of checkinRows) signals.checkedIn.set(row.user_id, row.submitted_at);
   for (const row of activeRows) {
     signals.lastActive.set(row.user_id, { lastActiveAt: row.last_active, quietDays: row.quiet_days });
   }
@@ -370,7 +432,9 @@ router.get('/clients', asyncHandler(async (req, res) => {
     [req.userId]
   );
 
-  const signals = await fetchClientSignals(req.userId, activeRows.map((row) => row.client_id), today);
+  const clientIds = activeRows.map((row) => row.client_id);
+  const signals = await fetchClientSignals(req.userId, clientIds, today);
+  const unreadFrom = await clientsWithUnread(req.userId, clientIds);
 
   const clients = activeRows.map((row) => {
     const activity = signals.lastActive.get(row.client_id) ?? { lastActiveAt: null, quietDays: null };
@@ -388,6 +452,10 @@ router.get('/clients', asyncHandler(async (req, res) => {
         planned: signals.planned.get(row.client_id) ?? null,
       },
       weightSeries: signals.weights.get(row.client_id) ?? [],
+      checkinThisWeek: signals.checkedIn.has(row.client_id) ? 'done' : 'due',
+      checkinSentAt: signals.checkedIn.get(row.client_id) ?? null,
+      // Something from this client the coach hasn't opened yet.
+      unreadMessages: unreadFrom.has(row.client_id),
     };
   });
   clients.sort(compareClientsForTriage);
@@ -423,6 +491,96 @@ router.delete('/clients/:linkId', asyncHandler(async (req, res) => {
   );
   if (!rowCount) return linkNotFound(res);
   res.status(204).end();
+}));
+
+function roundTo(value, places) {
+  if (value == null) return null;
+  const factor = 10 ** places;
+  return Math.round(Number(value) * factor) / factor;
+}
+
+// The client's week at a glance (Monday to Sunday of the coach's day), next
+// to their check-in. Deliberately no calories or protein — coaches see
+// training, sleep, steps, habits and weight only. `weighIns` are the last 30
+// days of weigh-ins, oldest first, already loaded for the summary.
+async function fetchThisWeek(clientId, weekStart, today, weighIns) {
+  const { rows: sessionRows } = await pool.query(
+    `SELECT COUNT(*)::integer AS sessions FROM training_logs
+     WHERE user_id = $1 AND date >= $2::date AND date < $2::date + 7`,
+    [clientId, weekStart]
+  );
+  const { rows: dailyRows } = await pool.query(
+    `SELECT AVG(sleep) AS avg_sleep, AVG(steps) AS avg_steps FROM daily_logs
+     WHERE user_id = $1 AND date >= $2::date AND date < $2::date + 7`,
+    [clientId, weekStart]
+  );
+  // Habits: "x of y" — ticks on the client's current (not archived) habits
+  // from Monday up to today, out of (current habits x days so far this week).
+  const { rows: habitRows } = await pool.query(
+    `SELECT COUNT(*)::integer AS ticked
+     FROM daily_log_habits dlh
+     JOIN daily_logs dl ON dl.id = dlh.daily_log_id
+     JOIN habits h ON h.id = dlh.habit_id
+     WHERE dl.user_id = $1 AND h.user_id = $1 AND h.archived_at IS NULL
+       AND dlh.completed = true
+       AND dl.date >= $2::date AND dl.date <= $3::date`,
+    [clientId, weekStart, today]
+  );
+  const { rows: habitCountRows } = await pool.query(
+    `SELECT COUNT(*)::integer AS habits FROM habits
+     WHERE user_id = $1 AND archived_at IS NULL`,
+    [clientId]
+  );
+  const daysSoFar = Math.min(7, Math.max(1, daysBetween(weekStart, today) + 1));
+  const { rows: lastRows } = await pool.query(
+    `SELECT MAX(date)::text AS last_logged_on FROM (
+       SELECT date FROM daily_logs WHERE user_id = $1
+       UNION ALL
+       SELECT date FROM training_logs WHERE user_id = $1
+     ) logged`,
+    [clientId]
+  );
+  const { rows: latestWeightRows } = await pool.query(
+    `SELECT weight FROM daily_logs
+     WHERE user_id = $1 AND weight IS NOT NULL
+     ORDER BY date DESC LIMIT 1`,
+    [clientId]
+  );
+
+  const weightChange = weighIns.length >= 2
+    ? roundTo(Number(weighIns[weighIns.length - 1].weight) - Number(weighIns[0].weight), 1)
+    : null;
+
+  return {
+    weekStart,
+    sessions: sessionRows[0].sessions,
+    avgSleep: roundTo(dailyRows[0].avg_sleep, 1),
+    avgSteps: roundTo(dailyRows[0].avg_steps, 0),
+    habitsTicked: habitRows[0].ticked,
+    habitsPossible: habitCountRows[0].habits * daysSoFar,
+    lastLoggedOn: lastRows[0].last_logged_on ?? null,
+    latestWeight: latestWeightRows[0] ? Number(latestWeightRows[0].weight) : null,
+    weightChange,
+  };
+}
+
+// The check-ins this client sent to THIS coach, newest week first. Only while
+// the link is active: once it ends, every check-in is out of reach (a plain
+// "not found"). Check-ins the client sent to another coach never show.
+router.get('/clients/:clientId/checkins', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.clientId)) return clientNotFound(res);
+  const today = resolveToday(req.query.today);
+  const link = await findActiveLink(req.userId, req.params.clientId);
+  if (!link) return clientNotFound(res);
+
+  const { rows } = await pool.query(
+    `SELECT ${CHECKIN_COLUMNS} FROM checkins
+     WHERE user_id = $1 AND coach_id = $2
+     ORDER BY week_start DESC
+     LIMIT 12`,
+    [req.params.clientId, req.userId]
+  );
+  res.json({ weekStart: weekStartOf(today), checkins: rows.map(toPublicCheckin) });
 }));
 
 router.get('/clients/:clientId/summary', asyncHandler(async (req, res) => {
@@ -461,8 +619,18 @@ router.get('/clients/:clientId/summary', asyncHandler(async (req, res) => {
     [req.params.clientId]
   );
 
+  const weekStart = weekStartOf(today);
+  const { rows: checkinRows } = await pool.query(
+    `SELECT ${CHECKIN_COLUMNS} FROM checkins
+     WHERE user_id = $1 AND coach_id = $2 AND week_start = $3::date`,
+    [req.params.clientId, req.userId, weekStart]
+  );
+  const thisWeek = await fetchThisWeek(req.params.clientId, weekStart, today, weighInRows);
+
   res.json({
     client: { displayName: client.display_name },
+    checkinThisWeek: checkinRows[0] ? toPublicCheckin(checkinRows[0]) : null,
+    thisWeek,
     weighIns: weighInRows.map((row) => ({ date: row.date, weight: row.weight })),
     recentSessions: sessionRows.map((row) => ({ id: row.id, date: row.date, notes: row.notes })),
     programs: programRows.map((row) => ({
@@ -479,6 +647,83 @@ router.get('/clients/:clientId/summary', asyncHandler(async (req, res) => {
 // that it exists). The client can never reach this route at all: every
 // /api/coach route is coach-only.
 const MAX_NOTE_LENGTH = 4000;
+
+// Messages with one client. Every request looks up the ACTIVE link between
+// this coach and this client in the database; a client who isn't theirs (or
+// whose link has ended) gets the same plain "not found" as a made-up id.
+router.get('/clients/:clientId/messages', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.clientId)) return clientNotFound(res);
+  const thread = await findCoachThread(req.userId, req.params.clientId);
+  if (!thread) return clientNotFound(res);
+  const messages = await loadMessages(thread.link_id, req.userId);
+  res.json({ thread: { otherName: thread.other_name }, messages });
+}));
+
+router.post('/clients/:clientId/messages/read', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.clientId)) return clientNotFound(res);
+  const thread = await findCoachThread(req.userId, req.params.clientId);
+  if (!thread) return clientNotFound(res);
+  await markThreadRead(thread.link_id, req.userId);
+  res.json({ ok: true });
+}));
+
+router.post('/clients/:clientId/messages', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.clientId)) return clientNotFound(res);
+  const body = cleanMessageBody(req.body?.body);
+  const thread = await findCoachThread(req.userId, req.params.clientId);
+  if (!thread) return clientNotFound(res);
+  const message = await addMessage(thread.link_id, req.userId, body);
+  // The link ended between the two steps above.
+  if (!message) return clientNotFound(res);
+  res.status(201).json({ message });
+}));
+
+// Progress photos the client chose to share, and their body measurements.
+// Every request looks up the ACTIVE link between this coach and this client in
+// the database. Not their client, a link that has ended, a photo that isn't
+// shared, or a photo of someone else: all get the same plain "not found", so
+// the answer never hints that a photo exists.
+router.get('/clients/:clientId/photos', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.clientId)) return clientNotFound(res);
+  const link = await findActiveLink(req.userId, req.params.clientId);
+  if (!link) return clientNotFound(res);
+  if (!photosEnabled()) return res.json({ enabled: false, photos: [] });
+
+  const { rows } = await pool.query(
+    `SELECT ${PHOTO_COLUMNS} FROM progress_photos
+     WHERE user_id = $1 AND shared_with_coach = true
+     ORDER BY taken_on DESC, created_at DESC, id DESC`,
+    [req.params.clientId]
+  );
+  res.json({ enabled: true, photos: rows.map((row) => toCoachPhoto(row, req.params.clientId)) });
+}));
+
+router.get('/clients/:clientId/photos/:photoId/file', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.clientId) || !validate.isUuid(req.params.photoId)) return clientNotFound(res);
+  if (!photosEnabled()) return clientNotFound(res);
+  // One query proves all three: the link is active and this coach's, the
+  // photo belongs to that client, and it is shared.
+  const { rows } = await pool.query(
+    `SELECT ${PHOTO_COLUMNS} FROM progress_photos
+     WHERE id = $1 AND user_id = $2 AND shared_with_coach = true
+       AND EXISTS (
+         SELECT 1 FROM coach_clients cc
+         WHERE cc.coach_id = $3 AND cc.client_id = $2 AND cc.status = 'active'
+       )`,
+    [req.params.photoId, req.params.clientId, req.userId]
+  );
+  if (!rows[0]) return clientNotFound(res);
+  if (!(await sendPhotoFile(res, rows[0]))) return clientNotFound(res);
+}));
+
+router.get('/clients/:clientId/measurements', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.clientId)) return clientNotFound(res);
+  const today = resolveToday(req.query.today);
+  const days = cleanDays(req.query.days);
+  const link = await findActiveLink(req.userId, req.params.clientId);
+  if (!link) return clientNotFound(res);
+  res.json({ measurements: await loadMeasurements(req.params.clientId, today, days) });
+}));
 
 function toPublicNote(row) {
   return { body: row.body, updatedAt: row.updated_at };

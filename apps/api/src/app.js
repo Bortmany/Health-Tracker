@@ -10,12 +10,14 @@ import { pool } from './db/pool.js';
 import { verifyToken } from './lib/jwt.js';
 import { logger } from './lib/logger.js';
 import { captureException, initSentry } from './lib/sentry.js';
+import { storageMode } from './lib/photoStorage.js';
 import { getSignupMode } from './lib/signupMode.js';
 import accountRouter from './routes/account.js';
 import adminRouter from './routes/admin.js';
 import activitiesRouter from './routes/activities.js';
 import authRouter from './routes/auth.js';
 import billingRouter from './routes/billing.js';
+import checkinsRouter from './routes/checkins.js';
 import coachRouter from './routes/coach.js';
 import coachLinkRouter from './routes/coachLink.js';
 import coachesRouter from './routes/coaches.js';
@@ -27,7 +29,10 @@ import healthSyncRouter from './routes/healthSync.js';
 import injuriesRouter from './routes/injuries.js';
 import legalRouter from './routes/legal.js';
 import logsRouter from './routes/logs.js';
+import measurementsRouter from './routes/measurements.js';
+import messagesRouter from './routes/messages.js';
 import muscleHeatmapRouter from './routes/muscleHeatmap.js';
+import photosRouter from './routes/photos.js';
 import plansRouter from './routes/plans.js';
 import programsRouter from './routes/programs.js';
 import settingsRouter from './routes/settings.js';
@@ -82,6 +87,9 @@ app.use(compression());
 // Paddle's webhook signature is checked against the raw request bytes, so
 // that one path must skip JSON parsing. It's registered before express.json.
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
+// Photo uploads (POST /api/photos) send the image itself as the body. This
+// JSON parser only reads JSON bodies, so the image passes by untouched and the
+// photos route reads it itself, capped at 8 MB (routes/photos.js).
 // Cap the request body so a huge (or malicious) payload can't tie up memory.
 // 1 MB is far more than any real form here sends; going over it makes the JSON
 // parser throw, which the error handler below turns into a clean 413.
@@ -254,8 +262,10 @@ const writeLimiter = rateLimit({
 });
 // /api/plans joined in Oct 2026: adopting a plan and writing an AI plan are
 // saves too. (The AI plan also has its own stricter daily cap, counted in the
-// database by the plans route.)
-for (const path of ['/api/logs', '/api/training-logs', '/api/programs', '/api/plans', '/api/health-sync', '/api/coach', '/api/coach-link']) {
+// database by the plans route.) /api/checkins joined with weekly check-ins,
+// /api/messages with coach messages, /api/photos and /api/measurements with
+// progress photos and body measurements.
+for (const path of ['/api/logs', '/api/training-logs', '/api/programs', '/api/plans', '/api/health-sync', '/api/coach', '/api/coach-link', '/api/checkins', '/api/messages', '/api/photos', '/api/measurements']) {
   app.use(path, writeLimiter);
 }
 
@@ -289,6 +299,38 @@ const applicationLimiter = rateLimit({
 });
 app.use('/api/coach-applications', applicationLimiter);
 
+// Sending coach messages: 60 per person per rolling hour, on its own counter.
+// The student's send and the coach's send share ONE limiter (so one budget per
+// person), and only the send itself counts — reading a thread, marking it
+// read and the unread check are free.
+const messageSendLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: writeLimiterKey,
+  // Mounted on the thread's own path, so the send is exactly the POST to '/'.
+  skip: (req) => rateLimitDisabled() || req.method !== 'POST' || req.path !== '/',
+  message: { error: { message: "You're sending messages very quickly. Please wait a few minutes.", code: 'RATE_LIMITED' } },
+});
+app.use('/api/messages', messageSendLimiter);
+app.use('/api/coach/clients/:clientId/messages', messageSendLimiter);
+
+// Adding progress photos: 20 per person per rolling 24 hours, on its own
+// counter. Only the upload counts — looking, sharing and deleting are free.
+const photoUploadLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: writeLimiterKey,
+  skip: (req) => rateLimitDisabled() || req.method !== 'POST' || req.path !== '/',
+  message: { error: { message: "You've added a lot of photos today. Please try again tomorrow.", code: 'RATE_LIMITED' } },
+});
+app.use('/api/photos', photoUploadLimiter);
+
 app.get('/api/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -300,6 +342,8 @@ app.get('/api/health', async (_req, res) => {
       signups: getSignupMode(),
       // Whether ADMIN_EMAIL is set — the switch for the coach-application review screen.
       admin: process.env.ADMIN_EMAIL ? 'configured' : 'dormant',
+      // "s3" (a storage bucket) | "local" (a folder, dev only) | "dormant".
+      photos: storageMode(),
     });
   } catch (err) {
     // Log the real reason for us; the public response stays a fixed message so
@@ -313,6 +357,7 @@ app.use('/api/account', accountRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/billing', billingRouter);
+app.use('/api/checkins', checkinsRouter);
 app.use('/api/export', exportRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/habits', habitsRouter);
@@ -326,7 +371,10 @@ app.use('/api/health-sync', healthSyncRouter);
 app.use('/api/injuries', injuriesRouter);
 app.use('/api/legal', legalRouter); // public — contact address for the legal pages
 app.use('/api/logs', logsRouter);
+app.use('/api/measurements', measurementsRouter);
+app.use('/api/messages', messagesRouter);
 app.use('/api/muscle-heatmap', muscleHeatmapRouter);
+app.use('/api/photos', photosRouter);
 app.use('/api/plans', plansRouter);
 app.use('/api/programs', programsRouter);
 app.use('/api/training-logs', trainingLogsRouter);

@@ -498,3 +498,89 @@ CREATE INDEX ai_plan_attempts_user_day_idx ON ai_plan_attempts(user_id, attempte
 -- Every library plan is 52 weeks long (the seeded phases add up to 52), so
 -- anyone who was given only the first 4 weeks now has the whole plan.
 UPDATE user_plans SET duration_weeks = 52 WHERE duration_weeks < 52;
+
+-- Weekly check-ins (Oct 2026, spec Agents/docs/specs/cut/coach-tools.md).
+--
+-- checkin_templates: each coach's own list of check-in questions (1 to 8).
+-- Every coach starts from the same four defaults; a coach without a row gets
+-- one created the first time their questions are read (the same four live in
+-- apps/api/src/lib/checkins.js — keep the two lists in step).
+CREATE TABLE checkin_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  coach_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  questions JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO checkin_templates (coach_id, questions)
+SELECT id, '["How did your training feel this week?", "How was your energy?", "How did you sleep?", "Is there anything your coach should know?"]'::jsonb
+FROM users
+WHERE role = 'coach'
+ON CONFLICT (coach_id) DO NOTHING;
+
+-- checkins: one per student per week (weeks start on Monday). The questions
+-- are copied next to each answer, so later edits to the coach's list never
+-- change what a student already sent. coach_id is the coach it was sent to; a
+-- coach only sees it while their link to that student is active.
+CREATE TABLE checkins (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  coach_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  week_start DATE NOT NULL,
+  mood SMALLINT NOT NULL CHECK (mood BETWEEN 1 AND 5),
+  answers JSONB NOT NULL,
+  notes TEXT,
+  submitted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, week_start)
+);
+
+CREATE INDEX checkins_coach_id_week_start_idx ON checkins(coach_id, week_start);
+
+-- Coach-student messages (Oct 2026, spec Agents/docs/specs/cut/coach-tools.md B).
+--
+-- One plain text thread per coach-student link. Each message belongs to the
+-- coach_clients row it was sent on. When a link ends, the row is kept (status
+-- 'ended'), so its messages stay in the database but are out of reach: every
+-- read and write checks for an ACTIVE link. A later reconnection always makes
+-- a NEW coach_clients row, so it starts with an empty thread.
+CREATE TABLE messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  coach_client_id UUID NOT NULL REFERENCES coach_clients(id) ON DELETE CASCADE,
+  sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body TEXT NOT NULL CHECK (char_length(body) BETWEEN 1 AND 2000),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  read_at TIMESTAMPTZ
+);
+
+CREATE INDEX messages_coach_client_id_created_at_idx ON messages(coach_client_id, created_at);
+
+-- Progress photos and body measurements (Oct 2026, spec
+-- Agents/docs/specs/cut/coach-tools.md C).
+--
+-- A photo row holds only a random file key (never the original file name);
+-- the image itself lives in storage (see apps/api/src/lib/photoStorage.js).
+-- Every photo starts private: a linked coach sees it only once the student
+-- turns shared_with_coach on.
+CREATE TABLE progress_photos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  taken_on DATE NOT NULL,
+  file_key TEXT NOT NULL UNIQUE,
+  content_type TEXT NOT NULL,
+  size_bytes INTEGER NOT NULL,
+  shared_with_coach BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX progress_photos_user_id_taken_on_idx ON progress_photos(user_id, taken_on DESC);
+
+-- Five optional body measurements on the daily log, in cm, next to waist.
+-- Silly values are refused here as well as by the API.
+ALTER TABLE daily_logs
+  ADD COLUMN chest NUMERIC CHECK (chest IS NULL OR chest BETWEEN 30 AND 250),
+  ADD COLUMN arms NUMERIC CHECK (arms IS NULL OR arms BETWEEN 10 AND 100),
+  ADD COLUMN hips NUMERIC CHECK (hips IS NULL OR hips BETWEEN 30 AND 250),
+  ADD COLUMN thighs NUMERIC CHECK (thighs IS NULL OR thighs BETWEEN 20 AND 150),
+  ADD COLUMN neck NUMERIC CHECK (neck IS NULL OR neck BETWEEN 15 AND 80);

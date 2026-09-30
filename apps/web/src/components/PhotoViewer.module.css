@@ -1,0 +1,137 @@
+/* Full-screen photo viewer. Sits above the page and the bottom nav, but
+   below the "it worked" toast (40) so its messages stay visible; the delete
+   question draws above it. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: var(--color-bg);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  padding-top: calc(var(--space-2) + env(safe-area-inset-top));
+}
+
+.date {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-label);
+  color: var(--color-text);
+}
+
+.iconButton {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  color: var(--color-text);
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.iconButton:hover:not([disabled]) {
+  border-color: var(--color-text-faint);
+}
+
+.iconButton:active:not([disabled]) {
+  transform: scale(0.94);
+}
+
+.iconButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.iconButton[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.iconSpacer {
+  width: 44px;
+  height: 44px;
+}
+
+.stage {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: 100%;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  touch-action: pan-y;
+}
+
+.imageWrap {
+  min-width: 0;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+/* The whole photo fits on screen: never cropped, never stretched. */
+.image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  user-select: none;
+}
+
+.imageBox {
+  width: min(100%, 360px);
+  aspect-ratio: 3 / 4;
+  max-height: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.imageSkeleton {
+  background: var(--color-surface-2);
+}
+
+.boxText {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.panel {
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  /* Full-width strip; its content keeps to the app's 640 column. */
+  padding: var(--space-4) max(var(--space-4), calc((100% - var(--screen-max-width)) / 2));
+  display: grid;
+  gap: var(--space-3);
+}
+
+.shareBlock {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}

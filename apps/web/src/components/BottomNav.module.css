@@ -52,3 +52,8 @@
   border-radius: var(--radius-full);
   background: currentColor;
 }
+
+/* The unread-messages dot pins to the top-right corner of the label. */
+.label {
+  position: relative;
+}

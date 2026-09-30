@@ -14,6 +14,7 @@ import {
   Toast,
   useToast,
 } from '../components/ui/index.js';
+import UnreadDot from '../components/UnreadDot.jsx';
 import UpgradePanel from '../components/UpgradePanel.jsx';
 import { useDeleteAccount, useExportData } from '../hooks/useAccount.js';
 import { useMe, useLogout } from '../hooks/useAuth.js';
@@ -27,7 +28,9 @@ import {
 } from '../hooks/useCoach.js';
 import { useMyApplication } from '../hooks/useCoachApplications.js';
 import { useCoachProfile } from '../hooks/useCoachProfile.js';
+import { useUnread } from '../hooks/useMessages.js';
 import { useSettings, useUpdateSettings } from '../hooks/useSettings.js';
+import { firstName } from '../lib/checkin.js';
 import { toCalendarDay } from '../lib/localDate.js';
 import { THEME_OPTIONS, useTheme } from '../lib/useTheme.js';
 import styles from './More.module.css';
@@ -154,6 +157,8 @@ function CoachInviteRow({ invite, currentCoach, onDone }) {
 // the invite-code form.
 function CoachSection({ onToast }) {
   const { data: link, isLoading } = useMyCoach();
+  const { data: unread } = useUnread();
+  const navigate = useNavigate();
   const redeemCode = useRedeemCoachCode();
   const removeCoach = useRemoveMyCoach();
   const cancelRequest = useCancelCoachRequest();
@@ -201,16 +206,24 @@ function CoachSection({ onToast }) {
   } else if (coach) {
     body = (
       <>
-        <div className={styles.row}>
-          <div>Coached by {coach.displayName}</div>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => setConfirmingRemove(true)}
-            disabled={removeCoach.isPending}
-          >
-            Remove coach
-          </Button>
+        <div className={styles.coachRow}>
+          <div className={styles.coachName}>Coached by {coach.displayName}</div>
+          <span className={`${styles.dotAnchor} ${styles.coachMessage}`}>
+            <Button size="sm" block onClick={() => navigate('/messages')}>
+              Message {firstName(coach.displayName)}
+            </Button>
+            {unread && <UnreadDot corner />}
+          </span>
+          <span className={styles.coachRemove}>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => setConfirmingRemove(true)}
+              disabled={removeCoach.isPending}
+            >
+              Remove coach
+            </Button>
+          </span>
           <ConfirmDialog
             open={confirmingRemove}
             message="Disconnect from your coach? They'll lose access to your logs."

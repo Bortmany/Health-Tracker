@@ -1,4 +1,6 @@
-import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import CheckinCard from '../components/CheckinCard.jsx';
 import LineChart from '../components/LineChart.jsx';
 import {
   Button,
@@ -9,6 +11,8 @@ import {
   Screen,
   Skeleton,
   StatCard,
+  Toast,
+  useToast,
 } from '../components/ui/index.js';
 import { useMe } from '../hooks/useAuth.js';
 import { useHabits } from '../hooks/useHabits.js';
@@ -30,7 +34,20 @@ const QUICK_LOGS = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const toast = useToast();
   const { data: user } = useMe();
+
+  // A screen that sends people back here can leave a one-line "it worked"
+  // message (the check-in form does). Show it once, then clear it so a
+  // refresh or the back button doesn't show it again.
+  const arrivalToast = location.state?.toast;
+  const showToast = toast.show;
+  useEffect(() => {
+    if (!arrivalToast) return;
+    showToast(arrivalToast);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [arrivalToast, showToast, navigate, location.pathname]);
   const { data: settings } = useSettings();
   const today = localToday();
   const from = localDaysAgo(29);
@@ -161,6 +178,8 @@ export default function Dashboard() {
       <div className={styles.stack}>
         {renderHero()}
 
+        <CheckinCard />
+
         <div className={styles.quickRow}>
           {QUICK_LOGS.map(({ label, focus }) => (
             <Button key={focus} variant="ghost" size="sm" onClick={() => navigate(`/log?focus=${focus}`)}>
@@ -231,6 +250,8 @@ export default function Dashboard() {
           )}
         </Card>
       </div>
+
+      <Toast message={toast.message} />
     </Screen>
   );
 }

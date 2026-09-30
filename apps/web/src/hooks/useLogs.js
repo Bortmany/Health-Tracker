@@ -42,6 +42,8 @@ export function usePutLog(date) {
       queryClient.invalidateQueries({ queryKey: ['logs'] });
       queryClient.invalidateQueries({ queryKey: ['habitSummary'] });
       queryClient.invalidateQueries({ queryKey: ['streak'] });
+      // Body measurements are saved with the day, and charted on Progress.
+      queryClient.invalidateQueries({ queryKey: ['measurements'] });
     },
   });
 }

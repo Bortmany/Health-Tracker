@@ -1,0 +1,295 @@
+/* Message thread (student and coach). On a phone the list fills the space
+   between the title and the composer, and the composer sits right above the
+   bottom nav. On a laptop it is one Card, about 70% of the window tall. */
+
+/* "← More" / "← Clients": same raised box as the check-in back link. */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  margin-bottom: var(--space-2);
+  background: var(--color-surface-2);
+  border: var(--surface-outline);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  letter-spacing: normal;
+  text-transform: none;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  border-color: var(--color-text-faint);
+}
+
+.backLink:active {
+  background: var(--color-border);
+}
+
+.backLink:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Title, back link and page padding take about 9rem above the thread. */
+.frame {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--nav-height) - env(safe-area-inset-bottom) - 9rem);
+  height: calc(100dvh - var(--nav-height) - env(safe-area-inset-bottom) - 9rem);
+  min-height: 18rem;
+}
+
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  overscroll-behavior: contain;
+}
+
+.offline {
+  flex: none;
+  margin: 0 0 var(--space-2);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.dayDivider {
+  align-self: center;
+  margin: var(--space-2) 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.rowMine,
+.rowTheirs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.rowMine {
+  align-items: flex-end;
+}
+
+.rowTheirs {
+  align-items: flex-start;
+}
+
+.bubble {
+  display: block;
+  max-width: 80%;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.bubbleMine {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+
+.bubbleTheirs {
+  background: var(--color-surface-2);
+  border: var(--surface-outline);
+}
+
+.bubbleSending {
+  opacity: 0.6;
+}
+
+/* Time, "Sending...", "Sent" / "Seen 3:45 PM". */
+.meta {
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+}
+
+/* A failed bubble is itself the "try again" button. */
+.failedButton {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.failedButton .bubble {
+  max-width: 80%;
+  margin-left: auto;
+  opacity: 0.6;
+}
+
+.failedButton:active .bubble {
+  transform: scale(0.98);
+}
+
+.failedButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-lg);
+}
+
+.failedLine {
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}
+
+.emptySlot {
+  margin: auto 0;
+}
+
+.emptyTitle {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: var(--text-base);
+}
+
+.emptyBody {
+  margin: 0;
+}
+
+/* "New message" floats just above the composer while reading older ones. */
+.pillSlot {
+  position: sticky;
+  bottom: var(--space-2);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.pillSlot > button {
+  pointer-events: auto;
+}
+
+.composer {
+  flex: none;
+  display: grid;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: var(--surface-outline);
+}
+
+.composerRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+/* Same look as the app's text boxes; starts one line tall. */
+.input {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.75rem;
+  resize: none;
+  background: var(--color-surface);
+  border: var(--surface-outline);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  padding: var(--space-2) var(--space-3);
+  outline: none;
+  overflow-y: hidden;
+}
+
+.input:focus {
+  border-color: var(--color-accent);
+}
+
+.input::placeholder {
+  color: var(--color-text-faint);
+}
+
+.input:disabled {
+  opacity: 0.6;
+}
+
+.sendSlot {
+  flex: none;
+}
+
+.sendSlot > button {
+  min-height: 2.75rem;
+}
+
+.counter,
+.counterOver {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-align: right;
+  color: var(--color-text-faint);
+}
+
+.counterOver {
+  color: var(--color-danger);
+}
+
+/* Only laptops send with Enter, so only they get the hint. */
+.hint {
+  display: none;
+  margin: 0;
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+}
+
+.errorBlock {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+.linkAsButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-2);
+  border: var(--surface-outline);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-4);
+  min-height: 2.75rem;
+  text-decoration: none;
+}
+
+.linkAsButton:hover {
+  border-color: var(--color-text-faint);
+}
+
+@media (min-width: 1024px) {
+  .frame {
+    height: 70vh;
+    padding: var(--space-4);
+    background: var(--color-surface);
+    border: var(--surface-outline);
+    border-radius: var(--radius-lg);
+  }
+
+  .bubble,
+  .failedButton .bubble {
+    max-width: 70%;
+  }
+
+  .hint {
+    display: block;
+  }
+}

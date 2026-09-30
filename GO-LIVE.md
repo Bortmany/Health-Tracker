@@ -88,6 +88,16 @@ whoever runs the app.
    and each shows a visible "not yet reviewed by a lawyer" notice. Get them
    reviewed, then remove that notice — it looks weak to a reviewer.
 
+## Progress photos — Railway Storage Bucket (built, asleep until set)
+
+Photos stay switched off in production ("Photo uploads are coming soon") until the app has somewhere safe to keep them.
+
+- [ ] In the Railway project, add a **Storage Bucket**.
+- [ ] Open the bucket's settings and copy its five values into the **app** service's variables: `S3_BUCKET` (the bucket name), `S3_ENDPOINT` (its address), `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` and `S3_REGION`. All five are needed. Redeploy.
+- [ ] Check `/api/health` shows `"photos": "s3"`, then add one photo from Progress and open it.
+- [ ] Keep the bucket **private** — never switch on public access. The app shows each photo only to its owner, or to their coach if they shared it.
+- [ ] **Backups are not confirmed.** The database backups above do not include photos. Turn on versioning for the bucket if Railway offers it, or schedule a regular copy of the bucket to somewhere else. Until then, a deleted or lost bucket means lost photos.
+
 ## Optional
 - [ ] `ANTHROPIC_API_KEY` — wakes the AI plan writer (personalized plans by Claude instead of picked from the 14-plan library).
 - `PORT`, `CORS_ORIGIN` — defaults are fine.

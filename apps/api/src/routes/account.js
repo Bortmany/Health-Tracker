@@ -2,6 +2,8 @@ import bcrypt from 'bcrypt';
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { logger } from '../lib/logger.js';
+import { deletePhoto } from '../lib/photoStorage.js';
 import { withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -22,7 +24,8 @@ router.use(requireAuth);
 // The coach case: a coach's own account and links are removed, but their
 // clients keep every program the coach wrote — the created_by_coach_id column
 // is simply cleared (matching its ON DELETE SET NULL constraint). Client data
-// is never touched.
+// is never touched — except the message threads shared with the departing
+// person, which go with the link they belong to, for both people.
 router.delete('/', asyncHandler(async (req, res) => {
   const { password } = req.body ?? {};
   // Must be a string: a non-string (array/object) would throw inside bcrypt.compare
@@ -45,7 +48,19 @@ router.delete('/', asyncHandler(async (req, res) => {
     });
   }
 
-  await withTransaction(async (client) => {
+  // Progress photo files live outside the database: the transaction hands
+  // back every file key it deleted, and the files are removed after it commits.
+  const photoKeys = await withTransaction(async (client) => {
+    // Messages first: everything this user sent, and every thread on their
+    // links (both people's messages — a thread belongs to the link, and the
+    // link goes below).
+    await client.query(
+      `DELETE FROM messages
+       WHERE sender_id = $1
+          OR coach_client_id IN (SELECT id FROM coach_clients WHERE coach_id = $1 OR client_id = $1)`,
+      [req.userId]
+    );
+
     // Coach/client links, in both directions: rows where this user is the
     // coach (including unredeemed invites) and rows where they are the client.
     await client.query('DELETE FROM coach_clients WHERE coach_id = $1 OR client_id = $1', [req.userId]);
@@ -57,6 +72,12 @@ router.delete('/', asyncHandler(async (req, res) => {
     // The user's own records. Nested children (program days/exercises, meals,
     // sets, habit ticks, check-ins) cascade off these parents — the same
     // cascades the app's normal delete endpoints rely on.
+    const { rows: photoRows } = await client.query(
+      'DELETE FROM progress_photos WHERE user_id = $1 RETURNING file_key',
+      [req.userId]
+    );
+    await client.query('DELETE FROM checkins WHERE user_id = $1', [req.userId]);
+    await client.query('DELETE FROM checkin_templates WHERE coach_id = $1', [req.userId]);
     await client.query('DELETE FROM user_plans WHERE user_id = $1', [req.userId]);
     await client.query('DELETE FROM ai_plan_adjustments WHERE user_id = $1', [req.userId]);
     await client.query('DELETE FROM ai_plan_attempts WHERE user_id = $1', [req.userId]);
@@ -71,7 +92,19 @@ router.delete('/', asyncHandler(async (req, res) => {
 
     // Finally the account itself.
     await client.query('DELETE FROM users WHERE id = $1', [req.userId]);
+    return photoRows.map((row) => row.file_key);
   });
+
+  // The account is gone; now remove its photo files. A file that is already
+  // missing is fine, and one that can't be removed right now is logged (by
+  // key only) rather than failing a deletion that has already happened.
+  for (const key of photoKeys) {
+    try {
+      await deletePhoto(key);
+    } catch (err) {
+      logger.error('Could not remove a deleted account\'s photo file', { fileKey: key, error: err });
+    }
+  }
 
   // Same cookie options the logout route uses, so the session cookie is
   // actually removed by the browser.

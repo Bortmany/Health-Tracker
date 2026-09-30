@@ -1,0 +1,122 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+/* The Card's own title spacing isn't used here (the button shares the row). */
+.header h2 {
+  margin: 0;
+}
+
+.privacyLine {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.fileInput {
+  display: none;
+}
+
+.groups {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.group {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.dayLabel {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.errorBlock {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.dormantTitle {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text);
+}
+
+.dormantLine {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* ---- Tiles still uploading, or failed ---- */
+
+.pendingTile {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-surface-2);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  text-align: center;
+}
+
+.pendingPulse {
+  position: absolute;
+  inset: 0;
+  background: var(--color-surface-2);
+}
+
+.pendingText {
+  position: relative;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.failedTile {
+  border: 1px solid var(--color-border);
+}
+
+.failedText {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.dropButton {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.dropButton:hover {
+  color: var(--color-text);
+}
+
+.dropButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -4px;
+  border-radius: var(--radius-sm);
+}

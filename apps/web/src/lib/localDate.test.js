@@ -3,7 +3,16 @@
 // local clock, so the expected day is the same in any time zone.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addDays, daysBetween, localDaysAgo, localToday, toCalendarDay } from './localDate.js';
+import {
+  addDays,
+  dayOfMoment,
+  daysBetween,
+  formatShortDay,
+  localDaysAgo,
+  localToday,
+  toCalendarDay,
+  weekStartOf,
+} from './localDate.js';
 
 test('late in the evening it is still the same day', () => {
   // 11:59 pm on 27 Sep.

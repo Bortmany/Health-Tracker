@@ -177,3 +177,41 @@
   padding-top: var(--space-3);
   border-top: var(--surface-outline);
 }
+
+/* "Your coach" when linked. Phone: name and "Remove coach" on one line, the
+   message button full width underneath. Laptop: all three on one line. */
+.coachRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'name remove'
+    'message message';
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.coachName {
+  grid-area: name;
+  min-width: 0;
+}
+
+.coachRemove {
+  grid-area: remove;
+}
+
+.coachMessage {
+  grid-area: message;
+}
+
+/* Holds a button and pins the unread dot to its top-right corner. */
+.dotAnchor {
+  position: relative;
+  display: block;
+}
+
+@media (min-width: 1024px) {
+  .coachRow {
+    grid-template-columns: 1fr auto auto;
+    grid-template-areas: 'name message remove';
+  }
+}

@@ -17,10 +17,12 @@ import {
   useToast,
 } from '../components/ui/index.js';
 import { useActivities } from '../hooks/useActivities.js';
+import { useMyCoach } from '../hooks/useCoach.js';
 import { useCreateHabit, useDeleteHabit } from '../hooks/useHabits.js';
 import { useLog, usePutLog } from '../hooks/useLogs.js';
 import styles from './Log.module.css';
 import { addDays, localToday } from '../lib/localDate.js';
+import { MEASUREMENTS, MEASUREMENT_KEYS, measurementPayload, rangeError, rangeErrors } from '../lib/measurements.js';
 
 const DURATIONS = [5, 10, 15, 20, 30, 45, 60, 75, 90, 120];
 
@@ -39,9 +41,9 @@ const QUICK_FIELDS = [
   { key: 'steps', label: 'Steps', step: '1', inputMode: 'numeric' },
 ];
 
-// Everything else goes in the collapsible "More metrics" group.
+// Everything else goes in the collapsible "More metrics" group. Waist lives
+// with the other body measurements in "Body measurements (cm)".
 const MORE_FIELDS = [
-  { key: 'waist', label: 'Waist (cm)', step: '0.1', inputMode: 'decimal' },
   { key: 'hrv', label: 'HRV', step: '1', inputMode: 'numeric' },
   { key: 'recovery', label: 'Recovery %', step: '1', inputMode: 'numeric' },
   { key: 'strain', label: 'Strain', step: '0.1', inputMode: 'decimal' },
@@ -61,6 +63,11 @@ function buildFormFromData(data) {
     strain: data.log?.strain ?? '',
     steps: data.log?.steps ?? '',
     calories: data.log?.calories ?? '',
+    chest: data.log?.chest ?? '',
+    arms: data.log?.arms ?? '',
+    hips: data.log?.hips ?? '',
+    thighs: data.log?.thighs ?? '',
+    neck: data.log?.neck ?? '',
     notes: data.log?.notes ?? '',
     habits: data.habits.map((h) => ({ habitId: h.habitId, label: h.label, completed: h.completed })),
     activities: data.activities.map((a, i) => ({
@@ -116,11 +123,16 @@ export default function Log() {
   const [habitToDelete, setHabitToDelete] = useState(null);
   const [searchParams] = useSearchParams();
   const toast = useToast();
+  const { data: myCoach } = useMyCoach();
+  // Out-of-range measurement boxes, checked when you tap away from one.
+  const [measureErrors, setMeasureErrors] = useState({});
+  const [measureFormError, setMeasureFormError] = useState(false);
 
   // Which sections are expanded. Defaults re-evaluate when the date changes:
   // a section that already has data for that day starts open.
   const [open, setOpen] = useState({
     metrics: false,
+    body: false,
     activities: false,
     habits: true,
     injuries: true,
@@ -138,8 +150,11 @@ export default function Log() {
       setForm(built);
       if (openInitRef.current !== date) {
         openInitRef.current = date;
+        setMeasureErrors({});
+        setMeasureFormError(false);
         setOpen({
           metrics: MORE_FIELDS.some(({ key }) => built[key] !== ''),
+          body: MEASUREMENT_KEYS.some((key) => built[key] !== ''),
           activities: built.activities.length > 0,
           habits: true,
           injuries: true,
@@ -161,6 +176,28 @@ export default function Log() {
 
   function updateField(key, value) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  // A box that's already flagged clears as soon as it's fixed; a new
+  // problem is only pointed out once you tap away (see checkMeasurement).
+  function updateMeasurement(key, value) {
+    updateField(key, value);
+    if (measureErrors[key] && !rangeError(key, value)) {
+      const next = { ...measureErrors };
+      delete next[key];
+      setMeasureErrors(next);
+      if (Object.keys(next).length === 0) setMeasureFormError(false);
+    }
+  }
+
+  function checkMeasurement(key) {
+    const message = rangeError(key, form?.[key]);
+    setMeasureErrors((errs) => {
+      const next = { ...errs };
+      if (message) next[key] = message;
+      else delete next[key];
+      return next;
+    });
   }
 
   function toggleHabit(habitId) {
@@ -255,9 +292,19 @@ export default function Log() {
     e.preventDefault();
     if (!form) return;
 
+    // Out-of-range measurements are pointed out here instead of sent.
+    const problems = rangeErrors(form);
+    if (Object.keys(problems).length > 0) {
+      setMeasureErrors(problems);
+      setMeasureFormError(true);
+      setOpen((o) => ({ ...o, body: true }));
+      return;
+    }
+    setMeasureFormError(false);
+
     const savingLog = putLog.mutateAsync({
       weight: form.weight === '' ? null : Number(form.weight),
-      waist: form.waist === '' ? null : Number(form.waist),
+      ...measurementPayload(form),
       sleep: form.sleep === '' ? null : Number(form.sleep),
       hrv: form.hrv === '' ? null : Number(form.hrv),
       recovery: form.recovery === '' ? null : Number(form.recovery),
@@ -297,6 +344,7 @@ export default function Log() {
 
   // Dots for collapsed groups that already hold entries for this day.
   const metricsHaveData = Boolean(form) && MORE_FIELDS.some(({ key }) => form[key] !== '');
+  const bodyHasData = Boolean(form) && MEASUREMENT_KEYS.some((key) => form[key] !== '');
   const injuriesHaveData =
     Boolean(form) &&
     form.injuryCheckins.some(
@@ -333,6 +381,7 @@ export default function Log() {
         </Button>
       </div>
 
+      {measureFormError && <ErrorText>Some measurements need a look before saving.</ErrorText>}
       {putLog.isError && <ErrorText>{putLog.error.message}</ErrorText>}
 
       {isLoading || !form ? (
@@ -387,6 +436,34 @@ export default function Log() {
                 </Field>
               ))}
             </div>
+          </Group>
+
+          <Group
+            title="Body measurements (cm)"
+            open={open.body}
+            hasData={bodyHasData}
+            onToggle={() => setOpen((o) => ({ ...o, body: !o.body }))}
+          >
+            <div className={`${styles.fieldGrid} ${styles.bodyGrid}`}>
+              {MEASUREMENTS.map(({ key, label, placeholder }) => (
+                <Field label={label} key={key} error={measureErrors[key]}>
+                  <Input
+                    type="number"
+                    name={key}
+                    inputMode="decimal"
+                    step="0.1"
+                    placeholder={placeholder}
+                    value={form[key]}
+                    aria-invalid={Boolean(measureErrors[key])}
+                    onChange={(e) => updateMeasurement(key, e.target.value)}
+                    onBlur={() => checkMeasurement(key)}
+                  />
+                </Field>
+              ))}
+            </div>
+            {myCoach?.coach && (
+              <p className={styles.bodyPrivacy}>Your coach can see these measurements, like your weight.</p>
+            )}
           </Group>
 
           <Group

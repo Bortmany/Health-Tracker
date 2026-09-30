@@ -103,6 +103,34 @@
   min-height: 2.75rem;
 }
 
+/* Name, then the unread-messages dot right after it. */
+.nameLine {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.nameLine > .clientName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Holds a button and pins the unread dot to its top-right corner. */
+.dotAnchor {
+  position: relative;
+  display: block;
+}
+
+.checkinPending {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
 .clientTop > .clientName {
   flex: 1;
   min-width: 0;
@@ -409,4 +437,68 @@
   color: var(--color-danger);
   text-align: right;
   margin-top: var(--space-1);
+}
+
+/* ---- Weekly check-ins ---- */
+
+/* The row's check-in chip sits on its own line under the status line. */
+.checkinLine {
+  margin-top: var(--space-2);
+}
+
+/* "Done" is the same neutral chip, just brighter text: never red or green. */
+.checkinDone > span {
+  color: var(--color-text);
+}
+
+.cardAction {
+  margin-top: var(--space-3);
+}
+
+/* "This week": six small number cards, two per row. */
+.weekGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+.checkinBody {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.checkinMood {
+  font-size: var(--text-base);
+  font-weight: 600;
+  margin: 0;
+}
+
+.checkinItem {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.checkinQuestion {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.checkinAnswer {
+  font-size: var(--text-base);
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.checkinBlank {
+  color: var(--color-text-faint);
+  font-size: var(--text-base);
+  margin: 0;
+}
+
+.checkinFooter {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
 }

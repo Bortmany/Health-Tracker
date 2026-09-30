@@ -8,6 +8,9 @@ import layoutStyles from './components/AppLayout.module.css';
 import { useMe } from './hooks/useAuth.js';
 import { useHealthSync } from './hooks/useHealthSync.js';
 import AdminCoaches from './pages/AdminCoaches.jsx';
+import CheckIn from './pages/CheckIn.jsx';
+import CheckinQuestions from './pages/CheckinQuestions.jsx';
+import ClientMessages from './pages/ClientMessages.jsx';
 import Clients from './pages/Clients.jsx';
 import CoachApplication from './pages/CoachApplication.jsx';
 import CoachApplicationStatus from './pages/CoachApplicationStatus.jsx';
@@ -19,6 +22,7 @@ import Heatmap from './pages/Heatmap.jsx';
 import Landing from './pages/Landing.jsx';
 import Log from './pages/Log.jsx';
 import Login from './pages/Login.jsx';
+import Messages from './pages/Messages.jsx';
 import More from './pages/More.jsx';
 import NotFound from './pages/NotFound.jsx';
 import Onboarding from './pages/Onboarding.jsx';
@@ -72,10 +76,14 @@ export default function App() {
             <Route path="/train" element={<Train />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/more" element={<More />} />
+            <Route path="/checkin" element={<CheckIn />} />
+            <Route path="/messages" element={<Messages />} />
             <Route path="/coach-application" element={<CoachApplication />} />
             <Route path="/coach-application/status" element={<CoachApplicationStatus />} />
             <Route element={<CoachRoute />}>
               <Route path="/coach/profile" element={<CoachProfileEditor />} />
+              <Route path="/coach/checkin-questions" element={<CheckinQuestions />} />
+              <Route path="/coach/clients/:clientId/messages" element={<ClientMessages />} />
             </Route>
             <Route element={<AdminRoute />}>
               <Route path="/admin/coaches" element={<AdminCoaches />} />

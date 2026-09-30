@@ -254,3 +254,16 @@
 .textarea:focus {
   border-color: var(--color-accent);
 }
+
+/* Body measurements: two columns on a phone, three once there's room. */
+@media (min-width: 1024px) {
+  .bodyGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.bodyPrivacy {
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
