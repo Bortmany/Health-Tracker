@@ -58,6 +58,8 @@ router.delete('/', asyncHandler(async (req, res) => {
     // sets, habit ticks, check-ins) cascade off these parents — the same
     // cascades the app's normal delete endpoints rely on.
     await client.query('DELETE FROM user_plans WHERE user_id = $1', [req.userId]);
+    await client.query('DELETE FROM ai_plan_adjustments WHERE user_id = $1', [req.userId]);
+    await client.query('DELETE FROM ai_plan_attempts WHERE user_id = $1', [req.userId]);
     await client.query('DELETE FROM training_logs WHERE user_id = $1', [req.userId]);
     await client.query('DELETE FROM nutrition_logs WHERE user_id = $1', [req.userId]);
     await client.query('DELETE FROM daily_logs WHERE user_id = $1', [req.userId]);

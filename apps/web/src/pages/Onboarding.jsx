@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import UpgradePanel, { PlanLengthBadge } from '../components/UpgradePanel.jsx';
 import { Button, Card, Chip, EmptyState, ErrorText, Field, Input, Skeleton } from '../components/ui/index.js';
-import { useMe } from '../hooks/useAuth.js';
 import { useAdoptTemplate, useRecommendedTemplates } from '../hooks/usePlans.js';
 import { useSettings, useUpdateSettings } from '../hooks/useSettings.js';
 import styles from './Onboarding.module.css';
@@ -65,12 +63,10 @@ const STEPS = [
 function RevealStep() {
   const navigate = useNavigate();
   const { data: settings } = useSettings();
-  const { data: user } = useMe();
   const { data: recommended = [], isLoading } = useRecommendedTemplates();
   const adopt = useAdoptTemplate();
   const updateSettings = useUpdateSettings();
   const [weight, setWeight] = useState('');
-  const [showUpgrade, setShowUpgrade] = useState(false);
   const top = recommended[0];
 
   // Straight into the first workout of the new program, with it already
@@ -103,16 +99,7 @@ function RevealStep() {
 
   function handleStart() {
     if (!top) return;
-    adopt.mutate(
-      { id: top.id, startDate: localToday() },
-      {
-        onSuccess: saveWeightThenStart,
-        // The full-year plan needs Premium — explain rather than just fail.
-        onError: (error) => {
-          if (error.code === 'PREMIUM_REQUIRED') setShowUpgrade(true);
-        },
-      }
-    );
+    adopt.mutate({ id: top.id, startDate: localToday() }, { onSuccess: saveWeightThenStart });
   }
 
   return (
@@ -138,13 +125,8 @@ function RevealStep() {
               <Chip>{top.experience}</Chip>
               <Chip>{top.daysPerWeek} days/week</Chip>
             </div>
-            <PlanLengthBadge
-              freeWeeks={top.freeWeeks}
-              premiumWeeks={top.premiumWeeks}
-              planTier={user?.planTier}
-              onSeePremium={() => setShowUpgrade(true)}
-            />
           </Card>
+          <p className={styles.includedNote}>Included free. Upgrade any time for an AI plan that adjusts weekly.</p>
 
           <div className={styles.weightField}>
             <Field label="Starting weight (kg)">
@@ -180,12 +162,6 @@ function RevealStep() {
           </div>
         </>
       )}
-
-      <UpgradePanel
-        open={showUpgrade}
-        onClose={() => setShowUpgrade(false)}
-        reason="thisPlan"
-      />
     </div>
   );
 }

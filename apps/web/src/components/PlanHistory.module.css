@@ -1,0 +1,97 @@
+.card {
+  margin-bottom: var(--space-4);
+}
+
+/* Lets the "See plan history" link scroll here without hiding under the top. */
+.anchor {
+  scroll-margin-top: var(--space-4);
+}
+
+.header {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.header:active {
+  opacity: 0.7;
+}
+
+.chevron {
+  color: var(--color-text-muted);
+  font-size: var(--text-lg);
+  transition: transform 0.15s ease;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.content {
+  margin-top: var(--space-2);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+}
+
+.row + .row {
+  border-top: 1px solid var(--color-border);
+}
+
+.rowTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.week {
+  font-weight: 600;
+}
+
+.date {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.summary {
+  margin: 0;
+  font-size: var(--text-base);
+  overflow-wrap: anywhere;
+}
+
+.changes {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.errorRow {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}

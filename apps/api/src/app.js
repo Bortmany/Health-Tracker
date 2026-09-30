@@ -252,7 +252,10 @@ const writeLimiter = rateLimit({
   skip: (req) => rateLimitDisabled() || req.method === 'GET',
   message: { error: { message: 'You are saving changes too quickly. Please slow down and try again shortly.', code: 'RATE_LIMITED' } },
 });
-for (const path of ['/api/logs', '/api/training-logs', '/api/programs', '/api/health-sync', '/api/coach', '/api/coach-link']) {
+// /api/plans joined in Oct 2026: adopting a plan and writing an AI plan are
+// saves too. (The AI plan also has its own stricter daily cap, counted in the
+// database by the plans route.)
+for (const path of ['/api/logs', '/api/training-logs', '/api/programs', '/api/plans', '/api/health-sync', '/api/coach', '/api/coach-link']) {
   app.use(path, writeLimiter);
 }
 

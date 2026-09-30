@@ -62,6 +62,12 @@ export default function Privacy() {
               exercises, sets (weight, reps, effort), and personal records.
             </li>
             <li>
+              <strong>AI plan history (paid members only):</strong> if you are
+              on the AI plan, we store a history of the weekly changes made to
+              your plan — the week number, a short summary, the exercises that
+              were added, removed or changed, and the date.
+            </li>
+            <li>
               <strong>Plan and billing status:</strong> whether your account is
               free or Premium. If paid upgrades are switched on and you upgrade,
               our payment provider Paddle gives us a customer reference — your
@@ -144,6 +150,14 @@ export default function Privacy() {
             <li>
               <strong>Payments:</strong> Paddle, only if you buy a Premium
               upgrade.
+            </li>
+            <li>
+              <strong>AI plan (paid members only):</strong> to write your AI
+              plan and adjust it each week, we send Anthropic (the company
+              that makes the Claude AI) your training-quiz answers, your
+              workout logs, your weigh-ins, and your recovery entries (sleep,
+              steps and injuries). Nothing is sent for free members, and no
+              food data is ever sent.
             </li>
             <li>
               <strong>Fonts:</strong> the app's fonts load from Google Fonts,

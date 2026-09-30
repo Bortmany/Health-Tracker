@@ -43,9 +43,11 @@ test('billing status reports switched off when no Paddle keys are set', async ()
   const body = await res.json();
   assert.equal(body.enabled, false);
   assert.equal(body.planTier, 'free');
-  // The Premium panel's wording comes from these, so they must be sent.
-  assert.equal(body.freeWeeks, 4);
-  assert.equal(body.premiumWeeks, 52);
+  // Plan length is no longer a paid feature, so no week counts are sent;
+  // instead the panel is told whether the AI plan writer is switched on.
+  assert.equal('freeWeeks' in body, false);
+  assert.equal('premiumWeeks' in body, false);
+  assert.equal(body.aiPlanEnabled, Boolean(process.env.ANTHROPIC_API_KEY));
 });
 
 test('checkout gives a friendly message while payments are switched off', async () => {

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import ProgressRing from '../components/ui/ProgressRing.jsx';
 import { useSignupMode } from '../hooks/useAuth.js';
 import useReveal from '../hooks/useReveal.js';
+import { priceLine } from '../lib/pricing.js';
 import styles from './Landing.module.css';
 
 // Public marketing page shown at "/" to signed-out visitors (see App.jsx's
@@ -261,18 +262,18 @@ export default function Landing() {
         <div className={styles.pricingGrid}>
           <div className={styles.priceCard}>
             <h3 className={styles.priceTitle}>Free</h3>
-            <p className={styles.pricePoint}>4-week plans</p>
+            <p className={styles.pricePoint}>Free, always</p>
             <p className={styles.priceBody}>
-              Full tracking — logs, training, habits, streaks — with 4-week workout plans.
+              Full tracking — logs, training, habits, streaks — plus a workout plan matched to you.
             </p>
             <JoinCta className={styles.priceCta} />
           </div>
           <div className={`${styles.priceCard} ${styles.priceCardAccent}`}>
             <h3 className={styles.priceTitle}>Premium</h3>
-            <p className={styles.pricePoint}>Full 52-week plans</p>
+            <p className={styles.pricePoint}>AI plan that adjusts weekly</p>
             <p className={styles.priceBody}>
-              Everything in Free, plus the complete 52-week progressions. Pricing is coming soon —
-              contact us if you want early access.
+              Everything in Free, plus a plan that re-adjusts every week from your workouts, weigh-ins
+              and recovery. {priceLine()}.
             </p>
             <JoinCta className={styles.priceCta} />
           </div>

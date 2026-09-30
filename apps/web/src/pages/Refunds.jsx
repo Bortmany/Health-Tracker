@@ -29,15 +29,17 @@ export default function Refunds() {
           <p>
             Cut has no trial to keep track of, because the free tier needs no
             card details and never expires. You can log your weight, sleep,
-            habits and training, and follow a 4-week plan, without paying
-            anything. Premium unlocks year-long plans, and you only pay once you
+            habits and training, and follow a workout plan matched to you,
+            without paying anything. Premium adds an AI plan that adjusts
+            weekly, and you only pay once you
             have decided the app is worth it. Nothing is ever charged
             automatically to an account that hasn't chosen to upgrade.
           </p>
 
           <h2>Cancelling</h2>
           <p>
-            Premium is a monthly subscription and you can cancel at any time.
+            Premium is a monthly or yearly subscription and you can cancel at
+            any time.
             There is no cancellation fee and no notice period.
           </p>
           <p>

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import PlanSection from '../components/PlanSection.jsx';
 import RestTimer from '../components/RestTimer.jsx';
+import UpgradePanel from '../components/UpgradePanel.jsx';
 import WorkoutSummary from '../components/WorkoutSummary.jsx';
 import {
   Button,
@@ -18,6 +19,7 @@ import {
   Toast,
   useToast,
 } from '../components/ui/index.js';
+import { useMe } from '../hooks/useAuth.js';
 import { useExercises } from '../hooks/useExercises.js';
 import { useActivePrograms, useCreateProgram, useUpdateProgram } from '../hooks/usePrograms.js';
 import {
@@ -298,6 +300,7 @@ export default function Train() {
   // True for the moment we spend loading the current bests before a save.
   const [preparingSave, setPreparingSave] = useState(false);
   const toast = useToast();
+  const { data: user } = useMe();
   const restTimerRef = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -551,7 +554,9 @@ export default function Train() {
         ))}
       </datalist>
 
-      <PlanSection />
+      <PlanSection onToast={toast.show} />
+      {/* Free members get one quiet invitation to the AI plan. */}
+      {user && user.planTier !== 'premium' && <UpgradePanel />}
 
       <Card className={styles.stackCard} title="Programs">
         {programsLoading ? (

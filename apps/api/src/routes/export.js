@@ -147,13 +147,23 @@ router.get('/', asyncHandler(async (req, res) => {
 
   // Current adopted plan, if any.
   const { rows: planRows } = await pool.query(
-    `SELECT up.start_date::text AS start_date, up.duration_weeks, t.name
+    `SELECT up.start_date::text AS start_date, up.duration_weeks, up.source,
+            COALESCE(up.ai_name, t.name) AS name
      FROM user_plans up
      LEFT JOIN plan_templates t ON t.id = up.plan_template_id
      WHERE up.user_id = $1`,
     [req.userId]
   );
   const plan = planRows[0];
+
+  // The AI plan's weekly adjustments (paid accounts), oldest first.
+  const { rows: adjustmentRows } = await pool.query(
+    `SELECT week_number, summary, changes, created_at
+     FROM ai_plan_adjustments
+     WHERE user_id = $1
+     ORDER BY created_at`,
+    [req.userId]
+  );
 
   // Current logging streak, computed the same way as GET /logs/streak.
   const { rows: streakRows } = await pool.query(
@@ -267,8 +277,14 @@ router.get('/', asyncHandler(async (req, res) => {
     })),
     personalRecords: recordRows.map((r) => ({ name: r.name, weight: r.weight, reps: r.reps, date: r.date })),
     plan: plan
-      ? { name: plan.name, startDate: plan.start_date, durationWeeks: plan.duration_weeks }
+      ? { name: plan.name, startDate: plan.start_date, durationWeeks: plan.duration_weeks, source: plan.source }
       : null,
+    aiPlanAdjustments: adjustmentRows.map((r) => ({
+      weekNumber: r.week_number,
+      summary: r.summary,
+      changes: r.changes,
+      createdAt: r.created_at,
+    })),
     streak,
     coach: coachRows[0] ? { displayName: coachRows[0].display_name } : null,
     coachLinks: coachLinkRows.map((row) => ({

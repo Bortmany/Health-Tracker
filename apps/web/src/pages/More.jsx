@@ -54,21 +54,12 @@ function buildForm(settings) {
   };
 }
 
+// Free members see the upgrade card right under the Account card.
 function PlanTierLine({ planTier }) {
-  const [showUpgrade, setShowUpgrade] = useState(false);
-
   if (planTier === 'premium') {
-    return <div className={styles.mutedLine}>Premium plan</div>;
+    return <div className={styles.mutedLine}>Premium plan — AI plan on</div>;
   }
-  return (
-    <div className={styles.mutedLine}>
-      Free plan{' — '}
-      <button type="button" className={styles.inlineLinkButton} onClick={() => setShowUpgrade(true)}>
-        see what Premium adds
-      </button>
-      <UpgradePanel open={showUpgrade} onClose={() => setShowUpgrade(false)} />
-    </div>
-  );
+  return <div className={styles.mutedLine}>Free plan</div>;
 }
 
 // Light, dark, or follow the phone. Saved on this device only — it isn't
@@ -544,6 +535,8 @@ export default function More() {
           </Button>
         </div>
       </Card>
+
+      {user && user.planTier !== 'premium' && <UpgradePanel />}
 
       <AppearanceSection />
 

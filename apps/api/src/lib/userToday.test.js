@@ -1,7 +1,7 @@
 // "Today" must be the user's day, never the server's UTC day.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { addDays, daysBetween, resolveToday, todayIn, weekStartOf } from './userToday.js';
+import { addDays, daysBetween, nearToday, resolveToday, todayIn, weekStartOf } from './userToday.js';
 
 // 9:30 pm UTC on 27 Sep is 1:30 am on 28 Sep in Oman.
 const LATE = new Date('2026-09-27T21:30:00Z');
@@ -36,4 +36,11 @@ test('weeks start on Monday', () => {
   assert.equal(weekStartOf('2026-09-28'), '2026-09-28'); // a Monday
   assert.equal(weekStartOf('2026-09-27'), '2026-09-21'); // Sunday belongs to the week before
   assert.equal(weekStartOf('2026-10-01'), '2026-09-28');
+});
+
+test('a start date must be today somewhere on Earth', () => {
+  assert.equal(nearToday('2026-09-26', 'startDate', LATE), '2026-09-26');
+  assert.equal(nearToday('2026-09-28', 'startDate', LATE), '2026-09-28');
+  assert.throws(() => nearToday('2000-01-01', 'startDate', LATE), /startDate must be today/);
+  assert.throws(() => nearToday('2026-09-25', 'startDate', LATE), /startDate/);
 });

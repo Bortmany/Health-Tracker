@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import ContactEmail from '../components/ContactEmail.jsx';
+import { priceLine } from '../lib/pricing.js';
 import styles from './Legal.module.css';
 
 // Public page — no login needed.
@@ -60,9 +61,10 @@ export default function Terms() {
 
           <h2>Free and Premium</h2>
           <p>
-            The free tier includes 4-week training plans; Premium unlocks
-            year-long plans. When paid upgrades are switched on, payment is
-            handled by Paddle and the price is shown before you pay. Premium is
+            The free tier includes tracking, training logs and a workout plan
+            matched to you; Premium adds an AI plan that adjusts weekly. When
+            paid upgrades are switched on, payment is handled by Paddle and the
+            price is {priceLine()}. Premium is
             a subscription; cancelling stops future charges. How cancelling and
             refunds work is set out in full in the{' '}
             <Link to="/refunds">Refund &amp; Cancellation Policy</Link>.

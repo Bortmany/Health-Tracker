@@ -24,11 +24,17 @@ export function todayIn(timeZone = DEFAULT_TIME_ZONE, now = new Date()) {
 // of UTC, so anything further off is a mistake and gets a plain 400.
 export function resolveToday(value, now = new Date()) {
   if (value == null || value === '') return todayIn(DEFAULT_TIME_ZONE, now);
-  const day = isoDate(value, 'today');
+  return nearToday(value, 'today', now);
+}
+
+// A real YYYY-MM-DD day that is within one day of the server's own (UTC) day,
+// i.e. "today" somewhere on Earth. Anything further off is a plain 400.
+export function nearToday(value, name, now = new Date()) {
+  const day = isoDate(value, name);
   const utcDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const offsetDays = Math.abs(Date.parse(`${day}T00:00:00Z`) - utcDay) / 86400000;
   if (offsetDays > 1) {
-    throw new ValidationError("today must be today's date on your device");
+    throw new ValidationError(`${name} must be today's date on your device`);
   }
   return day;
 }

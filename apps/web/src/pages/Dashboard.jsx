@@ -139,7 +139,7 @@ export default function Dashboard() {
           {plan.deload && <Chip tone="accent">Easy week</Chip>}
         </div>
         <p className={styles.heroMeta}>
-          Week {plan.weekNumber} of {plan.durationWeeks}
+          Week {plan.weekNumber}
         </p>
         {day && <p className={styles.heroNext}>Next up: {day.name}</p>}
         {plan.guidance && <p className={styles.heroGuidance}>{plan.guidance}</p>}

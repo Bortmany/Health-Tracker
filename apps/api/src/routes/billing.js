@@ -10,7 +10,7 @@ import {
   readWebhookEvent,
 } from '../lib/billing.js';
 import { logger } from '../lib/logger.js';
-import { FREE_WEEKS, PREMIUM_WEEKS } from '../lib/planLength.js';
+import { isAiPlanGenerationEnabled } from '../lib/aiPlanGenerator.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -94,10 +94,9 @@ router.get('/status', asyncHandler(async (req, res) => {
   res.json({
     enabled: isBillingEnabled(),
     planTier: rows[0]?.plan_tier ?? 'free',
-    // Sent here too so the Premium panel can say how long each plan runs
-    // without keeping its own copy of the numbers.
-    freeWeeks: FREE_WEEKS,
-    premiumWeeks: PREMIUM_WEEKS,
+    // Whether the AI plan writer is switched on (ANTHROPIC_API_KEY set), so
+    // the paid panel can say "not switched on yet" instead of offering it.
+    aiPlanEnabled: isAiPlanGenerationEnabled(),
   });
 }));
 
