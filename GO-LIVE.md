@@ -25,68 +25,93 @@ Railway does not back up the database unless you switch it on.
   4. Delete the scratch service so it stops costing money.
   5. Note the date and the three counts somewhere — that is your proof the backup can actually be restored.
 
-## Payments — Paddle (built, asleep until keys are set)
+## Payments — Whop (built, asleep until keys are set)
 
-The code is finished and switched off. Paddle sells the subscription as the
-merchant of record (they handle tax), which means **Paddle has to approve the
-app before it can take money** — and they only review a site that is already
-live. So the order matters:
+Cut uses **Whop for Platforms**: coaches pay a $49 startup fee, students pay
+their coach's monthly price, Cut keeps 15% (10% once a coach has 20+ paying
+students), and the AI plan is $12.99 a month or $89.99 a year. Nothing is
+charged until the variables below are set. Do it in the **sandbox first** and
+only move to live keys after every sandbox check passes.
 
-1. **Deploy Cut first, still dormant.** Nothing below can start until the app
-   is on a real web address.
-2. **Add the pages Paddle's review asks for** — see the blocker note below.
-3. **Apply to Paddle** at paddle.com with that live address, and wait for their
-   approval (usually a few days; they may come back with questions).
-4. **Create the product and its price** in the Paddle dashboard: one product
-   ("Cut Premium"), one recurring price. Copy the price id — it looks like
-   `pri_...`.
-5. **Create a server API key** (Paddle dashboard → Developer tools →
-   Authentication) and copy it. It is shown once.
-6. **Create a notification destination** (Developer tools → Notifications)
-   pointing at `https://YOUR-APP-ADDRESS/api/billing/webhook`, subscribed to
-   `subscription.activated`, `subscription.updated`, `subscription.canceled`,
-   `subscription.paused` and `subscription.expired`. Copy its secret key.
-7. **Set the five variables on Railway** and redeploy:
-   - [ ] `PADDLE_API_KEY` — the server API key from step 5
-   - [ ] `PADDLE_WEBHOOK_SECRET` — the notification secret from step 6
-   - [ ] `PADDLE_PRICE_ID` — the `pri_...` id from step 4
-   - [ ] `PADDLE_ENV` — `sandbox` while testing, `production` for real money
-     (anything else, including leaving it out, means sandbox)
-   - [ ] `APP_URL` — the app's own public address, e.g.
-     `https://cut.up.railway.app`
-8. **Test in the sandbox first.** Sign up at sandbox.paddle.com, repeat steps
-   4–6 there, set `PADDLE_ENV=sandbox`, and buy the plan with one of Paddle's
-   test cards. The account should flip to Premium within seconds of paying.
-   Then swap in the live keys and set `PADDLE_ENV=production`.
+**Set up Whop**
+1. [ ] **Create a Whop account** and a company for Cut (whop.com).
+2. [ ] **Enable Whop for Platforms** on that company (this is what lets coaches
+   be connected accounts that Whop pays and identity-checks).
+3. [ ] **Work in the sandbox first:** sign in at sandbox.whop.com and repeat
+   the steps below there. Test money only.
+4. [ ] **Create three plans:** the coach startup fee ($49, one-off), the AI
+   plan monthly ($12.99) and the AI plan yearly ($89.99). Copy each plan id.
+5. [ ] **Create an API key** (company settings, developer area) and copy it. It
+   is shown once.
+6. [ ] **Create a webhook** pointing at `{APP_URL}/api/billing/webhook` (for
+   example `https://cut.up.railway.app/api/billing/webhook`), subscribed to
+   payment, refund, dispute, membership and payout events. Copy its secret.
+7. [ ] **Set these on Railway** and redeploy:
+   - `MONEY_PROVIDER` — `whop` (the default)
+   - `WHOP_API_KEY`, `WHOP_WEBHOOK_SECRET`, `WHOP_COMPANY_ID`
+   - `WHOP_ENV` — leave blank (sandbox) while testing; `live` only at the end
+   - `WHOP_STARTUP_FEE_PLAN_ID`, `WHOP_AI_MONTHLY_PLAN_ID`, `WHOP_AI_YEARLY_PLAN_ID`
+   - `APP_URL` — the app's own public address
+   - `PAYOUT_METHOD` — leave unset until you have decided (see below)
+8. [ ] Check `/api/health` shows billing as configured (it never shows a key).
 
-Until the variables are set the upgrade button says "coming soon" and nothing
+**Test the whole sandbox flow** (use Whop's test cards)
+- [ ] A coach pays the startup fee.
+- [ ] The coach completes Whop's identity check and their profile says "Active".
+- [ ] A student is accepted by that coach, pays the coach's price, and the
+  coaching link turns active only after the payment.
+- [ ] Replay the same webhook from Whop's dashboard: the earnings ledger must
+  still show that payment exactly once.
+- [ ] Refund a payment in the sandbox: a negative line appears.
+- [ ] Press **Pay coaches now** on `/admin/coaches` and see the payout appear
+  with Whop's reference (or Whop's payout status, under Method A).
+- [ ] The student cancels in one tap and keeps access to the end of the period.
+- [ ] Both AI plan choices (monthly and yearly) reach a checkout.
+- [ ] Password reset: request an email, get it, set a new password, and check
+  the same link does not work a second time.
+
+**Decide Method A or B.** Under **A**, Whop takes Cut's fee on every payment
+and the coach's share never touches Cut. Under **B**, Cut collects and then
+sends the coach's share. In the sandbox, make a renewal payment and check
+whether Whop takes Cut's fee again on the renewal (and can switch from 15% to
+10% later). If yes, set `PAYOUT_METHOD=A`; if not, set `PAYOUT_METHOD=B`. With
+it unset, coach payouts stay off.
+
+**Things you still need to confirm with Whop** (they could not be checked
+without your account): that Platforms is switched on for your account; that
+payouts reach coaches in Oman and other countries you care about; whether the
+fee repeats on renewals (above); what name appears on students' card
+statements (then add it to `/refunds`); and the exact event names Whop sends
+(the sandbox test above will show any mismatch).
+
+**Go live:** only after the sandbox checks all pass, put the live API key,
+webhook secret and live plan ids in, set `WHOP_ENV=live`, and run one small
+real payment and refund yourself.
+
+Until the variables are set every money button says "coming soon" and nothing
 is charged. Premium can always be granted by hand:
 `UPDATE users SET plan_tier = 'premium' WHERE email = '...';`
 
-**For Paddle approval — the pages Paddle looks for.** Paddle reviews the live
-site and expects to find, linked from it: terms of service, a privacy policy,
-**and a refund / cancellation policy**, plus clear pricing and a way to contact
-whoever runs the app.
+**Pages Whop will want** — all public, linked from the app, and in place before
+you apply: `/pricing`, `/refunds`, `/terms`, `/privacy`, each with a contact
+email. They name Whop as the payment processor.
 
-- Terms — **exists** at `/terms`.
-- Privacy — **exists** at `/privacy`.
-- Refund / cancellation policy — **exists** at `/refunds`. It covers
-  cancelling (stops future charges, access runs to the end of the paid period,
-  no data is deleted), the three cases where we refund, how to ask, and names
-  Paddle as the merchant of record that appears on card statements. It is
-  linked from the More page and from the bottom of the terms and privacy pages.
+1. **Check the contact email.** The pages show a contact address that defaults
+   to `naeljam@hotmail.com`. To change it, set `PRIVACY_CONTACT_EMAIL` on
+   Railway. Make sure it is an address you actually read.
+2. **Have a lawyer read them.** The pages are plain-language templates marked
+   "not yet reviewed by a lawyer". Get them reviewed, then remove the notice.
 
-**Two things still to do on these pages before applying:**
+## Email — Resend (built, asleep until keys are set)
 
-1. **Check the contact email.** `/terms`, `/privacy` and `/refunds` show a
-   contact address (as a clickable email link) that defaults to
-   `naeljam@hotmail.com`. To use a different one, set the optional
-   `PRIVACY_CONTACT_EMAIL` variable on Railway — no code change needed.
-   Paddle needs a real support address visible on the site, so make sure
-   whichever address is showing is one you actually read.
-2. **Have a lawyer read them.** All three pages are plain-language templates
-   and each shows a visible "not yet reviewed by a lawyer" notice. Get them
-   reviewed, then remove that notice — it looks weak to a reviewer.
+Used for "Forgot password" emails.
+
+- [ ] Create an account at resend.com and **add and verify your domain** (they
+  give you a few DNS records to paste in).
+- [ ] Create an **API key** and set `RESEND_API_KEY` on Railway.
+- [ ] Set `EMAIL_FROM` to an address on that domain, e.g. `Cut <no-reply@yourdomain.com>`.
+- [ ] Redeploy, then run the password-reset test above. Until both variables are
+  set, the page says "Password reset is coming soon" and sends nothing.
 
 ## Progress photos — Railway Storage Bucket (built, asleep until set)
 
@@ -101,9 +126,6 @@ Photos stay switched off in production ("Photo uploads are coming soon") until t
 ## Optional
 - [ ] `ANTHROPIC_API_KEY` — wakes the AI plan writer (personalized plans by Claude instead of picked from the 14-plan library).
 - `PORT`, `CORS_ORIGIN` — defaults are fine.
-
-## Email
-- None wired (password reset / welcome email are future backlog only).
 
 ## Security note
 No committed secrets; JWT in a secure httpOnly cookie; bcrypt passwords; login is rate-limited; coach access verifies an active coach↔client link; all SQL is parameterized. The content-security-policy header is on and scoped to what the app actually loads (see `apps/api/src/app.js` — an earlier version of this note said it was disabled; that's stale). Solid for launch.

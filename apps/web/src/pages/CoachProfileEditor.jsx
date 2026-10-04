@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Button,
   Card,
@@ -14,7 +14,10 @@ import {
   Toast,
   useToast,
 } from '../components/ui/index.js';
+import EarningsCard from '../components/EarningsCard.jsx';
+import GetPaidCard from '../components/GetPaidCard.jsx';
 import { useCoachProfile, useUpdateCoachProfile } from '../hooks/useCoachProfile.js';
+import { earnings as earningsCopy } from '../lib/billingCopy.js';
 import { SPECIALTIES, hasVisibleSpecialty } from '../lib/specialties.js';
 import styles from './CoachProfileEditor.module.css';
 
@@ -43,6 +46,12 @@ function selectText(el) {
   const selection = window.getSelection();
   selection.removeAllRanges();
   selection.addRange(range);
+}
+
+// The coach's shareable profile link (used by the Share card and by the
+// "Copy my profile link" button in the empty payout history).
+function profileLinkOf(profile) {
+  return profile.referralLink || `${window.location.origin}/coach/${profile.slug}?ref=${profile.referralCode}`;
 }
 
 function ProfileForm({ profile, onSaved }) {
@@ -191,8 +200,7 @@ function ShareCard({ profile, onCopied }) {
   const copiedTimerRef = useRef(null);
   useEffect(() => () => window.clearTimeout(copiedTimerRef.current), []);
 
-  const link =
-    profile.referralLink || `${window.location.origin}/coach/${profile.slug}?ref=${profile.referralCode}`;
+  const link = profileLinkOf(profile);
 
   async function copyLink() {
     try {
@@ -237,12 +245,32 @@ function ShareCard({ profile, onCopied }) {
 export default function CoachProfileEditor() {
   const { data: profile, isLoading, isError, refetch, isFetching } = useCoachProfile();
   const toast = useToast();
+  const location = useLocation();
 
-  let content;
+  // "/coach/profile#get-paid" (from More and from the Clients inbox) jumps
+  // straight to the money steps.
+  useEffect(() => {
+    if (location.hash === '#get-paid') {
+      document.getElementById('get-paid')?.scrollIntoView({ block: 'start' });
+    }
+  }, [location.hash]);
+
+  async function copyProfileLink() {
+    if (!profile) return;
+    try {
+      await navigator.clipboard.writeText(profileLinkOf(profile));
+      toast.show(earningsCopy.linkCopied);
+    } catch {
+      // No clipboard access: the Share card below still shows the link to copy by hand.
+    }
+  }
+
+  let formContent;
+  let shareContent = null;
   if (isLoading) {
-    content = <Skeleton height={300} />;
+    formContent = <Skeleton height={300} />;
   } else if (isError || !profile) {
-    content = (
+    formContent = (
       <Card>
         <ErrorText>Couldn&apos;t load your profile — please try again.</ErrorText>
         <Button variant="secondary" onClick={() => refetch()} disabled={isFetching}>
@@ -251,16 +279,13 @@ export default function CoachProfileEditor() {
       </Card>
     );
   } else {
-    content = (
-      <div className={styles.stack}>
-        <ProfileForm profile={profile} onSaved={() => toast.show('Saved')} />
-        <ShareCard profile={profile} onCopied={() => toast.show('Link copied')} />
-      </div>
-    );
+    formContent = <ProfileForm profile={profile} onSaved={() => toast.show('Saved')} />;
+    shareContent = <ShareCard profile={profile} onCopied={() => toast.show('Link copied')} />;
   }
 
   return (
     <Screen
+      width={1040}
       title="Your coach profile"
       label={
         <Link className={styles.backLink} to="/more">
@@ -268,7 +293,16 @@ export default function CoachProfileEditor() {
         </Link>
       }
     >
-      {content}
+      <div className={styles.grid}>
+        <div className={styles.stack}>
+          <GetPaidCard onToast={toast.show} />
+          {formContent}
+        </div>
+        <div className={`${styles.stack} ${styles.side}`}>
+          <EarningsCard onCopyLink={copyProfileLink} />
+          {shareContent}
+        </div>
+      </div>
       <Toast message={toast.message} />
     </Screen>
   );

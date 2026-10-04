@@ -119,3 +119,12 @@ Checked on the companies' own pricing pages: [Trainerize](https://www.trainerize
 4. Choose the sales-tax option.
 
 The provider becomes final at the Step 5 gate.
+
+## 7. Step 5 go-ahead (1 Oct 2026)
+
+On 30 Sep I asked the owner to approve the money spec (`Agents/docs/specs/cut/coach-billing.md`), confirm Whop with PayPal as the fallback, and answer three questions. The owner replied "continue". I read that as approval of the spec as written, Whop with PayPal as the fallback, and the three defaults:
+- First test whether Whop takes Cut's fee on every payment, renewals included. If it doesn't, Cut sends each coach their share.
+- Students who joined free through an invite code stay free, and Cut takes no commission on them.
+- The $49 startup fee is refundable only if the coach never accepted a student.
+
+Everything is built and tested in test mode only, with a stand-in for Whop. No Whop test keys have been shared yet.

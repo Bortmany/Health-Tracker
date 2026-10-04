@@ -52,6 +52,22 @@ export function useSignupMode() {
   });
 }
 
+// Asks for a reset link. No cache to refresh: nothing about the signed-in
+// state changes (the person isn't signed in).
+export function useForgotPassword() {
+  return useMutation({ mutationFn: authApi.forgotPassword });
+}
+
+// Choosing a new password signs the person out everywhere, so any cached
+// "who am I" is cleared too.
+export function useResetPassword() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: authApi.resetPassword,
+    onSuccess: () => queryClient.setQueryData(ME_KEY, null),
+  });
+}
+
 export function useLogout() {
   const queryClient = useQueryClient();
   return useMutation({

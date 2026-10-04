@@ -29,6 +29,8 @@ import { PHOTO_COLUMNS, sendPhotoFile, toCoachPhoto } from '../lib/photos.js';
 import { photosEnabled } from '../lib/photoStorage.js';
 import * as validate from '../lib/validate.js';
 import { daysBetween, resolveToday, weekStartOf } from '../lib/userToday.js';
+import { coachReadiness } from '../lib/coachMoney.js';
+import { stopSubscriptionsWhere } from '../lib/stopSubscriptions.js';
 import { Rollback, withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireCoach } from '../middleware/requireCoach.js';
@@ -272,7 +274,21 @@ router.post('/requests/:id/accept', asyncHandler(async (req, res) => {
         });
         throw new Rollback();
       }
-      await client.query(`UPDATE coach_clients SET status = 'active' WHERE id = $1`, [request.id]);
+      // A request is a PAYING student: the coach must have paid the startup
+      // fee, passed the identity check and set a price first.
+      const readiness = await coachReadiness(client, req.userId);
+      if (!readiness.ready) {
+        res.status(409).json({
+          error: {
+            message: 'Finish the Get paid steps first (startup fee, identity check and your price), then you can accept.',
+            code: 'COACH_NOT_READY',
+          },
+        });
+        throw new Rollback();
+      }
+      // The link goes live only when the student's payment is confirmed by the
+      // payment company's webhook (routes/billing.js), never from here.
+      await client.query(`UPDATE coach_clients SET status = 'pending_payment' WHERE id = $1`, [request.id]);
       return true;
     });
   } catch (err) {
@@ -314,7 +330,7 @@ router.post('/invites/email', asyncHandler(async (req, res) => {
        WHERE u.email = $2 AND u.id <> $1
          AND NOT EXISTS (
            SELECT 1 FROM coach_clients cc
-           WHERE cc.coach_id = $1 AND cc.client_id = u.id AND cc.status IN ('requested', 'active', 'pending')
+           WHERE cc.coach_id = $1 AND cc.client_id = u.id AND cc.status IN ('requested', 'active', 'pending', 'pending_payment')
          )`,
       [req.userId, email]
     );
@@ -486,10 +502,12 @@ router.delete('/clients/:linkId', asyncHandler(async (req, res) => {
   if (!validate.isUuid(req.params.linkId)) return linkNotFound(res);
   const { rowCount } = await pool.query(
     `UPDATE coach_clients SET status = 'ended', ended_at = now()
-     WHERE id = $1 AND coach_id = $2 AND status IN ('active', 'pending', 'requested')`,
+     WHERE id = $1 AND coach_id = $2 AND status IN ('active', 'pending', 'requested', 'pending_payment')`,
     [req.params.linkId, req.userId]
   );
   if (!rowCount) return linkNotFound(res);
+  // Ending a link also stops that student's monthly payments.
+  await stopSubscriptionsWhere('cc.id = $1 AND cc.coach_id = $2', [req.params.linkId, req.userId]);
   res.status(204).end();
 }));
 

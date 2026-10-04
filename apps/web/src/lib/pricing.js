@@ -1,9 +1,19 @@
 // The one place the Premium prices live. Every screen and policy page that
 // shows a price reads it from here, so a price change is a one-line edit.
-// Checkout itself uses the price set up in Paddle — keep the two in step.
+// Checkout itself uses the plan set up with the payment partner — keep the two in step.
 export const PRICE_MONTHLY = 12.99;
 export const PRICE_YEARLY = 89.99;
 export const CURRENCY_SYMBOL = '$';
+
+// Coach billing numbers (whole dollars / whole percents). Every sentence that
+// quotes one reads it from here, so a change is a one-line edit.
+export const COACH_STARTUP_FEE = 49;
+export const STUDENT_PRICE_MIN = 10;
+export const STUDENT_PRICE_MAX = 500;
+export const COMMISSION_PERCENT = 15;
+export const COMMISSION_PERCENT_LOW = 10;
+export const COMMISSION_LOW_FROM_STUDENTS = 20;
+export const EXAMPLE_STUDENT_PRICE = 30;
 
 // 12.99 -> "$12.99". Whole amounts still show cents ("$90.00") so the two
 // prices always read alike.

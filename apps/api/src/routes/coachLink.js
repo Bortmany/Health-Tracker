@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { stopSubscriptionsWhere } from '../lib/stopSubscriptions.js';
 import * as validate from '../lib/validate.js';
 import { Rollback, withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -121,33 +122,51 @@ router.post('/redeem', asyncHandler(async (req, res) => {
   res.json({ coach });
 }));
 
-router.get('/', asyncHandler(async (req, res) => {
-  // One read covers the current coach, my own outgoing request and any
-  // invites coaches have sent me. Coaches are joined to their profile for the
-  // slug (LEFT JOIN: a coach without a profile row still shows by name).
+// The student's whole coaching picture: current coach, my own outgoing request,
+// any invites coaches have sent me, and (new) a coach who accepted me and is
+// waiting for my first payment. Also served at GET /api/coach/mine.
+export async function loadMyCoach(userId) {
+  // One read covers all of it. Coaches are joined to their profile for the
+  // slug and price (LEFT JOIN: a coach without a profile row still shows by
+  // name).
   const { rows } = await pool.query(
-    `SELECT cc.id, cc.status, cc.requested_by, cc.created_at, u.display_name, p.slug
+    `SELECT cc.id, cc.coach_id, cc.status, cc.requested_by, cc.created_at, u.display_name, p.slug, p.price_cents
      FROM coach_clients cc
      JOIN users u ON u.id = cc.coach_id AND u.role = 'coach'
      LEFT JOIN coach_profiles p ON p.user_id = cc.coach_id
-     WHERE cc.client_id = $1 AND cc.status IN ('active', 'requested')
+     WHERE cc.client_id = $1 AND cc.status IN ('active', 'requested', 'pending_payment')
      ORDER BY cc.created_at DESC`,
-    [req.userId]
+    [userId]
   );
   const active = rows.find((row) => row.status === 'active');
   const pending = rows.find((row) => row.status === 'requested' && row.requested_by !== 'coach');
   const invites = rows.filter((row) => row.status === 'requested' && row.requested_by === 'coach');
-  res.json({
+  const awaitingPayment = rows.find((row) => row.status === 'pending_payment');
+  return {
     coach: active ? toLinkedCoach(active) : null,
     pendingRequest: pending
       ? { id: pending.id, coach: toLinkedCoach(pending), createdAt: pending.created_at }
+      : null,
+    // The student sees the price they will pay and the coach's name, nothing
+    // about the coach's money. The price is the coach's CURRENT price; the
+    // checkout always charges what the server says at that moment.
+    pendingPayment: awaitingPayment
+      ? {
+          id: awaitingPayment.id,
+          coach: { id: awaitingPayment.coach_id, displayName: awaitingPayment.display_name },
+          priceCents: awaitingPayment.price_cents ?? null,
+        }
       : null,
     coachInvites: invites.map((row) => ({
       id: row.id,
       coach: toLinkedCoach(row),
       createdAt: row.created_at,
     })),
-  });
+  };
+}
+
+router.get('/', asyncHandler(async (req, res) => {
+  res.json(await loadMyCoach(req.userId));
 }));
 
 // Ask a coach from the directory to work with me. Only public profiles can be
@@ -177,7 +196,7 @@ router.post('/requests', asyncHandler(async (req, res) => {
       // Lock my live rows so two requests sent at once can't both get through.
       const { rows: mine } = await client.query(
         `SELECT status, requested_by FROM coach_clients
-         WHERE client_id = $1 AND status IN ('active', 'requested')
+         WHERE client_id = $1 AND status IN ('active', 'requested', 'pending_payment')
          FOR UPDATE`,
         [req.userId]
       );
@@ -185,7 +204,8 @@ router.post('/requests', asyncHandler(async (req, res) => {
         hasCoach(res);
         throw new Rollback();
       }
-      if (mine.some((row) => row.status === 'requested' && row.requested_by !== 'coach')) {
+      if (mine.some((row) => row.status === 'pending_payment'
+        || (row.status === 'requested' && row.requested_by !== 'coach'))) {
         res.status(409).json({
           error: { message: 'You already have a request waiting on a coach. Cancel it first under More.', code: 'REQUEST_PENDING' },
         });
@@ -230,7 +250,8 @@ router.delete('/requests/:id', asyncHandler(async (req, res) => {
   if (!validate.isUuid(req.params.id)) return requestNotFound(res);
   const { rowCount } = await pool.query(
     `UPDATE coach_clients SET status = 'declined'
-     WHERE id = $1 AND client_id = $2 AND status = 'requested' AND requested_by IN ('client', 'referral')`,
+     WHERE id = $1 AND client_id = $2
+       AND ((status = 'requested' AND requested_by IN ('client', 'referral')) OR status = 'pending_payment')`,
     [req.params.id, req.userId]
   );
   if (!rowCount) return requestNotFound(res);
@@ -268,6 +289,8 @@ router.post('/invites/:id/accept', asyncHandler(async (req, res) => {
           hasCoach(res);
           throw new Rollback();
         }
+        // Switching coach also stops the old coach's monthly payments.
+        await stopSubscriptionsWhere('cc.id = $1', [activeRows[0].id]);
         await client.query(
           `UPDATE coach_clients SET status = 'ended', ended_at = now() WHERE id = $1 AND client_id = $2`,
           [activeRows[0].id, req.userId]
@@ -307,6 +330,8 @@ router.post('/invites/:id/decline', asyncHandler(async (req, res) => {
 // End my current coaching link. The row stays, marked 'ended', and everything
 // in my account (logs, programs the coach assigned) stays exactly as it is.
 router.delete('/', asyncHandler(async (req, res) => {
+  // Ending the link also stops the monthly payments to that coach.
+  await stopSubscriptionsWhere(`cc.client_id = $1 AND cc.status = 'active'`, [req.userId]);
   await pool.query(
     `UPDATE coach_clients SET status = 'ended', ended_at = now() WHERE client_id = $1 AND status = 'active'`,
     [req.userId]

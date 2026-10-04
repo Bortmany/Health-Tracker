@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -14,6 +14,7 @@ import {
   Toast,
   useToast,
 } from '../components/ui/index.js';
+import CoachPayStep from '../components/CoachPayStep.jsx';
 import UnreadDot from '../components/UnreadDot.jsx';
 import UpgradePanel from '../components/UpgradePanel.jsx';
 import { useDeleteAccount, useExportData } from '../hooks/useAccount.js';
@@ -27,10 +28,12 @@ import {
   useRemoveMyCoach,
 } from '../hooks/useCoach.js';
 import { useMyApplication } from '../hooks/useCoachApplications.js';
+import { useCoachBilling } from '../hooks/useCoachBilling.js';
 import { useCoachProfile } from '../hooks/useCoachProfile.js';
 import { useUnread } from '../hooks/useMessages.js';
 import { useSettings, useUpdateSettings } from '../hooks/useSettings.js';
 import { firstName } from '../lib/checkin.js';
+import { getPaid, pills, pricing as pricingCopy, student as studentCopy, subscription as subscriptionCopy } from '../lib/billingCopy.js';
 import { toCalendarDay } from '../lib/localDate.js';
 import { THEME_OPTIONS, useTheme } from '../lib/useTheme.js';
 import styles from './More.module.css';
@@ -60,7 +63,13 @@ function buildForm(settings) {
 // Free members see the upgrade card right under the Account card.
 function PlanTierLine({ planTier }) {
   if (planTier === 'premium') {
-    return <div className={styles.mutedLine}>Premium plan — AI plan on</div>;
+    return (
+      <div className={styles.mutedLine}>
+        <Link className={styles.inlineLink} to="/account/subscription">
+          Premium plan — AI plan on
+        </Link>
+      </div>
+    );
   }
   return <div className={styles.mutedLine}>Free plan</div>;
 }
@@ -155,8 +164,11 @@ function CoachInviteRow({ invite, currentCoach, onDone }) {
 // The student's "Your coach" card. When more than one state could apply:
 // active coach → a coach's invite → the student's own pending request →
 // the invite-code form.
-function CoachSection({ onToast }) {
-  const { data: link, isLoading } = useMyCoach();
+function CoachSection({ onToast, payState, setPayState }) {
+  // While we wait for the provider to confirm a payment, check every few seconds.
+  const { data: link, isLoading, refetch, isFetching } = useMyCoach({
+    refetchInterval: payState === 'confirming' ? 5000 : false,
+  });
   const { data: unread } = useUnread();
   const navigate = useNavigate();
   const redeemCode = useRedeemCoachCode();
@@ -169,6 +181,33 @@ function CoachSection({ onToast }) {
   const coach = link?.coach ?? null;
   const pendingRequest = link?.pendingRequest ?? null;
   const coachInvites = link?.coachInvites ?? [];
+  const pendingPayment = link?.pendingPayment ?? null;
+
+  // The moment a confirmed payment turns into a coach link, say so once.
+  const coachName = coach?.displayName ?? null;
+  useEffect(() => {
+    if (payState === 'confirming' && coach) {
+      onToast(studentCopy.nowTraining(coachName ?? studentCopy.coachFallback));
+      setPayState(null);
+    }
+  }, [payState, coach, coachName, onToast, setPayState]);
+
+  // If a coach we were about to pay disappears without the student doing
+  // anything (the coach's access was ended), say so rather than go silent.
+  const hadPendingPayment = useRef(false);
+  const [coachGone, setCoachGone] = useState(false);
+  const studentEndedIt = useRef(false);
+  useEffect(() => {
+    if (isLoading) return;
+    if (pendingPayment) {
+      hadPendingPayment.current = true;
+      setCoachGone(false);
+    } else if (hadPendingPayment.current) {
+      hadPendingPayment.current = false;
+      if (!coach && payState !== 'confirming' && !studentEndedIt.current) setCoachGone(true);
+      studentEndedIt.current = false;
+    }
+  }, [pendingPayment, coach, isLoading, payState]);
 
   function handleRedeem(e) {
     e.preventDefault();
@@ -192,6 +231,14 @@ function CoachSection({ onToast }) {
 
   function handleCancelRequest() {
     cancelRequest.mutate(pendingRequest.id, { onSuccess: () => onToast('Request cancelled') });
+  }
+
+  // "Cancel request" on the pay step: needs the request's id, which the server
+  // may send inside pendingPayment or alongside it as pendingRequest.
+  const payRequestId = pendingPayment?.requestId ?? pendingRequest?.id ?? null;
+  function handleCancelPayment() {
+    studentEndedIt.current = true;
+    cancelRequest.mutate(payRequestId, { onSuccess: () => onToast(studentCopy.cancelledToast) });
   }
 
   // A coach's invite is shown even when the student already has a coach —
@@ -238,6 +285,19 @@ function CoachSection({ onToast }) {
     );
   } else if (coachInvites.length > 0) {
     body = inviteRows;
+  } else if (pendingPayment) {
+    body = (
+      <CoachPayStep
+        pendingPayment={pendingPayment}
+        payState={payState}
+        onCheckAgain={() => refetch()}
+        checkingAgain={isFetching}
+        onNotNow={() => onToast(studentCopy.notNowToast(pendingPayment.coach.displayName ?? studentCopy.coachFallback))}
+        onCancel={payRequestId ? handleCancelPayment : undefined}
+        cancelling={cancelRequest.isPending}
+        cancelError={cancelRequest.isError}
+      />
+    );
   } else if (pendingRequest) {
     body = (
       <div>
@@ -255,6 +315,7 @@ function CoachSection({ onToast }) {
   } else {
     body = (
       <form onSubmit={handleRedeem}>
+        {coachGone && <p className={styles.mutedLine}>{studentCopy.gone}</p>}
         {success && <p className={styles.mutedLine}>Connected with {success}.</p>}
         <div className={styles.connectRow}>
           {/* The label stays visible; the greyed example only shows the
@@ -288,6 +349,11 @@ function CoachSection({ onToast }) {
 
   return (
     <Card className={styles.stackCard} title="Your coach">
+      {pendingPayment && !coach && coachInvites.length === 0 && (
+        <div className={styles.payChip}>
+          <Chip tone="warn">{pills.waitingForPayment}</Chip>
+        </div>
+      )}
       {body}
     </Card>
   );
@@ -298,6 +364,7 @@ function CoachSection({ onToast }) {
 // even if the status can't load, so the editor is always reachable.
 function CoachProfileRow() {
   const { data: profile, isLoading, isError } = useCoachProfile();
+  const billing = useCoachBilling();
 
   let status;
   if (isLoading) {
@@ -313,6 +380,18 @@ function CoachProfileRow() {
         <div className={styles.mutedLine}>
           {profile.acceptingClients ? 'Accepting clients' : 'Not accepting new clients'}
         </div>
+        {billing.data && !billing.data.revoked && (
+          <div className={styles.paymentsLine}>
+            <span className={styles.mutedLine}>{getPaid.moreRowLabel}:</span>
+            {billing.data.active ? (
+              <Chip tone="accent">{getPaid.moreRowActive}</Chip>
+            ) : (
+              <Link to="/coach/profile#get-paid" className={styles.chipLink} title={getPaid.moreRowLink}>
+                <Chip tone="warn">{getPaid.moreRowSetup}</Chip>
+              </Link>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -490,12 +569,19 @@ export default function More() {
     }
   }, [location.state, location.pathname, navigate, showToast]);
 
-  // Coming back from a successful Paddle checkout: refresh the account so
-  // the Premium label shows up without a manual reload.
+  // Coming back from checkout: refresh the account so a new Premium label or
+  // coach shows up without a manual reload. `?paid=1` (paid a coach) starts
+  // the "confirming your payment" wait; `?paid=0` means nothing was taken.
+  // The address is cleaned so Back doesn't repeat any of it.
+  const [payState, setPayState] = useState(null);
   useEffect(() => {
-    if (searchParams.get('upgraded')) {
+    const paid = searchParams.get('paid');
+    if (searchParams.get('upgraded') || paid != null) {
       queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
       queryClient.invalidateQueries({ queryKey: ['billingStatus'] });
+      queryClient.invalidateQueries({ queryKey: ['myCoach'] });
+      if (paid === '1') setPayState('confirming');
+      else if (paid === '0') setPayState('cancelled');
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams, queryClient]);
@@ -547,6 +633,11 @@ export default function More() {
             {logout.isPending ? 'Logging out...' : 'Log out'}
           </Button>
         </div>
+        <div className={styles.manageRow}>
+          <Link className={styles.inlineLink} to="/account/subscription">
+            {subscriptionCopy.manageLink}
+          </Link>
+        </div>
       </Card>
 
       {user && user.planTier !== 'premium' && <UpgradePanel />}
@@ -554,7 +645,7 @@ export default function More() {
       <AppearanceSection />
 
       {user?.role === 'coach' && <CoachProfileRow />}
-      {user?.role !== 'coach' && <CoachSection onToast={showToast} />}
+      {user?.role !== 'coach' && <CoachSection onToast={showToast} payState={payState} setPayState={setPayState} />}
       {user?.role !== 'coach' && <CoachApplicationRow />}
 
       <Card className={styles.stackCard} title="Training quiz">
@@ -592,7 +683,7 @@ export default function More() {
 
       <p className={styles.legalLinks}>
         <Link to="/privacy">Privacy Policy</Link> · <Link to="/terms">Terms of Use</Link> ·{' '}
-        <Link to="/refunds">Refunds</Link>
+        <Link to="/refunds">Refunds</Link> · <Link to="/pricing">{pricingCopy.footerPricing}</Link>
       </p>
 
       <Toast message={toast.message} />

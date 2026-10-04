@@ -82,9 +82,23 @@ export default function Privacy() {
             </li>
             <li>
               <strong>Plan and billing status:</strong> whether your account is
-              free or Premium. If paid upgrades are switched on and you upgrade,
-              our payment provider Paddle gives us a customer reference — your
-              card details go to Paddle directly and never touch our servers.
+              free or Premium. If paid upgrades are switched on and you pay,
+              our payment processor Whop gives us a customer reference — your
+              card details go to Whop directly and never touch our servers.
+            </li>
+            <li>
+              <strong>Money ledger and payout records:</strong> each payment,
+              refund and payout is recorded against the named coach and the
+              named student it belongs to (amounts, Cut's commission, dates).
+              For coaches we also keep their Whop account reference and whether
+              their identity check has passed. A coach sees only their own
+              earnings; a student never sees a coach's money records.
+            </li>
+            <li>
+              <strong>Password-reset emails:</strong> if you ask to reset your
+              password, we email your address a one-time link that expires in
+              an hour. We store only a scrambled (hashed) copy of the link's
+              token, never the token itself.
             </li>
             <li>
               <strong>Device health data:</strong> only if you later connect a
@@ -200,8 +214,13 @@ export default function Privacy() {
               Railway, a cloud hosting provider.
             </li>
             <li>
-              <strong>Payments:</strong> Paddle, only if you buy a Premium
-              upgrade.
+              <strong>Payments and payouts:</strong> Whop, only if you buy a
+              Premium upgrade or paid coaching, or if you are a coach who is
+              paid through Cut.
+            </li>
+            <li>
+              <strong>Email:</strong> Resend sends our password-reset emails
+              and sees your email address when it does.
             </li>
             <li>
               <strong>AI plan (paid members only):</strong> to write your AI

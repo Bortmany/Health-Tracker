@@ -1,0 +1,18 @@
+/* Placeholder while the money switch loads: the size of a real button. */
+.bar {
+  display: inline-block;
+  width: 9rem;
+  height: 44px;
+  border-radius: var(--radius-md);
+}
+
+.note {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.block {
+  display: block;
+  width: 100%;
+}

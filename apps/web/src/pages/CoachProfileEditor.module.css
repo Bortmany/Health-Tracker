@@ -13,6 +13,25 @@
   gap: var(--space-4);
 }
 
+/* Phone: one column. Laptop: the money steps and the form on the left, the
+   earnings (sticky while scrolling) and the share link on the right. */
+.grid {
+  display: grid;
+  gap: var(--space-7);
+}
+
+@media (min-width: 1100px) {
+  .grid {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: start;
+  }
+
+  .side {
+    position: sticky;
+    top: var(--space-4);
+  }
+}
+
 .form {
   display: flex;
   flex-direction: column;

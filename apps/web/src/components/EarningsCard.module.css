@@ -1,0 +1,112 @@
+/* Four figures, two across (the card is narrow even on a laptop). */
+.figures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.settled {
+  background: var(--color-surface);
+  border: var(--surface-outline);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+.settledTitle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-lg);
+}
+
+.settledLine {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.explainer {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.history {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: var(--surface-outline);
+}
+
+.historyTitle {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 44px;
+  border-bottom: var(--surface-outline);
+}
+
+.list .row:last-child {
+  border-bottom: none;
+}
+
+.date {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  flex: 1;
+}
+
+.statusCol {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.amount {
+  font-size: var(--text-base);
+  font-weight: 600;
+  text-align: end;
+  min-width: 5rem;
+}
+
+/* The column header is a laptop-only touch. */
+.head {
+  display: none;
+  min-height: 32px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.head > span:first-child {
+  flex: 1;
+}
+
+@media (min-width: 1100px) {
+  .head {
+    display: flex;
+  }
+}
+
+.skeletonRows {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.skeletonRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}

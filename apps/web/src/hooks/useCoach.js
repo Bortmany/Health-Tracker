@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as coachApi from '../api/coach.js';
+import { normalizePendingPayment } from '../lib/billingLogic.js';
 import { localToday } from '../lib/localDate.js';
 
 // Every screen that can show a coach–student link reads one of these keys.
@@ -79,7 +80,8 @@ export function useSaveClientNote(clientId) {
 
 // ---- Student side ----
 
-// { coach: {displayName, slug} | null, pendingRequest: {...} | null, coachInvites: [...] }
+// { coach: {displayName, slug} | null, pendingRequest: {...} | null, coachInvites: [...],
+//   pendingPayment: { coach: {id, displayName}, priceCents } | null }
 export function useMyCoach(options = {}) {
   return useQuery({
     queryKey: MY_COACH_KEY,
@@ -89,6 +91,8 @@ export function useMyCoach(options = {}) {
         coach: data?.coach ?? null,
         pendingRequest: data?.pendingRequest ?? null,
         coachInvites: data?.coachInvites ?? [],
+        // Accepted by a coach but not paid yet (null when nothing is waiting).
+        pendingPayment: normalizePendingPayment(data),
       };
     },
     ...options,

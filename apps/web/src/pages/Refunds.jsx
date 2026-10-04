@@ -2,12 +2,13 @@ import { Link } from 'react-router-dom';
 import ContactEmail from '../components/ContactEmail.jsx';
 import styles from './Legal.module.css';
 
-// Public page — no login needed. Paddle (who sells Premium as the merchant of
-// record) only approves a seller account once a refund and cancellation policy
-// is published on the live site, and this page is what that requirement points
-// at. Kept factually matched to what Cut actually does: a free tier that never
-// expires and needs no card, a monthly Premium subscription, cancel any time,
-// access runs to the end of the paid period.
+// Public page — no login needed. The payment processor (Whop) only approves a
+// seller account once a refund and cancellation policy is published on the
+// live site, and this page is what that requirement points at. Kept factually
+// matched to what Cut actually does: a free tier that never expires and needs
+// no card, an AI plan subscription, paid coaching subscriptions, a one-off
+// coach startup fee, cancel any time, access runs to the end of the paid
+// period.
 export default function Refunds() {
   return (
     <div className={styles.screen}>
@@ -38,14 +39,15 @@ export default function Refunds() {
 
           <h2>Cancelling</h2>
           <p>
-            Premium is a monthly or yearly subscription and you can cancel at
-            any time.
-            There is no cancellation fee and no notice period.
+            The AI plan and paid coaching are monthly (or, for the AI plan,
+            yearly) subscriptions and you can cancel at any time from your
+            account, in one tap. There is no cancellation fee and no notice
+            period.
           </p>
           <p>
-            When you cancel, you keep Premium until the end of the period you
+            When you cancel, you keep access until the end of the period you
             have already paid for. After that the account goes back to the free
-            tier. Your logs, plans and history stay exactly where they are —
+            tier (or the coaching link ends). Your logs, plans and history stay exactly where they are —
             cancelling never deletes your data. (Deleting your account, from the
             More page, does — permanently and immediately.)
           </p>
@@ -64,7 +66,8 @@ export default function Refunds() {
             <li>
               <strong>Charged by mistake</strong> — for example a renewal you
               meant to cancel, or a duplicate charge — we refund it in full,
-              whenever you spot it.
+              whenever you spot it. Cut decides these cases; when a coaching
+              payment is refunded, the coach's share of it is reversed too.
             </li>
             <li>
               <strong>The service was broken</strong> — if Cut was unavailable
@@ -89,10 +92,17 @@ export default function Refunds() {
             working days depending on your bank.
           </p>
           <p>
-            Payments for Cut are handled by Paddle, who act as the reseller and
-            merchant of record — so it is Paddle, not Cut, that appears on your
-            card or bank statement. You can also raise a billing question with
-            them directly, and they will pass genuine refund decisions on to us.
+            Payments for Cut are handled by Whop, our payment processor. Whop
+            is not the seller of coaching and does not decide refunds; Cut
+            does. We will say here who appears on your card or bank statement
+            once that is confirmed.
+          </p>
+
+          <h2>Coach startup fee</h2>
+          <p>
+            Coaches pay a one-off startup fee. It is refundable only if no
+            student has ever been accepted by that coach. Once a student has
+            been accepted, the fee is not refunded.
           </p>
 
           <h2>Chargebacks</h2>

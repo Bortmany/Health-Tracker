@@ -55,15 +55,47 @@ export default function Terms() {
             redeeming the coach's invite code. Coaches get the access described
             in the Privacy Policy and must use it only to coach that client.
             Either side can end the connection at any time from the app. Cut
-            provides the tools; the coaching relationship, its quality, and any
-            payment between coach and client are between the two of you.
+            provides the tools; the coaching relationship and its quality are
+            between the two of you.
           </p>
+
+          <h2>Coaches, prices and payouts</h2>
+          <ul>
+            <li>
+              Coaches are independent. They are not employees or agents of Cut,
+              and Cut is not the coaching provider.
+            </li>
+            <li>
+              A coach pays a one-off startup fee, sets their own monthly price
+              (at least $10), and their students pay that price through our
+              payment processor, Whop.
+            </li>
+            <li>
+              Cut keeps a commission of 15% of each payment, or 10% once the
+              coach has 20 or more paying students. The rate that applied is
+              recorded against each payment.
+            </li>
+            <li>
+              Coaches are paid out only after passing Whop's identity check.
+              Refunds and chargebacks are taken off the coach's share, and a
+              coach whose balance is negative is not paid until it is cleared.
+            </li>
+            <li>
+              Coaching links made with a free invite code stay free and carry
+              no commission.
+            </li>
+            <li>
+              Cut gives no medical advice. Talk to a doctor before changing
+              your training or diet, especially if you have a health condition
+              or injury.
+            </li>
+          </ul>
 
           <h2>Free and Premium</h2>
           <p>
             The free tier includes tracking, training logs and a workout plan
             matched to you; Premium adds an AI plan that adjusts weekly. When
-            paid upgrades are switched on, payment is handled by Paddle and the
+            paid upgrades are switched on, payment is handled by Whop and the
             price is {priceLine()}. Premium is
             a subscription; cancelling stops future charges. How cancelling and
             refunds work is set out in full in the{' '}

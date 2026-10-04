@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import ProgressRing from '../components/ui/ProgressRing.jsx';
 import { useSignupMode } from '../hooks/useAuth.js';
 import useReveal from '../hooks/useReveal.js';
+import { pricing as pricingCopy } from '../lib/billingCopy.js';
 import { priceLine } from '../lib/pricing.js';
 import styles from './Landing.module.css';
 
@@ -172,7 +173,7 @@ function useJoinCta() {
   return { label: 'Join Cut' };
 }
 
-function JoinCta({ className, showNote = false }) {
+export function JoinCta({ className, showNote = false }) {
   const cta = useJoinCta();
   if (cta.closed) {
     return <p className={styles.ctaNote}>Sign-up is closed for now. Check back soon.</p>;
@@ -264,7 +265,8 @@ export default function Landing() {
             <h3 className={styles.priceTitle}>Free</h3>
             <p className={styles.pricePoint}>Free, always</p>
             <p className={styles.priceBody}>
-              Full tracking — logs, training, habits, streaks — plus a workout plan matched to you.
+              Full tracking — logs, training, habits, streaks — plus your full 52-week workout plan,
+              matched to you.
             </p>
             <JoinCta className={styles.priceCta} />
           </div>
@@ -278,6 +280,9 @@ export default function Landing() {
             <JoinCta className={styles.priceCta} />
           </div>
         </div>
+        <p className={styles.sectionSub}>
+          <Link to="/pricing">{pricingCopy.fullPricingLink}</Link>
+        </p>
       </Section>
 
       <Section className={styles.finalCta}>
@@ -290,6 +295,7 @@ export default function Landing() {
         <div className={styles.footerLinks}>
           <Link to="/privacy">Privacy</Link>
           <Link to="/terms">Terms</Link>
+          <Link to="/pricing">{pricingCopy.footerPricing}</Link>
         </div>
       </footer>
     </div>

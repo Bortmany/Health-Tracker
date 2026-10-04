@@ -24,3 +24,19 @@ export function getCoaches() {
 export function revokeCoach(userId) {
   return request(`/admin/coaches/${userId}/revoke`, { method: 'POST' });
 }
+
+// ---- Money (owner only) ----
+
+export function getCoachEarnings() {
+  return request('/admin/coaches/earnings');
+}
+
+// Pays every coach who is owed money and has finished the identity check.
+// -> { started, totalCents, failed }
+export function runPayouts() {
+  return request('/admin/payouts/run', { method: 'POST' });
+}
+
+export function getPayouts({ limit = 20, offset = 0 } = {}) {
+  return request(`/admin/payouts?limit=${limit}&offset=${offset}`);
+}

@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { pool } from './db/pool.js';
+import { healthSummary } from './lib/billing/index.js';
 import { verifyToken } from './lib/jwt.js';
 import { logger } from './lib/logger.js';
 import { captureException, initSentry } from './lib/sentry.js';
@@ -18,6 +19,7 @@ import activitiesRouter from './routes/activities.js';
 import authRouter from './routes/auth.js';
 import billingRouter from './routes/billing.js';
 import checkinsRouter from './routes/checkins.js';
+import coachBillingRouter from './routes/coachBilling.js';
 import coachRouter from './routes/coach.js';
 import coachLinkRouter from './routes/coachLink.js';
 import coachesRouter from './routes/coaches.js';
@@ -62,8 +64,8 @@ if (trustedProxy) {
 // Content-Security-Policy: tells the browser exactly which sources it may load
 // from, which blocks most injected-script attacks. These values are scoped to
 // what the Cut frontend actually uses: its own scripts/styles (same origin),
-// Google Fonts, and same-origin API calls. Paddle checkout is a full-page
-// redirect (no embedded script), so it needs nothing extra here.
+// Google Fonts, and same-origin API calls. Checkout is a full-page redirect to
+// the payment company (no embedded script), so it needs nothing extra here.
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -84,9 +86,10 @@ app.use(helmet({
   },
 }));
 app.use(compression());
-// Paddle's webhook signature is checked against the raw request bytes, so
-// that one path must skip JSON parsing. It's registered before express.json.
-app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
+// The payment company's webhook signature is checked against the raw request
+// bytes, so that one path must skip JSON parsing (whatever content type the
+// sender uses). It's registered before express.json.
+app.use('/api/billing/webhook', express.raw({ type: () => true, limit: '1mb' }));
 // Photo uploads (POST /api/photos) send the image itself as the body. This
 // JSON parser only reads JSON bodies, so the image passes by untouched and the
 // photos route reads it itself, capped at 8 MB (routes/photos.js).
@@ -184,6 +187,12 @@ const loginIpFailureThrottle = makeIpFailureThrottle({
   maxFailures: 20,
   message: 'Too many login attempts. Please wait 15 minutes and try again.',
 });
+const resetFailureThrottle = makeIpFailureThrottle({
+  successStatus: 200,
+  failureStatus: 400,
+  maxFailures: 10,
+  message: 'Too many tries. Please wait a few minutes and try again.',
+});
 const registerInviteFailureThrottle = makeIpFailureThrottle({
   successStatus: 201,
   failureStatus: 403,
@@ -197,6 +206,35 @@ const registerInviteFailureThrottle = makeIpFailureThrottle({
 app.use('/api/auth/login', loginIpFailureThrottle);
 app.use('/api/auth/register', registerLimiter, registerInviteFailureThrottle);
 app.use('/api/auth/logout', authLimiter);
+app.use('/api/auth/reset-password', resetFailureThrottle);
+
+// "Forgot password": two separate counters, so neither can be used to dodge the
+// other. One is per visitor (5 per 15 minutes); the other per email address
+// typed (3 per hour). Both answer with the same wording, so nothing reveals
+// which one tripped or whether the address has an account.
+const resetTooMany = { error: { message: 'Too many tries. Please wait a few minutes and try again.', code: 'RATE_LIMITED' } };
+const forgotVisitorLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitDisabled,
+  message: resetTooMany,
+});
+const forgotEmailLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: (req) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    return email ? `email:${email}` : `ip:${req.ip}`;
+  },
+  skip: rateLimitDisabled,
+  message: resetTooMany,
+});
+app.use('/api/auth/forgot-password', forgotVisitorLimiter, forgotEmailLimiter);
 app.use('/api/auth/me', authLimiter);
 // Invite codes get the same guessing protection as passwords.
 app.use('/api/coach-link/redeem', authLimiter);
@@ -265,7 +303,9 @@ const writeLimiter = rateLimit({
 // database by the plans route.) /api/checkins joined with weekly check-ins,
 // /api/messages with coach messages, /api/photos and /api/measurements with
 // progress photos and body measurements.
-for (const path of ['/api/logs', '/api/training-logs', '/api/programs', '/api/plans', '/api/health-sync', '/api/coach', '/api/coach-link', '/api/checkins', '/api/messages', '/api/photos', '/api/measurements']) {
+// Money routes join too (not the webhook: the signature is its protection, and
+// the payment company must never be throttled).
+for (const path of ['/api/billing/checkout', '/api/billing/ai-checkout', '/api/billing/coach-checkout', '/api/billing/subscriptions', '/api/admin/payouts', '/api/logs', '/api/training-logs', '/api/programs', '/api/plans', '/api/health-sync', '/api/coach', '/api/coach-link', '/api/checkins', '/api/messages', '/api/photos', '/api/measurements']) {
   app.use(path, writeLimiter);
 }
 
@@ -298,6 +338,30 @@ const applicationLimiter = rateLimit({
   message: { error: { message: 'You have sent the most applications allowed for today. Please try again tomorrow.', code: 'RATE_LIMITED' } },
 });
 app.use('/api/coach-applications', applicationLimiter);
+
+// Anything that opens a payment page or calls the payment company: 10 per
+// person per rolling hour, on its own counter, so a stuck button or a script
+// can't hammer checkout. Only POSTs count; reading is free.
+const checkoutLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: writeLimiterKey,
+  skip: (req) => rateLimitDisabled() || req.method !== 'POST',
+  message: { error: { message: 'Too many payment attempts. Please wait a while and try again.', code: 'RATE_LIMITED' } },
+});
+for (const path of [
+  '/api/billing/checkout',
+  '/api/billing/ai-checkout',
+  '/api/billing/coach-checkout',
+  '/api/coach/billing/startup-fee',
+  '/api/coach/billing/onboarding',
+  '/api/admin/payouts/run',
+]) {
+  app.use(path, checkoutLimiter);
+}
 
 // Sending coach messages: 60 per person per rolling hour, on its own counter.
 // The student's send and the coach's send share ONE limiter (so one budget per
@@ -344,6 +408,9 @@ app.get('/api/health', async (_req, res) => {
       admin: process.env.ADMIN_EMAIL ? 'configured' : 'dormant',
       // "s3" (a storage bucket) | "local" (a folder, dev only) | "dormant".
       photos: storageMode(),
+      // Money and email switches: words only (configured/dormant, provider and
+      // environment names, payout method) — never a key or secret.
+      ...healthSummary(),
     });
   } catch (err) {
     // Log the real reason for us; the public response stays a fixed message so
@@ -362,6 +429,7 @@ app.use('/api/export', exportRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/habits', habitsRouter);
 app.use('/api/activities', activitiesRouter);
+app.use('/api/coach', coachBillingRouter); // the coach's money screens; other paths fall through
 app.use('/api/coach', coachRouter);
 app.use('/api/coach-link', coachLinkRouter);
 app.use('/api/coaches', coachesRouter); // public — the coach directory and profile pages
