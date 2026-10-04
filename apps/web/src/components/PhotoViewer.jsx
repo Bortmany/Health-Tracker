@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Button, ConfirmDialog, ErrorText, Switch } from './ui/index.js';
+import { Button, ConfirmDialog, ErrorText, Switch, Tooltip } from './ui/index.js';
 import { useDeletePhoto, useSetPhotoSharing } from '../hooks/usePhotos.js';
 import { usePhotoFile } from '../hooks/usePhotoFile.js';
 import { formatShortDay } from '../lib/localDate.js';
@@ -187,44 +187,47 @@ export default function PhotoViewer({
   return createPortal(
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={`Photo from ${dateLabel}`}>
       <div className={styles.topBar}>
-        <button
-          type="button"
-          ref={closeRef}
-          className={styles.iconButton}
-          onClick={onClose}
-          title="Close photo"
-          aria-label="Close photo"
-        >
-          ✕
-        </button>
+        <Tooltip text="Close photo">
+          <button
+            type="button"
+            ref={closeRef}
+            className={styles.iconButton}
+            onClick={onClose}
+            aria-label="Close photo"
+          >
+            ✕
+          </button>
+        </Tooltip>
         <span className={styles.date}>{dateLabel}</span>
         <span className={styles.iconSpacer} aria-hidden="true" />
       </div>
 
       <div className={styles.stage} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-        <button
-          type="button"
-          className={`${styles.iconButton} ${styles.navButton}`}
-          onClick={showPrev}
-          disabled={!hasPrev}
-          title="Previous photo"
-          aria-label="Previous photo"
-        >
-          ‹
-        </button>
+        <Tooltip text="Previous photo">
+          <button
+            type="button"
+            className={`${styles.iconButton} ${styles.navButton}`}
+            onClick={showPrev}
+            disabled={!hasPrev}
+            aria-label="Previous photo"
+          >
+            ‹
+          </button>
+        </Tooltip>
         <div className={styles.imageWrap}>
           <ViewerImage key={photo.id} photo={photo} onGone={isOwner ? undefined : onGone} />
         </div>
-        <button
-          type="button"
-          className={`${styles.iconButton} ${styles.navButton}`}
-          onClick={showNext}
-          disabled={!hasNext}
-          title="Next photo"
-          aria-label="Next photo"
-        >
-          ›
-        </button>
+        <Tooltip text="Next photo">
+          <button
+            type="button"
+            className={`${styles.iconButton} ${styles.navButton}`}
+            onClick={showNext}
+            disabled={!hasNext}
+            aria-label="Next photo"
+          >
+            ›
+          </button>
+        </Tooltip>
       </div>
 
       <div className={styles.panel}>

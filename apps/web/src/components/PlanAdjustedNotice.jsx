@@ -9,6 +9,7 @@ import {
   shouldShowWaiting,
 } from '../lib/aiPlan.js';
 import { localToday } from '../lib/localDate.js';
+import { Tooltip } from './ui/index.js';
 import styles from './PlanAdjustedNotice.module.css';
 
 // "Your plan adjusted this week" inside the plan card: a bold title, the
@@ -44,15 +45,16 @@ export default function PlanAdjustedNotice({ plan, onSeeHistory }) {
           See plan history
         </button>
       </div>
-      <button
-        type="button"
-        className={styles.dismiss}
-        onClick={handleDismiss}
-        aria-label="Dismiss"
-        title="Dismiss"
-      >
-        <span aria-hidden="true">×</span>
-      </button>
+      <Tooltip text="Dismiss this notice">
+        <button
+          type="button"
+          className={styles.dismiss}
+          onClick={handleDismiss}
+          aria-label="Dismiss"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </Tooltip>
     </div>
   );
 }

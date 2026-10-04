@@ -1,0 +1,39 @@
+/* Colours come from the design tokens, so light and dark mode both work. */
+.bubble {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  border: var(--surface-outline);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-2);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  text-align: center;
+  animation: tipIn 0.12s ease-out;
+}
+
+.above {
+  transform: translate(-50%, -100%);
+}
+
+.below {
+  transform: translate(-50%, 0);
+}
+
+@keyframes tipIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble {
+    animation: none;
+  }
+}

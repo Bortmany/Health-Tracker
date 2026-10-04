@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import PhotoTile from './PhotoTile.jsx';
 import PhotoViewer from './PhotoViewer.jsx';
-import { Button, Card, EmptyState, ErrorText, SectionTitle, Skeleton } from './ui/index.js';
+import { Button, Card, EmptyState, ErrorText, SectionTitle, Skeleton, Tooltip } from './ui/index.js';
 import { useMyCoach } from '../hooks/useCoach.js';
 import { useMyPhotos, useUploadPhoto } from '../hooks/usePhotos.js';
 import {
@@ -31,15 +31,16 @@ function PendingTile({ item, onRetry, onDrop }) {
   }
   return (
     <div className={`${styles.pendingTile} ${styles.failedTile}`} role="group" aria-label="Upload failed">
-      <button
-        type="button"
-        className={styles.dropButton}
-        onClick={onDrop}
-        title="Remove this upload"
-        aria-label="Remove this upload"
-      >
-        ✕
-      </button>
+      <Tooltip text="Remove this upload">
+        <button
+          type="button"
+          className={styles.dropButton}
+          onClick={onDrop}
+          aria-label="Remove this upload"
+        >
+          ✕
+        </button>
+      </Tooltip>
       <span className={styles.failedText}>{item.message}</span>
       {item.retryable && (
         <Button variant="ghost" size="sm" onClick={onRetry}>
@@ -120,8 +121,8 @@ export default function PhotoGallery({ onToast }) {
     <Button
       variant="secondary"
       size="sm"
-      onClick={openPicker}
-      disabled={atLimit}
+      onClick={atLimit ? undefined : openPicker}
+      aria-disabled={atLimit ? 'true' : undefined}
       title={atLimit ? "You've reached 200 photos" : undefined}
     >
       Add photo

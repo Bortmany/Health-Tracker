@@ -102,6 +102,25 @@ export default function Terms() {
             <Link to="/refunds">Refund &amp; Cancellation Policy</Link>.
           </p>
 
+          <h2>Photos, messages and the AI plan</h2>
+          <ul>
+            <li>
+              Progress photos are private to you until you choose to share a
+              photo with your coach. Only upload photos of yourself, and only
+              ones you are happy for your coach to see if you share them.
+            </li>
+            <li>
+              Messages between you and your coach are for coaching. Keep them
+              respectful; abusive or unlawful messages can lead to the account
+              being suspended.
+            </li>
+            <li>
+              The AI plan is written by an AI from your quiz answers and logs.
+              It is a suggestion, not medical advice, and it can be wrong.
+              Stop and see a doctor if something hurts.
+            </li>
+          </ul>
+
           <h2>Fair use</h2>
           <ul>
             <li>Don't try to break into other people's accounts or data.</li>

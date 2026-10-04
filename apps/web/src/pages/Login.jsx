@@ -64,7 +64,7 @@ export default function Login() {
               />
             </Field>
             <div className={styles.forgotRow}>
-              <Link className={styles.forgotLink} to="/forgot-password" title={authCopy.forgotHint}>
+              <Link className={styles.forgotLink} to="/forgot-password">
                 {authCopy.forgotLink}
               </Link>
             </div>

@@ -1,3 +1,4 @@
+import Tooltip from './Tooltip.jsx';
 import styles from './StatCard.module.css';
 
 // Small metric card: micro-label, big display number, optional sub-line.
@@ -11,9 +12,15 @@ const VALUE_CLASS = { accent: styles.valueAccent, warn: styles.valueWarn };
 export default function StatCard({ label, value, sub, subTone = 'neutral', hint, valueTone }) {
   return (
     <div className={styles.card}>
-      <div className={styles.label} title={hint}>
-        {label}
-      </div>
+      {hint ? (
+        <Tooltip text={hint} describe>
+          <div className={styles.label} tabIndex={0}>
+            {label}
+          </div>
+        </Tooltip>
+      ) : (
+        <div className={styles.label}>{label}</div>
+      )}
       <div className={`${styles.value} ${VALUE_CLASS[valueTone] ?? ''}`.trim()}>{value}</div>
       {sub != null && <div className={`${styles.sub} ${TONE_CLASS[subTone] ?? ''}`.trim()}>{sub}</div>}
     </div>

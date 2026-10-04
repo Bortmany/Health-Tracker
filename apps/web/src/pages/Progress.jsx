@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import LineChart from '../components/LineChart.jsx';
 import MeasurementsChart from '../components/MeasurementsChart.jsx';
 import PhotoGallery from '../components/PhotoGallery.jsx';
-import { Card, EmptyState, Screen, Skeleton, Toast, useToast } from '../components/ui/index.js';
+import { Card, EmptyState, Screen, Skeleton, Toast, useToast, Tooltip } from '../components/ui/index.js';
 import { useHabitSummary, useLogsRange, useStreak } from '../hooks/useLogs.js';
 import { useMyMeasurements } from '../hooks/useMeasurements.js';
 import { usePersonalRecords, useTrainingLogs } from '../hooks/useTrainingLogs.js';
@@ -130,23 +130,27 @@ function ConsistencyCalendar() {
   return (
     <Card title="Consistency">
       <div className={styles.calHeader}>
-        <button
-          type="button"
-          className={styles.calNavButton}
-          onClick={() => setMonthStart((m) => shiftMonth(m, -1))}
-          aria-label="Previous month"
-        >
-          ←
-        </button>
+        <Tooltip text="Previous month">
+          <button
+            type="button"
+            className={styles.calNavButton}
+            onClick={() => setMonthStart((m) => shiftMonth(m, -1))}
+            aria-label="Previous month"
+          >
+            ←
+          </button>
+        </Tooltip>
         <span className={styles.calMonthLabel}>{monthLabel}</span>
-        <button
-          type="button"
-          className={styles.calNavButton}
-          onClick={() => setMonthStart((m) => shiftMonth(m, 1))}
-          aria-label="Next month"
-        >
-          →
-        </button>
+        <Tooltip text="Next month">
+          <button
+            type="button"
+            className={styles.calNavButton}
+            onClick={() => setMonthStart((m) => shiftMonth(m, 1))}
+            aria-label="Next month"
+          >
+            →
+          </button>
+        </Tooltip>
       </div>
 
       <div className={styles.calGrid}>

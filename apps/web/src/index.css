@@ -50,3 +50,9 @@ button {
   border-radius: var(--radius-md);
   animation: pulse 1.4s ease-in-out infinite;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}

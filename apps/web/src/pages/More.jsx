@@ -13,6 +13,7 @@ import {
   Skeleton,
   Toast,
   useToast,
+  Tooltip,
 } from '../components/ui/index.js';
 import CoachPayStep from '../components/CoachPayStep.jsx';
 import UnreadDot from '../components/UnreadDot.jsx';
@@ -386,9 +387,11 @@ function CoachProfileRow() {
             {billing.data.active ? (
               <Chip tone="accent">{getPaid.moreRowActive}</Chip>
             ) : (
-              <Link to="/coach/profile#get-paid" className={styles.chipLink} title={getPaid.moreRowLink}>
-                <Chip tone="warn">{getPaid.moreRowSetup}</Chip>
-              </Link>
+              <Tooltip text={getPaid.moreRowLink} describe>
+                <Link to="/coach/profile#get-paid" className={styles.chipLink}>
+                  <Chip tone="warn">{getPaid.moreRowSetup}</Chip>
+                </Link>
+              </Tooltip>
             )}
           </div>
         )}

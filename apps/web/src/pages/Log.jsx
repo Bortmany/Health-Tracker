@@ -15,6 +15,7 @@ import {
   Skeleton,
   Toast,
   useToast,
+  Tooltip,
 } from '../components/ui/index.js';
 import { useActivities } from '../hooks/useActivities.js';
 import { useMyCoach } from '../hooks/useCoach.js';
@@ -355,26 +356,30 @@ export default function Log() {
     <Screen>
       <div className={styles.header}>
         <div className={styles.dateNav}>
-          <button
-            type="button"
-            className={styles.dateNavButton}
-            onClick={() => setDate((d) => addDays(d, -1))}
-            aria-label="Previous day"
-          >
-            ←
-          </button>
+          <Tooltip text="Previous day">
+            <button
+              type="button"
+              className={styles.dateNavButton}
+              onClick={() => setDate((d) => addDays(d, -1))}
+              aria-label="Previous day"
+            >
+              ←
+            </button>
+          </Tooltip>
           <span className={styles.dateLabel}>
             {formatDateLabel(date)}
             {date === localToday() && <Chip tone="accent">Today</Chip>}
           </span>
-          <button
-            type="button"
-            className={styles.dateNavButton}
-            onClick={() => setDate((d) => addDays(d, 1))}
-            aria-label="Next day"
-          >
-            →
-          </button>
+          <Tooltip text="Next day">
+            <button
+              type="button"
+              className={styles.dateNavButton}
+              onClick={() => setDate((d) => addDays(d, 1))}
+              aria-label="Next day"
+            >
+              →
+            </button>
+          </Tooltip>
         </div>
         <Button onClick={handleSubmit} disabled={!form || saving}>
           {saving ? 'Saving...' : 'Save'}
@@ -503,14 +508,16 @@ export default function Log() {
                     </option>
                   ))}
                 </Select>
-                <button
-                  type="button"
-                  className={styles.removeButton}
-                  onClick={() => removeActivityRow(a.key)}
-                  aria-label="Remove activity"
-                >
-                  ✕
-                </button>
+                <Tooltip text="Remove activity">
+                  <button
+                    type="button"
+                    className={styles.removeButton}
+                    onClick={() => removeActivityRow(a.key)}
+                    aria-label="Remove activity"
+                  >
+                    ✕
+                  </button>
+                </Tooltip>
               </div>
             ))}
             <Button variant="ghost" size="sm" onClick={addActivityRow}>
@@ -539,15 +546,17 @@ export default function Log() {
                       />
                       {h.label}
                     </label>
-                    <button
-                      type="button"
-                      className={`${styles.removeButton} ${styles.habitRemove}`}
-                      onClick={() => setHabitToDelete(h)}
-                      disabled={deleteHabit.isPending}
-                      aria-label={`Remove habit ${h.label}`}
-                    >
-                      ✕
-                    </button>
+                    <Tooltip text={`Remove habit ${h.label}`}>
+                      <button
+                        type="button"
+                        className={`${styles.removeButton} ${styles.habitRemove}`}
+                        onClick={() => setHabitToDelete(h)}
+                        disabled={deleteHabit.isPending}
+                        aria-label={`Remove habit ${h.label}`}
+                      >
+                        ✕
+                      </button>
+                    </Tooltip>
                   </div>
                 ))}
               </div>

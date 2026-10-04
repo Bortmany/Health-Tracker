@@ -10,8 +10,9 @@ import { pool } from './db/pool.js';
 import { healthSummary } from './lib/billing/index.js';
 import { verifyToken } from './lib/jwt.js';
 import { logger } from './lib/logger.js';
-import { captureException, initSentry } from './lib/sentry.js';
+import { initSentry } from './lib/sentry.js';
 import { storageMode } from './lib/photoStorage.js';
+import { isAiPlanGenerationEnabled } from './lib/aiPlanGenerator.js';
 import { getSignupMode } from './lib/signupMode.js';
 import accountRouter from './routes/account.js';
 import adminRouter from './routes/admin.js';
@@ -305,7 +306,7 @@ const writeLimiter = rateLimit({
 // progress photos and body measurements.
 // Money routes join too (not the webhook: the signature is its protection, and
 // the payment company must never be throttled).
-for (const path of ['/api/billing/checkout', '/api/billing/ai-checkout', '/api/billing/coach-checkout', '/api/billing/subscriptions', '/api/admin/payouts', '/api/logs', '/api/training-logs', '/api/programs', '/api/plans', '/api/health-sync', '/api/coach', '/api/coach-link', '/api/checkins', '/api/messages', '/api/photos', '/api/measurements']) {
+for (const path of ['/api/billing/checkout', '/api/billing/ai-checkout', '/api/billing/coach-checkout', '/api/billing/subscriptions', '/api/admin', '/api/logs', '/api/training-logs', '/api/programs', '/api/plans', '/api/health-sync', '/api/coach', '/api/coach-link', '/api/checkins', '/api/messages', '/api/photos', '/api/measurements']) {
   app.use(path, writeLimiter);
 }
 
@@ -408,6 +409,8 @@ app.get('/api/health', async (_req, res) => {
       admin: process.env.ADMIN_EMAIL ? 'configured' : 'dormant',
       // "s3" (a storage bucket) | "local" (a folder, dev only) | "dormant".
       photos: storageMode(),
+      // The AI plan writer: "configured" once ANTHROPIC_API_KEY is set. Words only.
+      ai: isAiPlanGenerationEnabled() ? 'configured' : 'dormant',
       // Money and email switches: words only (configured/dormant, provider and
       // environment names, payout method) — never a key or secret.
       ...healthSummary(),
@@ -488,6 +491,5 @@ app.use((err, req, res, _next) => {
   // Anything else is a real server error: log it (secrets redacted) and, if
   // Sentry is switched on, report it — then return the standard shape.
   logger.error('Unhandled server error', { method: req.method, path: req.path, error: err });
-  captureException(err);
   res.status(500).json({ error: { message: 'Internal server error', code: 'INTERNAL_ERROR' } });
 });

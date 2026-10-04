@@ -10,6 +10,7 @@ import {
   Skeleton,
   Toast,
   useToast,
+  Tooltip,
 } from './ui/index.js';
 import MoneyButton from './MoneyButton.jsx';
 import { useAdminEarnings, useAdminPayouts, useResolvePayout, useRunPayouts } from '../hooks/useAdmin.js';
@@ -92,9 +93,11 @@ export function PayoutsSummary() {
     content = (
       <div className={styles.summary}>
         <div>
-          <div className={styles.owedLabel} title={copy.owedHint}>
-            {copy.owedLabel}
-          </div>
+          <Tooltip text={copy.owedHint} describe>
+            <div className={styles.owedLabel} tabIndex={0}>
+              {copy.owedLabel}
+            </div>
+          </Tooltip>
           <div className={styles.bigFigure}>{formatCents(data.totalOwedCents)}</div>
           <div className={styles.meta}>{copy.owedSub(coachCount)}</div>
         </div>
@@ -307,9 +310,11 @@ export function PayoutHistoryCard() {
                 <ResolveBox payout={payout} onDone={() => toast.show(copy.resolve.done)} />
               )}
               {ref && (
-                <button type="button" className={styles.refButton} title={copy.refHint} onClick={() => copyRef(ref)}>
-                  {ref}
-                </button>
+                <Tooltip text={copy.refHint} describe>
+                  <button type="button" className={styles.refButton} onClick={() => copyRef(ref)}>
+                    {ref}
+                  </button>
+                </Tooltip>
               )}
             </div>
           );

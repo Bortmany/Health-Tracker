@@ -16,3 +16,4 @@ export { default as ProgressRing } from './ProgressRing.jsx';
 export { default as Toast, useToast } from './Toast.jsx';
 export { default as ConfirmDialog } from './ConfirmDialog.jsx';
 export { default as Switch } from './Switch.jsx';
+export { default as Tooltip } from './Tooltip.jsx';

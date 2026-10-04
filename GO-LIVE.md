@@ -53,7 +53,7 @@ only move to live keys after every sandbox check passes.
    - `WHOP_STARTUP_FEE_PLAN_ID`, `WHOP_AI_MONTHLY_PLAN_ID`, `WHOP_AI_YEARLY_PLAN_ID`
    - `APP_URL` — the app's own public address
    - `PAYOUT_METHOD` — leave unset until you have decided (see below)
-8. [ ] Check `/api/health` shows billing as configured (it never shows a key).
+8. [ ] Check `/api/health` shows billing as configured (it never shows a key). The same page also has one plain word for each other switch: `ai`, `photos`, `email`, `payouts` and `sentry` each say `configured` or `dormant`.
 
 **Test the whole sandbox flow** (use Whop's test cards)
 - [ ] A coach pays the startup fee.
@@ -131,7 +131,7 @@ Photos stay switched off in production ("Photo uploads are coming soon") until t
 - [ ] **Backups are not confirmed.** The database backups above do not include photos. Turn on versioning for the bucket if Railway offers it, or schedule a regular copy of the bucket to somewhere else. Until then, a deleted or lost bucket means lost photos.
 
 ## Optional
-- [ ] `ANTHROPIC_API_KEY` — wakes the AI plan writer (personalized plans by Claude instead of picked from the 14-plan library).
+- [ ] `ANTHROPIC_API_KEY` — wakes the AI plan writer (`/api/health` then shows `"ai": "configured"`; personalized plans by Claude instead of picked from the 14-plan library).
 - `PORT`, `CORS_ORIGIN` — defaults are fine.
 
 ## Security note

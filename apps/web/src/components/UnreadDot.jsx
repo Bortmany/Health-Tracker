@@ -5,7 +5,7 @@ import styles from './UnreadDot.module.css';
 // parent (a nav label or a button's wrapper); otherwise it sits inline.
 export default function UnreadDot({ corner = false }) {
   return (
-    <span className={corner ? styles.corner : styles.dot} title="Unread messages">
+    <span className={corner ? styles.corner : styles.dot}>
       <span className={styles.hidden}>Unread messages</span>
     </span>
   );

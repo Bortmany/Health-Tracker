@@ -10,6 +10,7 @@ import {
   Skeleton,
   Toast,
   useToast,
+  Tooltip,
 } from '../components/ui/index.js';
 import { useCheckinQuestions, useSaveCheckinQuestions } from '../hooks/useCheckins.js';
 import {
@@ -162,16 +163,17 @@ function QuestionEditor({ saved }) {
                     />
                   </Field>
                 </div>
-                <button
-                  type="button"
-                  className={styles.removeButton}
-                  onClick={() => remove(row.key)}
-                  disabled={onlyOne}
-                  title={removeHint}
-                  aria-label={removeHint}
-                >
-                  ✕
-                </button>
+                <Tooltip text={removeHint}>
+                  <button
+                    type="button"
+                    className={styles.removeButton}
+                    onClick={() => remove(row.key)}
+                    disabled={onlyOne}
+                    aria-label={removeHint}
+                  >
+                    ✕
+                  </button>
+                </Tooltip>
               </li>
             );
           })}

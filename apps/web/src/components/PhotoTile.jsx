@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { usePhotoFile, useNearScreen } from '../hooks/usePhotoFile.js';
 import chipStyles from './ui/Chip.module.css';
+import { Tooltip } from './ui/index.js';
 import styles from './PhotoTile.module.css';
 
 // One 3:4 photo tile. The whole tile is a button that opens the viewer. The
@@ -12,13 +13,13 @@ export default function PhotoTile({ photo, tag = null, ariaLabel, onOpen, classN
   const file = usePhotoFile(photo.url, { active: near });
 
   return (
+    <Tooltip text="Open photo">
     <button
       type="button"
       ref={ref}
       className={`${styles.tile} ${className}`.trim()}
       onClick={onOpen}
       aria-label={ariaLabel}
-      title="Open photo"
     >
       {file.status === 'ready' ? (
         <img className={styles.image} src={file.src} alt="" draggable="false" />
@@ -33,5 +34,6 @@ export default function PhotoTile({ photo, tag = null, ariaLabel, onOpen, classN
         </span>
       )}
     </button>
+    </Tooltip>
   );
 }
