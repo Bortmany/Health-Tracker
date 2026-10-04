@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Card, ErrorText, Field, Input } from '../components/ui/index.js';
 import { useLogin } from '../hooks/useAuth.js';
+import { auth as authCopy } from '../lib/billingCopy.js';
 import { emailError } from '../lib/validation.js';
 import styles from './Auth.module.css';
 
@@ -62,6 +63,11 @@ export default function Login() {
                 required
               />
             </Field>
+            <div className={styles.forgotRow}>
+              <Link className={styles.forgotLink} to="/forgot-password" title={authCopy.forgotHint}>
+                {authCopy.forgotLink}
+              </Link>
+            </div>
             {login.isError && <ErrorText>{login.error.message}</ErrorText>}
             <Button type="submit" block disabled={login.isPending}>
               {login.isPending ? 'Logging in...' : 'Log in'}

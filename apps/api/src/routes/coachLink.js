@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { coachReadiness } from '../lib/coachMoney.js';
 import { stopSubscriptionsWhere } from '../lib/stopSubscriptions.js';
 import * as validate from '../lib/validate.js';
 import { Rollback, withTransaction } from '../lib/withTransaction.js';
@@ -258,9 +259,13 @@ router.delete('/requests/:id', asyncHandler(async (req, res) => {
   res.status(204).end();
 }));
 
-// Accept a coach's invite. With a coach already, the student must confirm
-// (replaceCurrent: true) — that ends the old link before the new one starts,
-// so nobody ever has two active coaches.
+// Accept a coach's invite. Like accepting a student's request, this is a PAYING
+// student: the coach must have paid the startup fee, passed the identity check
+// and set a price, and the link waits in 'pending_payment' until the student's
+// payment is confirmed by the payment company (routes/billing.js). Only an
+// invite CODE (/redeem above) is free, by design (grandfathered).
+// With a coach already, the student must confirm (replaceCurrent: true) — that
+// ends the old link before the new one starts, so nobody ever has two active coaches.
 router.post('/invites/:id/accept', asyncHandler(async (req, res) => {
   if (!validate.isUuid(req.params.id)) return inviteNotFound(res);
   const replaceCurrent = validate.boolean(req.body?.replaceCurrent, 'replaceCurrent', { optional: true }) === true;
@@ -280,6 +285,13 @@ router.post('/invites/:id/accept', asyncHandler(async (req, res) => {
         inviteNotFound(res);
         throw new Rollback();
       }
+      const readiness = await coachReadiness(client, invite.coach_id);
+      if (!readiness.ready) {
+        res.status(409).json({
+          error: { message: "This coach isn't set up to take paying students yet. Please try again later.", code: 'COACH_NOT_READY' },
+        });
+        throw new Rollback();
+      }
       const { rows: activeRows } = await client.query(
         `SELECT id FROM coach_clients WHERE client_id = $1 AND status = 'active' FOR UPDATE`,
         [req.userId]
@@ -296,7 +308,8 @@ router.post('/invites/:id/accept', asyncHandler(async (req, res) => {
           [activeRows[0].id, req.userId]
         );
       }
-      await client.query(`UPDATE coach_clients SET status = 'active' WHERE id = $1`, [invite.id]);
+      // Never straight to 'active': only the verified payment message does that.
+      await client.query(`UPDATE coach_clients SET status = 'pending_payment' WHERE id = $1 AND client_id = $2`, [invite.id, req.userId]);
       await closeOwnOpenRequests(client, req.userId);
       const { rows } = await client.query(
         `SELECT u.display_name, p.slug FROM users u
@@ -313,7 +326,7 @@ router.post('/invites/:id/accept', asyncHandler(async (req, res) => {
     throw err;
   }
   if (!coach) return;
-  res.json({ coach });
+  res.json({ coach, status: 'pending_payment' });
 }));
 
 router.post('/invites/:id/decline', asyncHandler(async (req, res) => {

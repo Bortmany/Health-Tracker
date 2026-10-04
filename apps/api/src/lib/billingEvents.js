@@ -1,4 +1,5 @@
-import { payoutMethod } from './billing/index.js';
+import { pool } from '../db/pool.js';
+import { getBillingClient, isBillingEnabled, payoutMethod } from './billing/index.js';
 import { computeCommission, reverseCommission } from './commission.js';
 import { payingStudentCount } from './coachMoney.js';
 import { logger } from './logger.js';
@@ -152,8 +153,10 @@ async function saveSubscription(client, event, ctx, { status = 'active' } = {}) 
 }
 
 // A coach's link goes live: the one place a paid link becomes 'active'.
+// Returns 'blocked' when the one-active-coach rule stopped it (the student
+// already has another active coach), otherwise 'ok'.
 async function activateCoachLink(client, link) {
-  if (!link || link.status !== 'pending_payment') return;
+  if (!link || link.status !== 'pending_payment') return 'ok';
   await client.query('SAVEPOINT activate_link');
   try {
     await client.query(
@@ -173,8 +176,52 @@ async function activateCoachLink(client, link) {
     if (err.code !== '23505') throw err;
     await client.query('ROLLBACK TO SAVEPOINT activate_link');
     logger.warn('A paid coaching link could not go live: the student already has an active coach');
+    await client.query('RELEASE SAVEPOINT activate_link');
+    return 'blocked';
   }
   await client.query('RELEASE SAVEPOINT activate_link');
+  return 'ok';
+}
+
+// Subscriptions to stop at the payment company. They are collected during the
+// message and only acted on AFTER the database work has committed (no network
+// call while a transaction is open). `rowId` is our stored subscription row,
+// if there is one, so it can be marked "cancels at period end" once stopped.
+function queueProviderCancel(tasks, providerSubscriptionId, rowId, why) {
+  if (!providerSubscriptionId) return;
+  tasks.push({ providerSubscriptionId, rowId: rowId ?? null, why });
+}
+
+async function runProviderCancels(tasks) {
+  if (tasks.length === 0 || !isBillingEnabled()) return;
+  let billing;
+  try {
+    billing = getBillingClient();
+  } catch (err) {
+    logger.error('Could not reach the payment company to stop a subscription', { error: err });
+    return;
+  }
+  for (const task of tasks) {
+    try {
+      const result = await billing.cancelSubscription({ providerSubscriptionId: task.providerSubscriptionId });
+      logger.warn('Stopped a subscription that could not go live', { why: task.why, subscriptionRow: task.rowId });
+      if (task.rowId) {
+        await pool.query(
+          `UPDATE student_subscriptions
+           SET cancel_at_period_end = true,
+               current_period_end = COALESCE($2::timestamptz, current_period_end),
+               updated_at = now()
+           WHERE id = $1 AND provider_subscription_id = $3`,
+          [task.rowId, result?.periodEnd ?? null, task.providerSubscriptionId]
+        );
+      }
+    } catch (err) {
+      logger.error(
+        'OWNER ACTION NEEDED: a student is paying for coaching that cannot go live and Cut could not stop it at the payment company. Cancel it by hand or refund.',
+        { why: task.why, subscriptionRow: task.rowId, error: err }
+      );
+    }
+  }
 }
 
 async function activateAiPlan(client, userId, customerId) {
@@ -200,11 +247,18 @@ async function writeLedger(client, row) {
   );
 }
 
+// True when this message is about a provider subscription different from the
+// one already stored for the same coaching link.
+function isExtraSubscription(ctx, event) {
+  const known = ctx.stored?.provider_subscription_id;
+  return Boolean(known && event.providerSubscriptionId && known !== event.providerSubscriptionId);
+}
+
 function settledByNow() {
   return payoutMethod() === 'A' ? 'provider' : 'cut';
 }
 
-async function onPaymentSucceeded(client, event) {
+async function onPaymentSucceeded(client, event, tasks) {
   const meta = event.metadata ?? {};
 
   if (meta.kind === 'coach_startup_fee') {
@@ -239,14 +293,39 @@ async function onPaymentSucceeded(client, event) {
     logger.warn('Coaching payment names no known coach; ignored');
     return;
   }
-  let sub = null;
   // A subscription row is only kept for a link that is still live (or one we
   // already track); a late payment on a dead link is still LEDGERED below.
   if (ctx.linkId && (ctx.stored || LIVE_LINK_STATUSES.includes(ctx.link.status))) {
-    sub = await saveSubscription(client, event, ctx, { status: 'active' });
-    if (sub.status !== 'ended') await activateCoachLink(client, ctx.link);
+    if (isExtraSubscription(ctx, event)) {
+      // A second subscription for a link that already has one (a double
+      // checkout): stop the extra one; the money it took is still ledgered.
+      queueProviderCancel(tasks, event.providerSubscriptionId, null, 'duplicate subscription for one link');
+    } else {
+      const sub = await saveSubscription(client, event, ctx, { status: 'active' });
+      if (sub.status !== 'ended') {
+        const outcome = await activateCoachLink(client, ctx.link);
+        if (outcome === 'blocked') {
+          queueProviderCancel(tasks, event.providerSubscriptionId, sub.id, 'student already has an active coach');
+        }
+      } else {
+        queueProviderCancel(tasks, event.providerSubscriptionId, null, 'payment on a subscription we already ended');
+      }
+    }
+  } else if (ctx.linkId) {
+    // A payment for a link that is dead (ended, declined, revoked): nothing is
+    // kept, so stop the subscription so it doesn't keep charging.
+    queueProviderCancel(tasks, event.providerSubscriptionId, null, 'payment for a coaching link that is no longer open');
   }
 
+  // Only US dollar amounts are ledgered (the parser already prefers a USD total
+  // when Whop supplies one). Anything else is logged and skipped, never guessed.
+  // UNCONFIRMED in Whop's sandbox: whether the amount field is the TOTAL the
+  // student paid or net of tax/fees. Until confirmed, the commission is worked
+  // out on this amount as given.
+  if (event.currency && event.currency !== 'usd') {
+    logger.warn('Coaching payment is not in US dollars; no ledger row written', { currency: event.currency });
+    return;
+  }
   const gross = positiveCents(event.amountCents);
   const ref = event.providerEventRef ?? event.providerPaymentId;
   if (!gross || !ref) {
@@ -274,13 +353,19 @@ async function onPaymentSucceeded(client, event) {
 // payment at the original rate. Netted off the coach's balance.
 async function onReversal(client, event, kind) {
   const ref = event.providerEventRef ?? event.eventId;
-  if (!ref || !event.refundedPaymentId) {
+  if (event.currency && event.currency !== 'usd') {
+    logger.warn('Refund is not in US dollars; no ledger row written', { currency: event.currency });
+    return;
+  }
+  // Refunds and chargebacks both carry the ORIGINAL payment's id in providerPaymentId.
+  const originalPaymentId = event.refundedPaymentId ?? event.providerPaymentId;
+  if (!ref || !originalPaymentId) {
     logger.warn('Refund message did not say which payment it undoes; ignored');
     return;
   }
   const { rows } = await client.query(
     `SELECT * FROM commission_ledger WHERE source_ref = $1`,
-    [`payment:${event.refundedPaymentId}`]
+    [`payment:${originalPaymentId}`]
   );
   const original = rows[0];
   if (!original) {
@@ -317,14 +402,26 @@ async function onReversal(client, event, kind) {
   });
 }
 
-async function onSubscriptionStarted(client, event) {
+async function onSubscriptionStarted(client, event, tasks) {
   const ctx = await resolveContext(client, event);
   if (!ctx || !ctx.kind || !(await userExists(client, ctx.userId))) return;
-  if (ctx.kind === 'coach' && (!ctx.linkId || !(ctx.stored || LIVE_LINK_STATUSES.includes(ctx.link.status)))) return;
+  if (ctx.kind === 'coach' && (!ctx.linkId || !(ctx.stored || LIVE_LINK_STATUSES.includes(ctx.link.status)))) {
+    if (ctx.kind === 'coach') {
+      queueProviderCancel(tasks, event.providerSubscriptionId, null, 'subscription for a coaching link that is no longer open');
+    }
+    return;
+  }
+  if (ctx.kind === 'coach' && isExtraSubscription(ctx, event)) {
+    queueProviderCancel(tasks, event.providerSubscriptionId, null, 'duplicate subscription for one link');
+    return;
+  }
   const sub = await saveSubscription(client, event, ctx, { status: 'active' });
   if (sub.status === 'ended') return;
-  if (ctx.kind === 'ai_plan') await activateAiPlan(client, ctx.userId, event.providerCustomerId);
-  else await activateCoachLink(client, ctx.link);
+  if (ctx.kind === 'ai_plan') {
+    await activateAiPlan(client, ctx.userId, event.providerCustomerId);
+  } else if ((await activateCoachLink(client, ctx.link)) === 'blocked') {
+    queueProviderCancel(tasks, event.providerSubscriptionId, sub.id, 'student already has an active coach');
+  }
 }
 
 async function onSubscriptionEnded(client, event) {
@@ -336,7 +433,20 @@ async function onSubscriptionEnded(client, event) {
     [sub.id]
   );
   if (sub.kind === 'ai_plan') {
-    await client.query(`UPDATE users SET plan_tier = 'free' WHERE id = $1`, [sub.user_id]);
+    // Back to free only when nothing else still grants the AI plan: another
+    // live AI subscription of theirs. (Owner-granted premium has no separate
+    // marker in the database today - it is just plan_tier - so it cannot be
+    // told apart here; if the owner starts granting premium by hand, add a
+    // "granted" flag and check it in this statement.)
+    await client.query(
+      `UPDATE users SET plan_tier = 'free'
+       WHERE id = $1
+         AND NOT EXISTS (
+           SELECT 1 FROM student_subscriptions
+           WHERE user_id = $1 AND kind = 'ai_plan' AND status <> 'ended' AND id <> $2
+         )`,
+      [sub.user_id, sub.id]
+    );
   } else if (sub.coach_client_id) {
     await client.query(
       `UPDATE coach_clients SET status = 'ended', ended_at = now()
@@ -373,7 +483,8 @@ async function onIdentityVerified(client, event) {
 // Applies one verified message. Returns 'duplicate' when it was seen before,
 // 'handled' otherwise (including messages we choose to ignore).
 export async function applyBillingEvent(event) {
-  return withTransaction(async (client) => {
+  const tasks = [];
+  const outcome = await withTransaction(async (client) => {
     if (event.eventId) {
       const { rowCount } = await client.query(
         `INSERT INTO billing_events (event_id, event_type) VALUES ($1, $2) ON CONFLICT (event_id) DO NOTHING`,
@@ -384,7 +495,7 @@ export async function applyBillingEvent(event) {
 
     switch (event.type) {
       case 'payment.succeeded':
-        await onPaymentSucceeded(client, event);
+        await onPaymentSucceeded(client, event, tasks);
         break;
       case 'payment.failed':
         // A failed renewal keeps access while the provider retries.
@@ -403,7 +514,7 @@ export async function applyBillingEvent(event) {
         await onReversal(client, event, 'chargeback');
         break;
       case 'subscription.started':
-        await onSubscriptionStarted(client, event);
+        await onSubscriptionStarted(client, event, tasks);
         break;
       case 'subscription.cancel_scheduled':
         if (event.providerSubscriptionId) {
@@ -428,4 +539,7 @@ export async function applyBillingEvent(event) {
     }
     return 'handled';
   });
+  // Only now that everything is saved: stop any subscription that can't go live.
+  await runProviderCancels(tasks);
+  return outcome;
 }

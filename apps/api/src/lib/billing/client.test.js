@@ -333,7 +333,7 @@ test('errors are plain, carry the status, and never contain the key or the provi
       (error) => {
         assert.ok(error instanceof BillingError);
         assert.equal(error.status, status);
-        assert.equal(error.outcomeUnknown, status >= 500);
+        assert.equal(error.outcomeUnknown, status >= 500 || status === 409);
         assert.ok(!error.message.includes(API_KEY));
         assert.ok(!error.message.includes('4242'));
         assert.ok(!JSON.stringify(error).includes(API_KEY));

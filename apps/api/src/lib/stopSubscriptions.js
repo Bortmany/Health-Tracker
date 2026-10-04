@@ -7,8 +7,9 @@ import { logger } from './logger.js';
 // for coaching that no longer exists. For each live subscription on those
 // links this asks the payment company to cancel at the end of the paid period
 // and marks it "cancels at period end". It never throws: the link has already
-// been ended, and a payment company hiccup must not undo that. A failure is
-// logged (ids only) so the owner can cancel by hand.
+// been ended, and a payment company hiccup must not undo that. If the
+// payment company can't cancel it, the row is NOT marked cancelled (so the next
+// attempt retries) and an owner-visible error line is logged (ids only).
 //
 // `where` is a SQL fragment on coach_clients (alias cc) and `params` its values.
 export async function stopSubscriptionsWhere(where, params) {
@@ -29,10 +30,14 @@ export async function stopSubscriptionsWhere(where, params) {
           const result = await client.cancelSubscription({ providerSubscriptionId: sub.provider_subscription_id });
           periodEnd = result?.periodEnd ?? null;
         } catch (err) {
-          logger.error('Could not stop a coaching subscription at the payment company', {
-            subscriptionId: sub.id,
-            error: err,
-          });
+          // The payment company did not stop it. Leave "cancels at period end"
+          // OFF so the next attempt tries again, and say so clearly: the owner
+          // may need to cancel this one by hand.
+          logger.error(
+            'OWNER ACTION NEEDED: a coaching subscription could NOT be cancelled at the payment company, so the student may still be charged. It will be retried; cancel it by hand if it keeps failing.',
+            { subscriptionId: sub.id, error: err }
+          );
+          continue;
         }
       }
       await pool.query(

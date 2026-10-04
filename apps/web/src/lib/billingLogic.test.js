@@ -10,6 +10,7 @@ import {
   normalizeStatus,
   normalizeSubscriptions,
   owedTone,
+  passwordResetError,
   payButtonState,
   payoutPill,
   priceFigure,
@@ -204,4 +205,11 @@ test('wording that quotes prices follows the one pricing file', () => {
   assert.equal(copy.student.payButton(3000, 'Sara'), 'Pay $30/month to start with Sara');
   assert.equal(copy.subscription.subscribeYearly, 'Subscribe, $89.99 a year');
   assert.equal(copy.admin.confirmSend(39800, 5, 1), "Send $398.00 to 5 coaches now? Money moves to their accounts and can't be taken back. 1 coach isn't included (identity check not finished).");
+});
+
+test("passwordResetError checks length first, then the match", () => {
+  assert.equal(passwordResetError("short", "short"), "short");
+  assert.equal(passwordResetError(undefined, ""), "short");
+  assert.equal(passwordResetError("longenough1", "different1"), "mismatch");
+  assert.equal(passwordResetError("longenough1", "longenough1"), null);
 });

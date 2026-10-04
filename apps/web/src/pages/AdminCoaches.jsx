@@ -13,13 +13,16 @@ import {
   Toast,
   useToast,
 } from '../components/ui/index.js';
+import { MoneyBlock, PayoutHistoryCard, PayoutsSummary } from '../components/AdminPayouts.jsx';
 import {
+  useAdminEarnings,
   useApproveApplication,
   useCoachApplications,
   useCoaches,
   useDeclineApplication,
   useRevokeCoach,
 } from '../hooks/useAdmin.js';
+import { admin as adminCopy, pills } from '../lib/billingCopy.js';
 import styles from './AdminCoaches.module.css';
 
 const REASON_MAX = 300;
@@ -139,18 +142,39 @@ function PendingRow({ application, expanded, onToggle, onDecided }) {
   );
 }
 
-function CoachRow({ coach, onRevoke, revoking, error }) {
+function CoachRow({ coach, money, onRevoke, revoking, error, former = false }) {
   return (
-    <div className={styles.row}>
+    <div className={styles.row} id={`coach-${coach.userId}`}>
       <div className={styles.coachHead}>
         <div className={styles.rowInfo}>
-          <div className={styles.rowName}>{coach.displayName}</div>
+          <div className={styles.rowName}>
+            {coach.displayName}
+            {money && !money.identityVerified && (
+              <>
+                {' '}
+                <Chip tone="warn" title={adminCopy.identityHint}>
+                  {pills.identityNotChecked}
+                </Chip>
+              </>
+            )}
+            {former && (
+              <>
+                {' '}
+                <Chip>{pills.revoked}</Chip>
+              </>
+            )}
+          </div>
           <div className={styles.rowMeta}>{coach.email}</div>
-          <div className={styles.rowMeta}>Coaching since {formatDate(coach.coachingSince)}</div>
+          {coach.coachingSince && <div className={styles.rowMeta}>Coaching since {formatDate(coach.coachingSince)}</div>}
         </div>
-        <Button variant="danger" size="sm" onClick={onRevoke} disabled={revoking}>
-          Revoke
-        </Button>
+        <div className={styles.coachEnd}>
+          <MoneyBlock money={money} />
+          {!former && (
+            <Button variant="danger" size="sm" onClick={onRevoke} disabled={revoking}>
+              Revoke
+            </Button>
+          )}
+        </div>
       </div>
       {error && <ErrorText>{SAVE_ERROR}</ErrorText>}
     </div>
@@ -160,6 +184,7 @@ function CoachRow({ coach, onRevoke, revoking, error }) {
 export default function AdminCoaches() {
   const applications = useCoachApplications('pending');
   const coaches = useCoaches();
+  const earnings = useAdminEarnings();
   const revoke = useRevokeCoach();
   const toast = useToast();
   const [expandedId, setExpandedId] = useState(null);
@@ -168,6 +193,11 @@ export default function AdminCoaches() {
 
   const pending = applications.data?.applications ?? [];
   const coachList = coaches.data?.coaches ?? [];
+  const moneyById = new Map((earnings.data?.coaches ?? []).map((c) => [String(c.userId), c]));
+  // Revoked coaches who are still owed (or owe) money stay visible here.
+  const formerOwed = (earnings.data?.coaches ?? []).filter(
+    (c) => c.revoked && c.owedCents != null && c.owedCents !== 0
+  );
 
   function handleRevoke() {
     const coach = coachToRevoke;
@@ -182,7 +212,10 @@ export default function AdminCoaches() {
   }
 
   return (
-    <Screen title="Coach applications">
+    <Screen title="Coaches" width={1040}>
+      <PayoutsSummary />
+      <div className={styles.cols}>
+        <div className={styles.colMain}>
       <Card className={styles.stackCard} title="Pending">
         {applications.isLoading ? (
           <Skeleton height="4rem" count={3} />
@@ -215,6 +248,7 @@ export default function AdminCoaches() {
             <CoachRow
               key={coach.userId}
               coach={coach}
+              money={moneyById.get(String(coach.userId))}
               onRevoke={() => setCoachToRevoke(coach)}
               revoking={revoke.isPending}
               error={revokeFailedId === coach.userId}
@@ -222,6 +256,20 @@ export default function AdminCoaches() {
           ))
         )}
       </Card>
+
+      {formerOwed.length > 0 && (
+        <Card className={styles.stackCard} title={adminCopy.formerTitle}>
+          <p className={styles.rowMeta}>{adminCopy.formerLine}</p>
+          {formerOwed.map((c) => (
+            <CoachRow key={c.userId} coach={c} money={c} former />
+          ))}
+        </Card>
+      )}
+        </div>
+        <div className={styles.colSide}>
+          <PayoutHistoryCard />
+        </div>
+      </div>
 
       <ConfirmDialog
         open={Boolean(coachToRevoke)}

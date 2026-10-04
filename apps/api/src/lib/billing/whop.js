@@ -333,6 +333,8 @@ export function parseWebhookEvent(rawBody) {
         };
       }
 
+      // Owner decision pending: what to do when a dispute is WON or LOST (only
+      // dispute.created is handled below).
       case 'dispute.created': {
         const paymentId = safeId(
           pickString(data, ['payment_id']) ?? pickString(nested(data, 'payment'), ['id'])
@@ -498,7 +500,11 @@ export function createWhopClient(config, options = {}) {
       throw new BillingError(message, {
         status: response.status,
         providerCode: code ? code.slice(0, 60) : null,
-        outcomeUnknown: response.status >= 500,
+        // 409 means Whop is still working on a request with the SAME key, so
+        // the first attempt may well have gone through: never "definitely not
+        // sent". Same for any 5xx. Only a clear refusal (400/401/403/404/422...)
+        // is known-not-done.
+        outcomeUnknown: response.status >= 500 || response.status === 409,
       });
     }
 

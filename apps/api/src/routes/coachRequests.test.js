@@ -47,6 +47,14 @@ async function makeCoach(label, { isPublic = true, accepting = true } = {}) {
      VALUES ($1, $2, $3, 'Headline', $4, ARRAY['fat-loss']::text[], $5, $6)`,
     [account.user.id, slug, generateReferralCode(), LONG_BIO, isPublic, accepting]
   );
+  // Accepting a paying student needs the Get paid steps done (startup fee,
+  // identity check, a price). These coaches have them.
+  await pool.query('UPDATE coach_profiles SET price_cents = 3000 WHERE user_id = $1', [account.user.id]);
+  await pool.query(
+    `INSERT INTO coach_subscriptions (coach_id, startup_fee_paid_at, provider_account_id, identity_verified)
+     VALUES ($1, now(), $2, true)`,
+    [account.user.id, `biz_${label}_${run}`]
+  );
   return { ...account, slug };
 }
 
@@ -56,6 +64,12 @@ function json(cookie, method, path, body) {
     headers: { 'Content-Type': 'application/json', Cookie: cookie },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+}
+
+// Stands in for the student's verified payment: only the payment company's
+// signed message turns an accepted link live (tested in billing.webhook.test.js).
+async function markPaid(id) {
+  await pool.query(`UPDATE coach_clients SET status = 'active' WHERE id = $1 AND status = 'pending_payment'`, [id]);
 }
 
 async function linkStatus(id) {
@@ -95,6 +109,12 @@ test('student requests a coach → coach sees it → accept → active on both s
   const acceptRes = await json(coach.cookie, 'POST', `/coach/requests/${request.id}/accept`);
   assert.equal(acceptRes.status, 200);
   assert.deepEqual(await acceptRes.json(), { ok: true });
+  // Accepting only waits for payment: no coach yet, but the price is shown.
+  assert.equal((await linkStatus(request.id)).status, 'pending_payment');
+  const waiting = await (await json(student.cookie, 'GET', '/coach-link')).json();
+  assert.equal(waiting.coach, null);
+  assert.equal(waiting.pendingPayment.priceCents, 3000);
+  await markPaid(request.id);
 
   const afterRes = await json(student.cookie, 'GET', '/coach-link');
   const after = await afterRes.json();
@@ -188,6 +208,7 @@ test('request rules: HAS_COACH, REQUEST_PENDING, NOT_ACCEPTING, private coach 40
   // With an active coach, no new requests.
   const { requests } = await (await json(coach.cookie, 'GET', '/coach/requests')).json();
   await json(coach.cookie, 'POST', `/coach/requests/${requests[0].id}/accept`);
+  await markPaid(requests[0].id);
   const has = await json(student.cookie, 'POST', '/coach-link/requests', { coachSlug: other.slug });
   assert.equal(has.status, 409);
   assert.equal((await has.json()).error.code, 'HAS_COACH');
@@ -236,8 +257,12 @@ test('invite by email: same 202 for known and unknown addresses; a row only for 
   // The student accepts.
   const acceptRes = await json(student.cookie, 'POST', `/coach-link/invites/${rows[0].id}/accept`);
   assert.equal(acceptRes.status, 200);
-  assert.deepEqual(await acceptRes.json(), { coach: { displayName: 'emailcoach User', slug: coach.slug } });
-  assert.equal((await linkStatus(rows[0].id)).status, 'active');
+  assert.deepEqual(await acceptRes.json(), {
+    coach: { displayName: 'emailcoach User', slug: coach.slug },
+    status: 'pending_payment',
+  });
+  // An email invite is a PAYING student: never straight to active.
+  assert.equal((await linkStatus(rows[0].id)).status, 'pending_payment');
 });
 
 test('accepting an invite with a coach already: 409 without replaceCurrent, switches with it', async () => {
@@ -274,7 +299,7 @@ test('accepting an invite with a coach already: 409 without replaceCurrent, swit
   const old = await linkStatus(oldRows[0].id);
   assert.equal(old.status, 'ended');
   assert.ok(old.ended_at);
-  assert.equal((await linkStatus(coachInvites[0].id)).status, 'active');
+  assert.equal((await linkStatus(coachInvites[0].id)).status, 'pending_payment');
 
   // The old coach's assigned program is still in the student's account.
   const { programs } = await (await json(student.cookie, 'GET', '/programs')).json();
@@ -297,6 +322,7 @@ test('ending a link from either side keeps programs, marks it ended, and re-link
   // Link via request → accept.
   const { request } = await (await json(student.cookie, 'POST', '/coach-link/requests', { coachSlug: coach.slug })).json();
   await json(coach.cookie, 'POST', `/coach/requests/${request.id}/accept`);
+  await markPaid(request.id);
   const { program } = await (await json(coach.cookie, 'POST', `/coach/clients/${student.user.id}/programs`, {
     name: 'Kept Plan', days: [],
   })).json();
@@ -316,6 +342,7 @@ test('ending a link from either side keeps programs, marks it ended, and re-link
   const { request: second } = await (await json(student.cookie, 'POST', '/coach-link/requests', { coachSlug: coach.slug })).json();
   assert.ok(second.id);
   assert.equal((await json(coach.cookie, 'POST', `/coach/requests/${second.id}/accept`)).status, 200);
+  await markPaid(second.id);
   assert.equal((await json(student.cookie, 'DELETE', '/coach-link')).status, 204);
   row = await linkStatus(second.id);
   assert.equal(row.status, 'ended');
@@ -328,6 +355,7 @@ test('ending a link from either side keeps programs, marks it ended, and re-link
   const other = await makeCoach('endother');
   const { request: third } = await (await json(student.cookie, 'POST', '/coach-link/requests', { coachSlug: coach.slug })).json();
   await json(coach.cookie, 'POST', `/coach/requests/${third.id}/accept`);
+  await markPaid(third.id);
   assert.equal((await json(other.cookie, 'DELETE', `/coach/clients/${third.id}`)).status, 404);
   assert.equal((await linkStatus(third.id)).status, 'active');
 
@@ -364,6 +392,7 @@ test('redeeming an invite code withdraws the student\'s open request to another 
   const { coachInvites } = await (await json(student.cookie, 'GET', '/coach-link')).json();
   assert.equal((await json(student.cookie, 'POST', `/coach-link/invites/${coachInvites[0].id}/accept`)).status, 200);
   assert.equal((await linkStatus(second.id)).status, 'declined');
+  assert.equal((await linkStatus(coachInvites[0].id)).status, 'pending_payment');
   assert.equal((await (await json(later.cookie, 'GET', '/coach/requests')).json()).requests.length, 0);
 });
 
@@ -413,29 +442,34 @@ test('an invite from someone who is no longer a coach is hidden and cannot be ac
   assert.equal((await linkStatus(coachInvites[0].id)).status, 'requested');
 });
 
-test('accepting two invites at the same moment: one wins, the other gets HAS_COACH (never a crash)', async () => {
+test('accepting two invites at the same moment never crashes and never activates a link without payment', async () => {
   const student = await register('dualstudent');
-  for (let round = 0; round < 3; round += 1) {
-    const a = await makeCoach(`duala${round}`);
-    const b = await makeCoach(`dualb${round}`);
-    await json(a.cookie, 'POST', '/coach/invites/email', { email: student.email });
-    await json(b.cookie, 'POST', '/coach/invites/email', { email: student.email });
-    const { coachInvites } = await (await json(student.cookie, 'GET', '/coach-link')).json();
-    assert.equal(coachInvites.length, 2);
+  const a = await makeCoach('duala');
+  const b = await makeCoach('dualb');
+  await json(a.cookie, 'POST', '/coach/invites/email', { email: student.email });
+  await json(b.cookie, 'POST', '/coach/invites/email', { email: student.email });
+  const { coachInvites } = await (await json(student.cookie, 'GET', '/coach-link')).json();
+  assert.equal(coachInvites.length, 2);
 
-    const results = await Promise.all(
-      coachInvites.map((invite) => json(student.cookie, 'POST', `/coach-link/invites/${invite.id}/accept`))
-    );
-    const statuses = results.map((res) => res.status).sort();
-    assert.deepEqual(statuses, [200, 409]);
-    const loser = results.find((res) => res.status === 409);
-    assert.equal((await loser.json()).error.code, 'HAS_COACH');
-
-    // End the link so the next round starts coach-free.
-    assert.equal((await json(student.cookie, 'DELETE', '/coach-link')).status, 204);
-    const leftovers = await (await json(student.cookie, 'GET', '/coach-link')).json();
-    for (const invite of leftovers.coachInvites) {
-      await json(student.cookie, 'POST', `/coach-link/invites/${invite.id}/decline`);
-    }
+  const results = await Promise.all(
+    coachInvites.map((invite) => json(student.cookie, 'POST', `/coach-link/invites/${invite.id}/accept`))
+  );
+  assert.ok(results.every((res) => res.status === 200));
+  // Both wait for payment; whichever the student pays for first goes live and
+  // withdraws the other (billing.webhook.test.js).
+  for (const invite of coachInvites) {
+    assert.equal((await linkStatus(invite.id)).status, 'pending_payment');
   }
+});
+
+test('accepting an email invite from a coach who is not set up to get paid is refused', async () => {
+  const coach = await makeCoach('unreadyinviter');
+  await pool.query('UPDATE coach_profiles SET price_cents = NULL WHERE user_id = $1', [coach.user.id]);
+  const student = await register('unreadystudent');
+  await json(coach.cookie, 'POST', '/coach/invites/email', { email: student.email });
+  const { coachInvites } = await (await json(student.cookie, 'GET', '/coach-link')).json();
+  const res = await json(student.cookie, 'POST', `/coach-link/invites/${coachInvites[0].id}/accept`);
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).error.code, 'COACH_NOT_READY');
+  assert.equal((await linkStatus(coachInvites[0].id)).status, 'requested');
 });

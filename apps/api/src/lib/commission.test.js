@@ -74,6 +74,27 @@ test('a full refund reverses the original exactly; a partial one uses the stored
   assert.equal(over.grossCents, -3000);
 });
 
+test('repeated partial refunds never reverse more commission than was taken', () => {
+  const original = splitAtRate(9, 1500); // 1.35 cents rounds to 1
+  assert.equal(original.commissionCents, 1);
+  let remainingGross = 9;
+  let remainingCommission = original.commissionCents;
+  let totalReversed = 0;
+  for (const refundCents of [4, 4, 1]) {
+    const reversed = reverseCommission({
+      originalGrossCents: remainingGross, originalCommissionCents: remainingCommission, rateBps: 1500, refundCents,
+    });
+    assert.ok(-reversed.commissionCents <= remainingCommission);
+    assert.equal(reversed.grossCents, -refundCents);
+    assert.equal(reversed.commissionCents + reversed.coachCents, reversed.grossCents);
+    remainingGross += reversed.grossCents;
+    remainingCommission += reversed.commissionCents;
+    totalReversed += -reversed.commissionCents;
+  }
+  assert.ok(totalReversed <= original.commissionCents);
+  assert.ok(remainingCommission >= 0);
+});
+
 test('prices: $10 to $500 in whole cents', () => {
   assert.equal(isValidPriceCents(1000), true);
   assert.equal(isValidPriceCents(50000), true);

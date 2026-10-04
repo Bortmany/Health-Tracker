@@ -235,14 +235,23 @@ const RESET_LINK_MINUTES = 60;
 
 const sha256Hex = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
+// The public address used in emailed links. In production it MUST be set: a
+// localhost fallback there would email people a dead link, so the caller
+// refuses to send instead (null). Development keeps the localhost fallback.
 function appBaseUrl() {
   const raw = (process.env.APP_URL ?? '').trim().replace(/\/+$/, '');
-  return raw || 'http://localhost:5173';
+  if (raw) return raw;
+  return process.env.NODE_ENV === 'production' ? null : 'http://localhost:5173';
 }
 
 // Creates a new reset link for this account (voiding any older ones) and
 // emails it.
 async function sendResetLink(userId, address) {
+  const baseUrl = appBaseUrl();
+  if (!baseUrl) {
+    logger.error('APP_URL is not set in production, so the password reset email was NOT sent. Set APP_URL to the public address.');
+    return;
+  }
   const token = crypto.randomBytes(RESET_TOKEN_BYTES).toString('base64url');
   await withTransaction(async (client) => {
     // A new request voids every older link that hasn't been used.
@@ -263,7 +272,7 @@ async function sendResetLink(userId, address) {
       'Someone asked to reset the password for your Cut account.',
       '',
       `Open this link to choose a new password. It works once and expires in ${RESET_LINK_MINUTES} minutes:`,
-      `${appBaseUrl()}/reset-password?token=${token}`,
+      `${baseUrl}/reset-password?token=${token}`,
       '',
       "If that wasn't you, ignore this email. Your password has not changed.",
     ].join('\n'),

@@ -24,6 +24,7 @@ import {
   Toast,
   useToast,
 } from '../components/ui/index.js';
+import { useCoachBilling } from '../hooks/useCoachBilling.js';
 import { useCheckinQuestions } from '../hooks/useCheckins.js';
 import { useClientMeasurements } from '../hooks/useMeasurements.js';
 import {
@@ -42,6 +43,7 @@ import {
   useDeclineRequest,
   useInviteByEmail,
 } from '../hooks/useCoachRequests.js';
+import { inbox as inboxCopy } from '../lib/billingCopy.js';
 import { firstName, formatWeightChange, habitsValue, moodSummary } from '../lib/checkin.js';
 import { dayOfMoment, formatShortDay } from '../lib/localDate.js';
 import { emailError } from '../lib/validation.js';
@@ -647,10 +649,16 @@ function ClientDetail({ clientId, clientName, unread = false, onToast }) {
 function RequestRow({ request, onDone }) {
   const accept = useAcceptRequest();
   const decline = useDeclineRequest();
+  const billing = useCoachBilling();
   const busy = accept.isPending || decline.isPending;
+  // A paying student can only be accepted once the coach has paid the startup
+  // fee and finished the identity check. While we don't know yet, the server
+  // still decides (it answers COACH_NOT_READY).
+  const notReady = Boolean(billing.data) && !billing.data.active && !billing.data.revoked;
+  const notReadyFromServer = accept.isError && accept.error?.code === 'COACH_NOT_READY';
 
   const takenElsewhere = accept.isError && accept.error?.status === 409;
-  const failed = (accept.isError && !takenElsewhere) || decline.isError;
+  const failed = (accept.isError && !takenElsewhere && !notReadyFromServer) || decline.isError;
 
   return (
     <div className={styles.requestRow}>
@@ -663,11 +671,14 @@ function RequestRow({ request, onDone }) {
           <Button
             size="sm"
             onClick={() =>
+              !notReady &&
               accept.mutate(request.id, {
                 onSuccess: () => onDone(`Accepted — ${request.displayName} is now training with you.`),
               })
             }
             disabled={busy}
+            aria-disabled={notReady ? 'true' : undefined}
+            title={notReady ? inboxCopy.acceptHint : undefined}
           >
             {accept.isPending ? 'Accepting...' : 'Accept'}
           </Button>
@@ -681,6 +692,11 @@ function RequestRow({ request, onDone }) {
           </Button>
         </div>
       </div>
+      {(notReady || notReadyFromServer) && (
+        <p className={styles.clientEmail}>
+          {inboxCopy.notReadyLine} <Link to="/coach/profile#get-paid">{inboxCopy.goToGetPaid}</Link>
+        </p>
+      )}
       {takenElsewhere && <ErrorText>This student now has another coach — nothing to do here.</ErrorText>}
       {failed && <ErrorText>Couldn&apos;t save that — please try again.</ErrorText>}
     </div>

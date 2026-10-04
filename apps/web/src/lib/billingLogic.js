@@ -239,6 +239,17 @@ export function owedTone(owedCents) {
   return 'plain';
 }
 
+// ---- Reset password form ----
+
+export const PASSWORD_MIN = 8;
+
+// null when fine, else 'short' or 'mismatch' (short is checked first).
+export function passwordResetError(password, again) {
+  if (typeof password !== 'string' || password.length < PASSWORD_MIN) return 'short';
+  if (password !== again) return 'mismatch';
+  return null;
+}
+
 export const MONEY_OFF = {
   label: common.comingSoon,
   hint: common.moneyOffHint,

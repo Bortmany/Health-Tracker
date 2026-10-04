@@ -102,10 +102,14 @@ router.post('/billing/onboarding', requireAuth, requireCoach, asyncHandler(async
   }
   const billing = getBillingClient();
   if (!billing) return res.status(503).json(DISABLED_MESSAGE);
+  // The coach's own name and email, so the identity check is pre-filled.
+  const { rows: who } = await pool.query('SELECT email, display_name FROM users WHERE id = $1', [req.userId]);
   let result;
   try {
     result = await billing.createCoachOnboardingLink({
       coachUserId: req.userId,
+      email: who[0]?.email,
+      name: who[0]?.display_name,
       providerAccountId: readiness.providerAccountId,
       returnUrl: `${config.appUrl}/coach/profile#get-paid`,
     });

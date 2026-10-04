@@ -1,0 +1,140 @@
+.stackCard {
+  margin-bottom: var(--space-4);
+}
+
+.warnCard {
+  border: 1px solid var(--color-warning, var(--color-accent));
+  font-size: var(--text-sm);
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.summaryEnd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.owedLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.bigFigure {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  margin: var(--space-1) 0;
+}
+
+.meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.link {
+  color: var(--color-accent);
+}
+
+/* ---- Owed figure in a coach row ---- */
+.moneyBlock {
+  text-align: end;
+}
+
+.moneyLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.owedFigure {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.owedAccent {
+  color: var(--color-accent);
+}
+
+.owedWarn {
+  color: var(--color-warning, var(--color-text));
+}
+
+/* ---- History ---- */
+.historyRow {
+  border-bottom: var(--surface-outline);
+  padding: var(--space-3) 0;
+  min-height: 44px;
+}
+
+.historyRow:last-of-type {
+  border-bottom: none;
+}
+
+.historyLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.historyInfo {
+  min-width: 0;
+}
+
+.historyEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+
+.amount {
+  font-weight: 600;
+}
+
+.refButton {
+  margin-top: var(--space-1);
+  padding: var(--space-1) 0;
+  background: none;
+  border: none;
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+
+.refButton:hover,
+.refButton:focus-visible {
+  color: var(--color-accent);
+}
+
+@media (min-width: 56.25em) {
+  .summary {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .summaryEnd {
+    align-items: flex-end;
+    max-width: 22rem;
+  }
+}

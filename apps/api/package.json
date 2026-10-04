@@ -7,7 +7,7 @@
     "dev": "node --env-file-if-exists=../../.env --watch src/server.js",
     "start": "node --env-file-if-exists=../../.env src/server.js",
     "migrate": "node --env-file-if-exists=../../.env src/db/migrate.js",
-    "test": "npm run test:db && DISABLE_RATE_LIMIT=true node --env-file-if-exists=../../.env --import ./src/db/useTestDb.js --test",
+    "test": "npm run test:db && DISABLE_RATE_LIMIT=true node --env-file-if-exists=../../.env --import ./src/db/useTestDb.js --test --test-concurrency=1",
     "test:db": "node --env-file-if-exists=../../.env src/db/prepareTestDb.js"
   },
   "dependencies": {

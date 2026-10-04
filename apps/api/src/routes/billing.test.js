@@ -1,87 +1,120 @@
 // Payments while they are switched OFF — the state the app ships in until the
-// owner sets the Paddle variables. The webhook's signature checking and the
-// plan changes it makes are tested separately in billing.webhook.test.js,
-// which runs in its own process with the variables set.
-
+// owner sets the payment variables. Every money button must answer with a plain
+// "not switched on yet", never an error page, and nothing can move money or
+// change a plan. The switched-ON paths are in billing.webhook.test.js and
+// coachBilling.test.js (separate processes with the variables set).
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { app } from '../app.js';
 import { pool } from '../db/pool.js';
+import { moneyOff, startKit } from './moneyTestKit.js';
 
-let server;
-let baseUrl;
-let cookie;
-let otherCookie;
+moneyOff();
+
+let kit;
+let student;
+let other;
+let coach;
+let admin;
 
 before(async () => {
-  server = app.listen(0);
-  const { port } = server.address();
-  baseUrl = `http://localhost:${port}/api`;
-
-  const stamp = Date.now();
-  const register = async (email) => {
-    const res = await fetch(`${baseUrl}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password: 'hunter2pass', displayName: 'Billing Test' }),
-    });
-    return res.headers.get('set-cookie').split(';')[0];
-  };
-
-  cookie = await register(`billing-test-${stamp}@example.com`);
-  otherCookie = await register(`billing-other-${stamp}@example.com`);
+  kit = startKit(app, pool);
+  kit.start();
+  student = await kit.register('dormant-student');
+  other = await kit.register('dormant-other');
+  coach = await kit.makeCoach('dormant-coach');
+  admin = await kit.makeAdmin('dormant-admin');
 });
 
 after(async () => {
-  await new Promise((resolve) => server.close(resolve));
-  await pool.end();
+  await kit.stop();
 });
 
-test('billing status reports switched off when no Paddle keys are set', async () => {
-  const res = await fetch(`${baseUrl}/billing/status`, { headers: { Cookie: cookie } });
+test('status says switched off, with payouts and email off too, and plan only when signed in', async () => {
+  const res = await kit.call(student, 'GET', '/billing/status');
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.enabled, false);
+  assert.equal(body.configured, false);
   assert.equal(body.planTier, 'free');
-  // Plan length is no longer a paid feature, so no week counts are sent;
-  // instead the panel is told whether the AI plan writer is switched on.
-  assert.equal('freeWeeks' in body, false);
-  assert.equal('premiumWeeks' in body, false);
+  assert.deepEqual(body.payouts, { configured: false, method: null });
+  assert.equal(body.email.configured, false);
   assert.equal(body.aiPlanEnabled, Boolean(process.env.ANTHROPIC_API_KEY));
+
+  // Public (the forgot-password screen reads it signed out): no plan then.
+  const anon = await (await fetch(`${kit.baseUrl}/billing/status`)).json();
+  assert.equal(anon.planTier, undefined);
+  assert.equal(anon.configured, false);
+  // Signed out: no payout method or other settings are revealed.
+  assert.equal('payouts' in anon, false);
+  assert.equal('aiPlanEnabled' in anon, false);
 });
 
-test('checkout gives a friendly message while payments are switched off', async () => {
-  const res = await fetch(`${baseUrl}/billing/checkout`, {
-    method: 'POST',
-    headers: { Cookie: cookie },
-  });
-  assert.equal(res.status, 503);
-  const body = await res.json();
-  assert.equal(body.error.code, 'BILLING_DISABLED');
+test('every checkout answers 503 BILLING_DISABLED while payments are off', async () => {
+  for (const [who, path, body] of [
+    [student, '/billing/checkout'],
+    [student, '/billing/ai-checkout', { interval: 'month' }],
+    [student, '/billing/coach-checkout', { coachId: coach.id }],
+    [coach, '/coach/billing/startup-fee'],
+    [coach, '/coach/billing/onboarding'],
+  ]) {
+    const res = await kit.call(who, 'POST', path, body);
+    assert.equal(res.status, 503, path);
+    assert.equal((await res.json()).error.code, 'BILLING_DISABLED', path);
+  }
 });
 
-test('the webhook is refused while payments are switched off', async () => {
-  const res = await fetch(`${baseUrl}/billing/webhook`, {
+test('the webhook is refused with 503 while payments are off, and writes nothing', async () => {
+  const res = await fetch(`${kit.baseUrl}/billing/webhook`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ event_type: 'subscription.activated' }),
+    body: JSON.stringify({ id: 'msg_dormant', type: 'payment.succeeded', data: {} }),
   });
   assert.equal(res.status, 503);
+  assert.equal((await pool.query(`SELECT 1 FROM billing_events WHERE event_id = 'msg_dormant'`)).rowCount, 0);
 });
 
-test('billing status needs a login', async () => {
-  const res = await fetch(`${baseUrl}/billing/status`);
-  assert.equal(res.status, 401);
+test('paying coaches says PAYOUTS_DISABLED when no payout method is chosen', async () => {
+  const res = await kit.call(admin, 'POST', '/admin/payouts/run');
+  assert.equal(res.status, 503);
+  assert.equal((await res.json()).error.code, 'PAYOUTS_DISABLED');
 });
 
-test('each person only ever sees their own plan', async () => {
-  // Make the first account Premium by hand, exactly as the owner would.
-  const { user } = await fetch(`${baseUrl}/auth/me`, { headers: { Cookie: cookie } }).then((r) => r.json());
-  await pool.query(`UPDATE users SET plan_tier = 'premium' WHERE id = $1::uuid`, [user.id]);
+test('/api/health reports money as dormant, in words only', async () => {
+  const body = await (await fetch(`${kit.baseUrl}/health`)).json();
+  assert.equal(body.billing.state, 'dormant');
+  assert.equal(body.payouts.state, 'dormant');
+  assert.equal(body.email.state, 'dormant');
+});
 
-  const mine = await fetch(`${baseUrl}/billing/status`, { headers: { Cookie: cookie } }).then((r) => r.json());
-  const theirs = await fetch(`${baseUrl}/billing/status`, { headers: { Cookie: otherCookie } }).then((r) => r.json());
+test('subscription and money routes need a login', async () => {
+  for (const path of ['/billing/subscriptions', '/coach/billing', '/coach/earnings', '/coach/payouts']) {
+    assert.equal((await kit.call(null, 'GET', path)).status, 401, path);
+  }
+  assert.equal((await kit.call(null, 'POST', '/billing/checkout')).status, 401);
+});
 
+test('a brand-new account has no subscriptions, and each person only sees their own plan', async () => {
+  const list = await (await kit.call(student, 'GET', '/billing/subscriptions')).json();
+  assert.deepEqual(list.subscriptions, []);
+
+  await pool.query(`UPDATE users SET plan_tier = 'premium' WHERE id = $1`, [student.id]);
+  const mine = await (await kit.call(student, 'GET', '/billing/status')).json();
+  const theirs = await (await kit.call(other, 'GET', '/billing/status')).json();
   assert.equal(mine.planTier, 'premium');
   assert.equal(theirs.planTier, 'free');
+});
+
+test('cancelling needs a real subscription id that belongs to you', async () => {
+  assert.equal((await kit.call(student, 'POST', '/billing/subscriptions/not-a-uuid/cancel')).status, 404);
+  assert.equal((await kit.call(student, 'POST', '/billing/subscriptions/00000000-0000-4000-8000-000000000000/cancel')).status, 404);
+});
+
+test('a student cannot reach the coach money screens; admin routes 404 for non-admins', async () => {
+  assert.equal((await kit.call(student, 'GET', '/coach/billing')).status, 403);
+  assert.equal((await kit.call(student, 'PUT', '/coach/billing/price', { priceCents: 3000 })).status, 403);
+  for (const [method, path] of [['GET', '/admin/coaches/earnings'], ['POST', '/admin/payouts/run'], ['GET', '/admin/payouts']]) {
+    const res = await kit.call(coach, method, path);
+    assert.equal(res.status, 404, path);
+  }
 });

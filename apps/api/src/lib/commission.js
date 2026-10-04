@@ -73,10 +73,14 @@ export function reverseCommission({ originalGrossCents, originalCommissionCents,
     };
   }
   const part = splitAtRate(refund, rateBps);
+  // Repeated partial refunds each round half-up, so they could add up to more
+  // than the commission that was ever taken. Never reverse more than what is
+  // left of the original commission (callers pass the REMAINING amounts).
+  const commission = Math.min(part.commissionCents, Math.max(originalCommissionCents, 0));
   return {
     grossCents: -part.grossCents,
-    commissionCents: -part.commissionCents,
-    coachCents: -part.coachCents,
+    commissionCents: -commission,
+    coachCents: -(part.grossCents - commission),
     rateBps,
   };
 }

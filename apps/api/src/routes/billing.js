@@ -95,6 +95,10 @@ router.get('/status', asyncHandler(async (req, res) => {
     planTier = rows[0]?.plan_tier ?? 'free';
   }
   const enabled = isBillingEnabled();
+  // Signed-out visitors only learn whether payments are switched on, plus
+  // whether email is on (the forgot-password screen needs that); the payout
+  // method and the other settings are for signed-in people.
+  if (!userId) return res.json({ enabled, configured: enabled, email: { configured: isEmailEnabled() } });
   res.json({
     enabled,
     // Same thing under the name the screens read.
@@ -265,6 +269,17 @@ router.post('/coach-checkout', asyncHandler(async (req, res) => {
   if (!rows[0]) {
     return res.status(404).json({ error: { message: 'Nothing to pay for here.', code: 'NOT_FOUND' } });
   }
+  // One live subscription per link: a second checkout would charge twice.
+  const { rows: liveSubs } = await pool.query(
+    `SELECT 1 FROM student_subscriptions
+     WHERE user_id = $1 AND coach_client_id = $2 AND kind = 'coach' AND status <> 'ended'`,
+    [req.userId, rows[0].id]
+  );
+  if (liveSubs[0]) {
+    return res.status(409).json({
+      error: { message: 'You already have a subscription for this coach.', code: 'ALREADY_SUBSCRIBED' },
+    });
+  }
   const readiness = await coachReadiness(pool, coachId);
   if (!readiness.ready) {
     return res.status(409).json({
@@ -281,11 +296,16 @@ router.post('/coach-checkout', asyncHandler(async (req, res) => {
       coachUserId: coachId,
       linkId: rows[0].id,
       amountCents: readiness.priceCents,
+      // The coach's own payment-company account (they get paid into it).
+      providerAccountId: readiness.providerAccountId,
       // Under Method A the payment company takes Cut's share on every payment.
       ...(payoutMethod() === 'A' ? { platformFeePercent: ratePercentFor(students + 1) } : {}),
       successUrl: `${config.appUrl}/more?paid=1`,
       cancelUrl: `${config.appUrl}/more?paid=0`,
-      reference: crypto.randomUUID(),
+      // The same link and price always give the same key, so pressing pay twice
+      // (or a retry) gets the same checkout page, not a second one.
+      reference: `coach-link-${rows[0].id}`,
+      idempotencyKey: `coach-checkout-${rows[0].id}-${readiness.priceCents}`,
     },
     { priceCents: readiness.priceCents }
   );

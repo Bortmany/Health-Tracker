@@ -18,6 +18,7 @@ import CoachDirectory from './pages/CoachDirectory.jsx';
 import CoachProfileEditor from './pages/CoachProfileEditor.jsx';
 import CoachPublicProfile from './pages/CoachPublicProfile.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import ForgotPassword from './pages/ForgotPassword.jsx';
 import Heatmap from './pages/Heatmap.jsx';
 import Landing from './pages/Landing.jsx';
 import Log from './pages/Log.jsx';
@@ -26,10 +27,13 @@ import Messages from './pages/Messages.jsx';
 import More from './pages/More.jsx';
 import NotFound from './pages/NotFound.jsx';
 import Onboarding from './pages/Onboarding.jsx';
+import Pricing from './pages/Pricing.jsx';
 import Privacy from './pages/Privacy.jsx';
 import Progress from './pages/Progress.jsx';
 import Refunds from './pages/Refunds.jsx';
 import Register from './pages/Register.jsx';
+import ResetPassword from './pages/ResetPassword.jsx';
+import Subscription from './pages/Subscription.jsx';
 import Terms from './pages/Terms.jsx';
 import Train from './pages/Train.jsx';
 
@@ -61,6 +65,9 @@ export default function App() {
         <Route path="/" element={<RootRoute />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/pricing" element={<Pricing />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/refunds" element={<Refunds />} />
@@ -76,6 +83,7 @@ export default function App() {
             <Route path="/train" element={<Train />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/more" element={<More />} />
+            <Route path="/account/subscription" element={<Subscription />} />
             <Route path="/checkin" element={<CheckIn />} />
             <Route path="/messages" element={<Messages />} />
             <Route path="/coach-application" element={<CoachApplication />} />

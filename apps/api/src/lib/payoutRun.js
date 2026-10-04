@@ -18,12 +18,22 @@ import { withTransaction } from './withTransaction.js';
 //    negative ledger rows that net off first).
 //  * A revoked coach is paid like any other: revoking access does not forgive
 //    a debt.
-//  * A transfer that definitely failed releases its ledger rows so the money is
+//  * A transfer that definitely failed (a clear refusal, or the payment
+//    company's own "failed" status) releases its ledger rows so the money is
 //    owed again. A transfer whose outcome is unknown (network trouble) stays
 //    "pending" and is retried with the same key on the next run.
 
 // Arbitrary fixed number naming "the payout run" lock.
 const PAYOUT_LOCK_KEY = 7270027;
+
+// Only a clear refusal from the payment company proves the money never moved.
+// A timeout, a dropped connection, a server error, or a "still working on that
+// key" (409) could all hide a transfer that DID go through, so they are NOT
+// clear: the payout stays pending and is retried with the same key.
+const CLEAR_REFUSAL_STATUSES = new Set([400, 401, 403, 404, 422]);
+function isClearRefusal(err) {
+  return err?.outcomeUnknown === false && CLEAR_REFUSAL_STATUSES.has(err?.status);
+}
 
 async function applyTransferResult(payoutId, result) {
   const status = result?.status === 'paid' ? 'paid' : result?.status === 'failed' ? 'failed' : 'pending';
@@ -67,7 +77,7 @@ async function settleInFlight(billing) {
       }
     } catch (err) {
       logger.error('Could not settle an in-flight payout', { payoutId: payout.id, error: err });
-      if (err?.outcomeUnknown === false && !payout.provider_reference) {
+      if (isClearRefusal(err) && !payout.provider_reference) {
         await applyTransferResult(payout.id, { status: 'failed' });
       }
     }
@@ -112,6 +122,9 @@ async function claimForCoach(coachId) {
 export async function runPayoutsMethodB() {
   const billing = getBillingClient();
   const lockClient = await pool.connect();
+  // If the lock can't be released cleanly, the connection is destroyed (which
+  // also drops the lock) instead of going back to the pool still holding it.
+  let destroyLockClient = false;
   try {
     const { rows: lock } = await lockClient.query('SELECT pg_try_advisory_lock($1::bigint) AS ok', [PAYOUT_LOCK_KEY]);
     if (!lock[0].ok) return { busy: true };
@@ -154,16 +167,21 @@ export async function runPayoutsMethodB() {
           // ledger rows so the coach is owed it again. Anything unclear
           // (a timeout, a dropped connection) leaves the payout "pending"; the
           // next run retries it with the same key, which cannot pay twice.
-          if (err?.outcomeUnknown === false) {
+          if (isClearRefusal(err)) {
             await applyTransferResult(claim.payoutId, { status: 'failed' });
           }
         }
       }
       return { started, totalCents, failed };
     } finally {
-      await lockClient.query('SELECT pg_advisory_unlock($1::bigint)', [PAYOUT_LOCK_KEY]);
+      try {
+        await lockClient.query('SELECT pg_advisory_unlock($1::bigint)', [PAYOUT_LOCK_KEY]);
+      } catch (err) {
+        destroyLockClient = true;
+        logger.error('Could not release the payout run lock; closing its connection', { error: err });
+      }
     }
   } finally {
-    lockClient.release();
+    lockClient.release(destroyLockClient);
   }
 }

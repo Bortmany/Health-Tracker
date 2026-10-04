@@ -109,3 +109,40 @@
 .legalNote a {
   color: var(--color-text-muted);
 }
+
+/* "Forgot password?" under the password field. */
+.forgotRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: calc(-1 * var(--space-2));
+}
+
+.forgotLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.forgotLink:hover,
+.forgotLink:focus-visible {
+  text-decoration: underline;
+}
+
+.noticeStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.noticeStack a {
+  color: var(--color-accent);
+}
+
+.fieldHint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}

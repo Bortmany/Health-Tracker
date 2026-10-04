@@ -19,7 +19,7 @@ before(async () => {
   baseUrl = `http://localhost:${port}/api`;
   // The grant only ever fires once. Clear any admin left by an earlier local
   // run so this file's fresh admin account can be granted.
-  await pool.query("UPDATE users SET is_admin = false WHERE email LIKE 'admin-%@example.com'");
+  await pool.query("UPDATE users SET is_admin = false WHERE email LIKE 'admin-%@example.com' OR email LIKE 'money-%'");
 });
 
 after(async () => {

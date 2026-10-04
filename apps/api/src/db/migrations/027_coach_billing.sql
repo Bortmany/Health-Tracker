@@ -1,6 +1,6 @@
 -- Coach money (Oct 2026, spec Agents/docs/specs/cut/coach-billing.md).
--- Additive only: nothing here changes or drops existing data. The old
--- older customer-reference column from migration 018 stays where it is, unused.
+-- Additive only: nothing here changes or drops existing data.
+-- The older customer-reference column from migration 018 stays where it is, unused.
 
 -- The coach's own monthly price for students, in whole cents. Empty until the
 -- coach sets one. The database refuses anything outside $10 to $500 as well as
