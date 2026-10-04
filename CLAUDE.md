@@ -20,7 +20,7 @@ All planned phases are built, tested, reviewed, and merged to `main`. 245/245 ba
   - Check-ins (024): one per student per week; answers snapshot their questions; each coach edits up to 8 questions.
   - Messages (025): one thread per `coach_clients` link, 60 sends/hour per person; an ended link hides its thread.
   - Photos + measurements (026): `lib/photoStorage.js` is the only file that knows about storage; photos are private until the student shares one, and a coach sees shared ones only via an active link. Chest/arms/hips/thighs/neck sit on the daily log and a linked coach sees them with no switch.
-- Coach money, Step 5 (Oct 2026, spec `Agents/docs/specs/cut/coach-billing.md`, migration 027): coaches pay a $49 startup fee and pass Whop's identity check; a student pays the coach's own price (floor $10, cap $500); Cut's commission is 15%, or 10% at 20+ paying students, in integer cents rounded half-up with the rate stored on the row. The ledger (`commission_ledger`) has `source_ref` UNIQUE and every write is `ON CONFLICT DO NOTHING`, so replayed webhooks change nothing; refunds and chargebacks are negative rows. Payouts only happen from the owner's "Pay coaches now" button (locked against double-clicks). Invite-code students stay free. Password reset uses hashed, single-use, 1-hour tokens sent by Resend.
+- Coach money, Step 5 (Oct 2026, spec `Agents/docs/specs/cut/coach-billing.md`, migration 027): coaches pay a $49 startup fee and pass Whop's identity check; a student pays the coach's own price (floor $10, cap $500); Cut's commission is 15%, or 10% at 20+ paying students, in integer cents rounded half-up with the rate stored on the row. The ledger (`commission_ledger`) has `source_ref` UNIQUE and every write is `ON CONFLICT DO NOTHING`, so replayed webhooks change nothing; refunds and chargebacks are negative rows. Payouts only happen from the owner's "Pay coaches now" button (locked against double-clicks). Invite-code students stay free. Migration 028 adds the payout-retry safety rules (original account and key kept, 3-day manual-review limit), saved retries for failed cancels and automatic refunds, dispute-won give-backs and the delayed coach switch. Password reset uses hashed, single-use, 1-hour tokens sent by Resend.
 
 **Dormant switches** (code shipped, asleep until env vars are set on Railway):
 - `ADMIN_EMAIL` → the one account that can review coach applications (granted once, at first sign-in)
@@ -31,7 +31,7 @@ All planned phases are built, tested, reviewed, and merged to `main`. 245/245 ba
 
 ## Conventions (non-negotiable)
 
-- **Migrations:** numbered SQL files in `apps/api/src/db/migrations/` (next is 028). Always append the same DDL to `docs/schema.sql`.
+- **Migrations:** numbered SQL files in `apps/api/src/db/migrations/` (next is 029). Always append the same DDL to `docs/schema.sql`.
 - **Routes:** `router.use(requireAuth)` first; every query parameterized (`$1…`); user-scoped queries filter `user_id = req.userId`; `asyncHandler` wrapper; snake_case → camelCase via `toPublicX(row)` mappers; errors `{ error: { message, code } }` in plain English; literal paths registered before `/:id`.
 - **Nested writes:** transaction — BEGIN, upsert parent, DELETE children, re-INSERT, COMMIT; ROLLBACK in catch; `client.release()` in finally (see `routes/programs.js` `replaceDays`).
 - **Postgres trap:** placeholders in `COALESCE($n, …)` or typed comparisons need explicit casts (`::uuid`, `::boolean`, `::integer`) or you get runtime 42883 errors.
@@ -71,4 +71,4 @@ Possible future work: PayPal as a fallback payment provider, scheduled automatic
 | `docs/mobile.md` | Step-by-step for App Store / Play Store |
 | `railway.json` | Railway deploy config (build, migrate, start, health check) |
 | `Agents` repo, `.claude/agents/` | The generic dev crew (builder, researcher, content-curator in `development/`; verifier, code-reviewer in `quality/` — full roster in that repo's CLAUDE.md) — works on any repo by reading this file's conventions; include the Agents repo in the session |
-| `apps/api/src/db/migrations/` | 27 migrations so far; runner is `src/db/migrate.js` |
+| `apps/api/src/db/migrations/` | 29 migrations so far; runner is `src/db/migrate.js` |

@@ -37,6 +37,11 @@ export function runPayouts() {
   return request('/admin/payouts/run', { method: 'POST' });
 }
 
+// Settles a payout parked for a check: outcome is 'paid' or 'failed'.
+export function resolvePayout(id, outcome, note) {
+  return request(`/admin/payouts/${id}/resolve`, { method: 'POST', body: JSON.stringify({ outcome, note }) });
+}
+
 export function getPayouts({ limit = 20, offset = 0 } = {}) {
   return request(`/admin/payouts?limit=${limit}&offset=${offset}`);
 }

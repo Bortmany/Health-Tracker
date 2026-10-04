@@ -6,12 +6,13 @@ import {
   ConfirmDialog,
   EmptyState,
   ErrorText,
+  Input,
   Skeleton,
   Toast,
   useToast,
 } from './ui/index.js';
 import MoneyButton from './MoneyButton.jsx';
-import { useAdminEarnings, useAdminPayouts, useRunPayouts } from '../hooks/useAdmin.js';
+import { useAdminEarnings, useAdminPayouts, useResolvePayout, useRunPayouts } from '../hooks/useAdmin.js';
 import { useMoneySwitch } from '../hooks/useBilling.js';
 import { admin as copy, common, pills } from '../lib/billingCopy.js';
 import { owedTone, payButtonState, payoutPill } from '../lib/billingLogic.js';
@@ -29,6 +30,7 @@ export function MoneyBlock({ money }) {
       <div className={styles.moneyLabel}>{copy.owed}</div>
       <div className={`${styles.owedFigure} ${toneClass}`.trim()}>{formatCents(money.owedCents)}</div>
       <div className={styles.meta}>{copy.paidSoFar(money.paidCents)}</div>
+      {money.beingCheckedCents > 0 && <div className={styles.meta}>{copy.beingChecked(money.beingCheckedCents)}</div>}
     </div>
   );
 }
@@ -133,6 +135,7 @@ export function PayoutsSummary() {
   }
 
   const negatives = data?.negativeBalances ?? [];
+  const attention = data?.needsAttention ?? [];
 
   return (
     <>
@@ -143,6 +146,18 @@ export function PayoutsSummary() {
       {failedNote && (
         <Card className={`${styles.stackCard} ${styles.warnCard}`}>
           <Chip tone="warn">{pills.headsUp}</Chip> <span>{copy.partialFail(failedNote.failed, failedNote.total)}</span>
+        </Card>
+      )}
+
+      {attention.length > 0 && (
+        <Card className={`${styles.stackCard} ${styles.warnCard}`}>
+          <Chip tone="warn">{pills.headsUp}</Chip>{' '}
+          <span>Needs your attention:</span>
+          {attention.map((item) => (
+            <p key={`${item.id}`} className={styles.meta}>
+              {item.message}
+            </p>
+          ))}
         </Card>
       )}
 
@@ -176,6 +191,70 @@ export function PayoutsSummary() {
       />
       <Toast message={toast.message} />
     </>
+  );
+}
+
+// Buttons for a payout parked for a check: the owner says it was sent or not,
+// types a short note, and taps once more to confirm. Nothing changes until then.
+function ResolveBox({ payout, onDone }) {
+  const resolve = useResolvePayout();
+  const [choice, setChoice] = useState(null); // 'paid' | 'failed' | null
+  const [note, setNote] = useState('');
+  const [needNote, setNeedNote] = useState(false);
+
+  function confirm() {
+    const trimmed = note.trim();
+    if (!trimmed) {
+      setNeedNote(true);
+      return;
+    }
+    resolve.mutate(
+      { id: payout.id, outcome: choice, note: trimmed },
+      { onSuccess: () => { setChoice(null); setNote(''); onDone(); } }
+    );
+  }
+
+  if (!choice) {
+    return (
+      <div className={styles.resolveBox}>
+        <p className={styles.meta}>{copy.resolve.hint}</p>
+        <div className={styles.resolveButtons}>
+          <Button size="sm" variant="secondary" onClick={() => setChoice('paid')}>
+            {copy.resolve.sent}
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setChoice('failed')}>
+            {copy.resolve.notSent}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className={styles.resolveBox}>
+      <p className={styles.meta}>{choice === 'paid' ? copy.resolve.confirmSent : copy.resolve.confirmNotSent}</p>
+      <label className={styles.meta} htmlFor={`resolve-note-${payout.id}`}>
+        {copy.resolve.noteLabel}
+      </label>
+      <Input
+        id={`resolve-note-${payout.id}`}
+        value={note}
+        maxLength={300}
+        placeholder={copy.resolve.notePlaceholder}
+        aria-invalid={needNote ? 'true' : undefined}
+        disabled={resolve.isPending}
+        onChange={(e) => { setNote(e.target.value); setNeedNote(false); }}
+      />
+      {needNote && <ErrorText>{copy.resolve.needNote}</ErrorText>}
+      {resolve.isError && <ErrorText>{copy.resolve.error}</ErrorText>}
+      <div className={styles.resolveButtons}>
+        <Button size="sm" onClick={confirm} disabled={resolve.isPending}>
+          {resolve.isPending ? copy.resolve.saving : copy.resolve.confirm}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => { setChoice(null); setNeedNote(false); }} disabled={resolve.isPending}>
+          {copy.resolve.cancel}
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -224,6 +303,9 @@ export function PayoutHistoryCard() {
                   <Chip tone={pill.tone}>{pill.label}</Chip>
                 </div>
               </div>
+              {payout?.status === 'manual_review' && payout?.id && (
+                <ResolveBox payout={payout} onDone={() => toast.show(copy.resolve.done)} />
+              )}
               {ref && (
                 <button type="button" className={styles.refButton} title={copy.refHint} onClick={() => copyRef(ref)}>
                   {ref}

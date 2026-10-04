@@ -86,8 +86,9 @@ export async function loadEarnings(db, coachId) {
     [coachId]
   );
   const { rows: paidRows } = await db.query(
-    `SELECT COALESCE(SUM(amount_cents), 0)::int AS paid
-     FROM payouts WHERE coach_id = $1 AND status IN ('pending', 'paid')`,
+    `SELECT COALESCE(SUM(amount_cents) FILTER (WHERE status = 'paid'), 0)::int AS paid,
+            COALESCE(SUM(amount_cents) FILTER (WHERE status IN ('pending', 'manual_review')), 0)::int AS being_checked
+     FROM payouts WHERE coach_id = $1`,
     [coachId]
   );
   const r = rows[0];
@@ -96,7 +97,10 @@ export async function loadEarnings(db, coachId) {
     thisMonthCents: r.this_month,
     studentsThisMonth: r.students_this_month,
     owedCents: r.owed,
+    // Only payouts the payment company confirmed count as paid. Money in a
+    // payout still unconfirmed (or parked for a check) is "being checked".
     paidCents: paidRows[0].paid + Math.max(r.provider_settled, 0),
+    beingCheckedCents: paidRows[0].being_checked,
   };
 }
 

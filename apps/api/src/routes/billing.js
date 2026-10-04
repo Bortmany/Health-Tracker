@@ -22,6 +22,7 @@ import { isEmailEnabled } from '../lib/email.js';
 import { isAiPlanGenerationEnabled } from '../lib/aiPlanGenerator.js';
 import { verifyTokenPayload } from '../lib/jwt.js';
 import { logger } from '../lib/logger.js';
+import { retryPendingCancels } from '../lib/providerRetries.js';
 import * as validate from '../lib/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -144,6 +145,8 @@ const SUBSCRIPTION_SELECT = `
   LEFT JOIN users cu ON cu.id = cc.coach_id`;
 
 router.get('/subscriptions', asyncHandler(async (req, res) => {
+  // Any cancel of this student's that failed earlier gets another try now.
+  await retryPendingCancels({ userId: req.userId });
   const { rows } = await pool.query(
     `${SUBSCRIPTION_SELECT}
      WHERE s.user_id = $1
@@ -305,7 +308,9 @@ router.post('/coach-checkout', asyncHandler(async (req, res) => {
       // The same link and price always give the same key, so pressing pay twice
       // (or a retry) gets the same checkout page, not a second one.
       reference: `coach-link-${rows[0].id}`,
-      idempotencyKey: `coach-checkout-${rows[0].id}-${readiness.priceCents}`,
+      // The key also carries the coach's CURRENT price and payment account, so a
+      // changed price or account can never be answered with an old checkout.
+      idempotencyKey: `coach-checkout-${rows[0].id}-${readiness.priceCents}-${readiness.providerAccountId}`,
     },
     { priceCents: readiness.priceCents }
   );

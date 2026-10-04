@@ -63,6 +63,20 @@ export function useRunPayouts() {
   });
 }
 
+// Settling a payout stuck in review changes what is owed and paid, and the
+// history, so all of them refresh.
+export function useResolvePayout() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, outcome, note }) => adminApi.resolvePayout(id, outcome, note),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: EARNINGS_KEY });
+      queryClient.invalidateQueries({ queryKey: PAYOUTS_KEY });
+      queryClient.invalidateQueries({ queryKey: COACHES_KEY });
+    },
+  });
+}
+
 // Every decision touches both lists (an approval adds a coach; a revoke
 // may free someone to apply again), so all three refresh both.
 function useRefreshAdminLists() {

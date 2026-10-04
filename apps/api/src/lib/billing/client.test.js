@@ -322,6 +322,47 @@ test('payout status reads the transfer with a GET and no idempotency key', async
   assert.equal(f.requests[0].body, undefined);
 });
 
+test('finding a transfer by key: found, not found, and "could not tell" are three different answers', async () => {
+  const entry = (id, key) => ({ id, status: 'succeeded', idempotence_key: key, metadata: { payoutId: key } });
+  // Found on the second page.
+  const f1 = fakeFetch(
+    { body: { data: [entry('xfer_a', 'other')], page_info: { has_next_page: true, end_cursor: 'c1' } } },
+    { body: { data: [entry('xfer_b', 'mine')], page_info: { has_next_page: false } } }
+  );
+  const found = await createWhopClient(config(), { fetch: f1 }).findTransferByKey({ idempotencyKey: 'mine', providerAccountId: 'biz_coach1' });
+  assert.deepEqual(found, { found: true, providerReference: 'xfer_b', status: 'paid' });
+  assert.equal(f1.requests[0].method, 'GET');
+  assert.ok(f1.requests[0].url.includes('destination_id=biz_coach1'));
+  assert.ok(f1.requests[1].url.includes('after=c1'));
+
+  // Everything read, nothing matches: a trustworthy "not found".
+  const f2 = fakeFetch({ body: { data: [entry('xfer_a', 'other')], page_info: { has_next_page: false } } });
+  assert.deepEqual(
+    await createWhopClient(config(), { fetch: f2 }).findTransferByKey({ idempotencyKey: 'mine', providerAccountId: 'biz_coach1' }),
+    { found: false }
+  );
+
+  // An error, or entries that do not say which payout they belong to: NOT "not found".
+  await assert.rejects(
+    () => createWhopClient(config(), { fetch: fakeFetch({ status: 500, body: {} }) }).findTransferByKey({ idempotencyKey: 'mine', providerAccountId: 'biz_coach1' }),
+    BillingError
+  );
+  const f3 = fakeFetch({ body: { data: [{ id: 'xfer_x', status: 'succeeded' }], page_info: { has_next_page: false } } });
+  await assert.rejects(
+    () => createWhopClient(config(), { fetch: f3 }).findTransferByKey({ idempotencyKey: 'mine', providerAccountId: 'biz_coach1' }),
+    BillingError
+  );
+});
+
+test('refunding a payment posts a full refund with a stable key', async () => {
+  const f = fakeFetch({ body: { id: 'rf_1' } });
+  const result = await createWhopClient(config(), { fetch: f }).refundPayment({ providerPaymentId: 'pay_1' });
+  assert.deepEqual(result, { refunded: true });
+  assert.equal(f.requests[0].method, 'POST');
+  assert.equal(f.requests[0].url, 'https://sandbox-api.whop.com/api/v1/payments/pay_1/refund');
+  assert.equal(f.requests[0].headers['Idempotency-Key'], 'auto-refund-pay_1');
+});
+
 /* ---------------- errors ---------------- */
 
 test('errors are plain, carry the status, and never contain the key or the provider text', async () => {
@@ -329,7 +370,7 @@ test('errors are plain, carry the status, and never contain the key or the provi
   for (const status of [400, 401, 403, 404, 409, 429, 500, 503]) {
     const client = createWhopClient(config(), { fetch: fakeFetch({ status, body: secretish }) });
     await assert.rejects(
-      () => client.cancelSubscription({ providerSubscriptionId: 'mem_1' }),
+      () => client.refundPayment({ providerPaymentId: 'pay_1', idempotencyKey: 'k_1' }),
       (error) => {
         assert.ok(error instanceof BillingError);
         assert.equal(error.status, status);
@@ -343,6 +384,13 @@ test('errors are plain, carry the status, and never contain the key or the provi
       String(status)
     );
   }
+});
+
+test('cancelling a subscription the provider no longer has says alreadyGone; other errors still throw', async () => {
+  const gone = createWhopClient(config(), { fetch: fakeFetch({ status: 404, body: {} }) });
+  assert.deepEqual(await gone.cancelSubscription({ providerSubscriptionId: 'mem_1' }), { alreadyGone: true });
+  const broken = createWhopClient(config(), { fetch: fakeFetch({ status: 500, body: {} }) });
+  await assert.rejects(() => broken.cancelSubscription({ providerSubscriptionId: 'mem_1' }));
 });
 
 test('a provider error code is kept for the caller, trimmed', async () => {

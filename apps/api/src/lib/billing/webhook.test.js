@@ -282,11 +282,13 @@ test('identity events mark the coach verified; other account states do not', () 
 });
 
 test('events Cut does not use are ignored but still readable', () => {
-  for (const type of ['payment.pending', 'transfer.completed', 'membership.trial_ending_soon', 'dispute.updated', 'account.updated']) {
+  for (const type of ['payment.pending', 'transfer.completed', 'membership.trial_ending_soon', 'account.updated']) {
     const event = parseWebhookEvent(buildFakeEvent(type));
     assert.equal(event.type, 'ignored', type);
     assert.equal(event.eventId, 'msg_fake1');
   }
+  // A lost dispute needs nothing more from Cut.
+  assert.equal(parseWebhookEvent(buildFakeEvent('dispute.updated', { status: 'lost' })).type, 'ignored');
 });
 
 test('the older company_id envelope field still names the account', () => {

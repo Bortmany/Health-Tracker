@@ -172,7 +172,10 @@ test('admin figures are whole cents with safe defaults', () => {
   assert.equal(e.coaches.length, 1);
   assert.equal(e.coaches[0].revoked, true);
   assert.equal(e.negativeBalances.length, 1);
+  const flagged = normalizeAdminEarnings({ needsAttention: [{ id: 'a', message: 'Check this.' }, { id: 'b' }, null] });
+  assert.deepEqual(flagged.needsAttention, [{ id: 'a', message: 'Check this.' }]);
   const empty = normalizeAdminEarnings(undefined);
+  assert.deepEqual(empty.needsAttention, []);
   assert.equal(empty.totalOwedCents, 0);
   assert.deepEqual(empty.coaches, []);
 });

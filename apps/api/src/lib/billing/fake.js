@@ -17,6 +17,8 @@ const CLIENT_METHODS = [
   'cancelSubscription',
   'transferToCoach',
   'getPayoutStatus',
+  'findTransferByKey',
+  'refundPayment',
 ];
 
 // A client that behaves like the real one with fixed, predictable answers.
@@ -24,15 +26,20 @@ const CLIENT_METHODS = [
 //                 those calls throw a plain BillingError.
 //   transferStatus — what transferToCoach reports ('paid' by default).
 //   periodEnd   — what cancelSubscription reports.
+//   cancelAlreadyGone — cancelSubscription answers { alreadyGone: true } (the
+//                 payment company no longer has that subscription).
 // Every call is pushed onto `.calls` as { method, args } before anything else
 // happens, including calls that then fail.
 export function createFakeBillingClient({
   failOn = [],
   transferStatus = 'paid',
   periodEnd = '2030-01-31T00:00:00.000Z',
+  cancelAlreadyGone = false,
 } = {}) {
   const calls = [];
   const transfers = new Map(); // idempotency key -> reference, so repeats don't pay twice
+  const refunded = new Set(); // payment ids already refunded
+  const knownTransfers = new Map(); // key -> { providerReference, status }: what a lookup can find
 
   const failures =
     typeof failOn === 'string'
@@ -68,6 +75,7 @@ export function createFakeBillingClient({
 
     async cancelSubscription(args) {
       record('cancelSubscription', args);
+      if (cancelAlreadyGone) return { alreadyGone: true };
       return { periodEnd };
     },
 
@@ -75,6 +83,7 @@ export function createFakeBillingClient({
       record('transferToCoach', args);
       const key = args?.idempotencyKey;
       if (!transfers.has(key)) transfers.set(key, `fake_transfer_${key}`);
+      knownTransfers.set(key, { providerReference: transfers.get(key), status: transferStatus });
       return { providerReference: transfers.get(key), status: transferStatus };
     },
 
@@ -82,6 +91,24 @@ export function createFakeBillingClient({
       record('getPayoutStatus', args);
       return { status: transferStatus };
     },
+  };
+
+  // Looks up a transfer by its key: only ones this fake actually sent, or ones
+  // a test planted with plantTransfer() (a send that "went through" even though
+  // the caller saw an error).
+  client.findTransferByKey = async (args) => {
+    record('findTransferByKey', args);
+    const hit = knownTransfers.get(args?.idempotencyKey);
+    return hit ? { found: true, ...hit } : { found: false };
+  };
+  client.plantTransfer = (key, status = 'paid') => {
+    knownTransfers.set(key, { providerReference: `fake_transfer_${key}`, status });
+  };
+
+  client.refundPayment = async (args) => {
+    record('refundPayment', args);
+    refunded.add(args?.providerPaymentId);
+    return { refunded: true };
   };
 
   // Handy for a test that wants every method name.
@@ -128,6 +155,13 @@ const DEFAULT_DATA = {
   'refund.created': { id: 'rf_fake1', payment_id: 'pay_fake1', amount: 30, currency: 'usd', status: 'succeeded' },
   'refund.updated': { id: 'rf_fake1', payment_id: 'pay_fake1', amount: 30, currency: 'usd', status: 'succeeded' },
   'dispute.created': {
+    id: 'dspt_fake1',
+    amount: 30,
+    currency: 'usd',
+    status: 'needs_response',
+    payment: { id: 'pay_fake1' },
+  },
+  'dispute.updated': {
     id: 'dspt_fake1',
     amount: 30,
     currency: 'usd',

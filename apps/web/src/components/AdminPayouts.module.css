@@ -126,6 +126,20 @@
   color: var(--color-accent);
 }
 
+/* ---- Settling a payout parked for a check ---- */
+.resolveBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.resolveButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 @media (min-width: 56.25em) {
   .summary {
     flex-direction: row;

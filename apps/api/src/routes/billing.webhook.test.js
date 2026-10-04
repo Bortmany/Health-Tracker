@@ -343,8 +343,11 @@ test('a paid link that cannot go live (student already has another coach) is can
   const stored = (await subRowFor(first.student.id)).find((r) => r.provider_subscription_id === fields.membership_id);
   assert.ok(stored, 'the subscription row is kept');
   assert.equal(stored.cancel_at_period_end, true);
-  // The money was still recorded.
-  assert.equal((await ledgerFor(second.id)).length, 1);
+  // The coach is NOT credited: the payment and its automatic refund net to zero.
+  const secondRows = await ledgerFor(second.id);
+  assert.equal(secondRows.length, 2);
+  assert.equal(secondRows.reduce((sum, r) => sum + r.coach_cents, 0), 0);
+  assert.deepEqual(fake.calls.filter((c) => c.method === 'refundPayment').map((c) => c.args.providerPaymentId), [fields.id]);
 });
 
 test('a payment for a dead link cancels the subscription at the provider and keeps no row', async () => {
@@ -356,7 +359,10 @@ test('a payment for a dead link cancels the subscription at the provider and kee
   assert.equal((await kit.webhook('payment.succeeded', fields)).status, 200);
   assert.deepEqual(cancelCalls(fake), [fields.membership_id]);
   assert.equal((await subRowFor(s.student.id)).length, 0);
-  assert.equal((await ledgerFor(s.coach.id)).length, 1);
+  // Not credited: payment and refund net to zero, and the student is refunded.
+  const rows = await ledgerFor(s.coach.id);
+  assert.equal(rows.reduce((sum, r) => sum + r.coach_cents, 0), 0);
+  assert.deepEqual(fake.calls.filter((c) => c.method === 'refundPayment').map((c) => c.args.providerPaymentId), [fields.id]);
 });
 
 test('a second subscription for the same link is cancelled at the provider; the first stays', async () => {
@@ -374,12 +380,15 @@ test('a second subscription for the same link is cancelled at the provider; the 
   assert.equal(await linkOf(s.linkId), 'active');
 });
 
-test('a payment that is not in US dollars writes no ledger row but still answers 200', async () => {
+test('a payment that is not in US dollars credits nothing but leaves a flagged, held row for the owner, and answers 200', async () => {
   setBillingClient(createFakeBillingClient());
   const s = await setup('eurpay');
   const res = await kit.webhook('payment.succeeded', paymentFields(s, { currency: 'eur' }));
   assert.equal(res.status, 200);
-  assert.equal((await ledgerFor(s.coach.id)).length, 0);
+  const rows = await ledgerFor(s.coach.id);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].owner_flag, 'non_usd_payment');
+  assert.equal(rows[0].coach_cents, 0);
 });
 
 test('stopping subscriptions: a provider failure leaves it NOT cancelled so the next attempt retries; success marks it', async () => {
@@ -391,6 +400,8 @@ test('stopping subscriptions: a provider failure leaves it NOT cancelled so the 
   setBillingClient(createFakeBillingClient({ failOn: 'cancelSubscription' }));
   await stopSubscriptionsWhere('cc.id = $1', [s.linkId]);
   assert.equal(await flag(), false);
+  // ...and the failed cancel is saved, once, for a later retry.
+  assert.equal((await pool.query('SELECT 1 FROM pending_cancels')).rowCount > 0, true);
 
   const ok = createFakeBillingClient();
   setBillingClient(ok);

@@ -139,6 +139,7 @@ router.get('/earnings', requireAuth, requireCurrentOrFormerCoach, asyncHandler(a
     allTimeCents: earnings.allTimeCents,
     owedCents: earnings.owedCents,
     paidCents: earnings.paidCents,
+    beingCheckedCents: earnings.beingCheckedCents,
     studentsThisMonth: earnings.studentsThisMonth,
     // Who sends the coach their money: 'provider' under Method A, else 'cut'.
     settledBy: payoutMethod() === 'A' ? 'provider' : 'cut',

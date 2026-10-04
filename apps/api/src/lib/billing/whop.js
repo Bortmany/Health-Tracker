@@ -172,6 +172,8 @@ export function verifyWebhook(rawBody, headers, secret, now = Date.now()) {
 /* Reading a webhook                                                   */
 /* ------------------------------------------------------------------ */
 
+// Dispute states where the money is currently held back from the coach.
+const OPEN_DISPUTE_STATUSES = new Set(['needs_response', 'warning_needs_response', 'under_review', 'warning_under_review']);
 const KINDS = new Set(['coach_startup_fee', 'coach_student', 'ai_plan']);
 const INTERVALS = new Set(['month', 'year']);
 
@@ -250,7 +252,8 @@ const EMPTY_EVENT = {
 // Mapping:
 //   payment.succeeded -> payment.succeeded        payment.failed -> payment.failed
 //   refund.created/updated (status succeeded) -> payment.refunded
-//   dispute.created -> payment.disputed
+//   dispute.created / dispute.updated (still open) -> payment.disputed
+//   dispute.updated (won) -> payment.dispute_won
 //   membership.activated -> subscription.started
 //   membership.cancel_at_period_end_changed (now true) -> subscription.cancel_scheduled
 //   membership.deactivated -> subscription.ended
@@ -333,15 +336,26 @@ export function parseWebhookEvent(rawBody) {
         };
       }
 
-      // Owner decision pending: what to do when a dispute is WON or LOST (only
-      // dispute.created is handled below).
-      case 'dispute.created': {
+      // A dispute: opening it (and any update that still says it is open)
+      // takes the coach's share back; WON gives it back; lost or anything else
+      // does nothing more. dispute.created and dispute.updated can both announce
+      // the same open dispute - the ledger writes only one row per dispute.
+      case 'dispute.created':
+      case 'dispute.updated': {
+        const status = nonEmptyString(data.status)?.toLowerCase() ?? '';
+        let type = 'ignored';
+        if (OPEN_DISPUTE_STATUSES.has(status) || (rawType === 'dispute.created' && status === '')) {
+          type = 'payment.disputed';
+        } else if (status === 'won') {
+          type = 'payment.dispute_won';
+        }
+        if (type === 'ignored') return event;
         const paymentId = safeId(
           pickString(data, ['payment_id']) ?? pickString(nested(data, 'payment'), ['id'])
         );
         return {
           ...event,
-          type: 'payment.disputed',
+          type,
           providerPaymentId: paymentId,
           providerEventRef: safeId(data.id),
           providerCustomerId: customer,
@@ -665,9 +679,17 @@ export function createWhopClient(config, options = {}) {
   // Stops renewals but keeps access to the end of the period already paid for.
   async function cancelSubscription({ providerSubscriptionId } = {}) {
     const id = requireId(providerSubscriptionId, 'subscription');
-    const answer = await call('POST', `/memberships/${encodeURIComponent(id)}/cancel`, {
-      body: { cancel_at_period_end: true },
-    });
+    let answer;
+    try {
+      answer = await call('POST', `/memberships/${encodeURIComponent(id)}/cancel`, {
+        body: { cancel_at_period_end: true },
+      });
+    } catch (err) {
+      // The provider no longer has this subscription (already cancelled or
+      // gone): the goal is met, so say so in provider-neutral terms.
+      if (err?.status === 404) return { alreadyGone: true };
+      throw err;
+    }
     return { periodEnd: toIso(answer.current_period_end) };
   }
 
@@ -702,6 +724,9 @@ export function createWhopClient(config, options = {}) {
         amount: centsToDollars(amountCents),
         currency: 'usd',
         idempotence_key: idempotencyKey,
+        // Our own payout id too, so a later lookup can find this transfer even
+        // if the provider does not echo the key back.
+        metadata: { payoutId: idempotencyKey },
         notes: 'Cut coach payout',
       },
       idempotencyKey,
@@ -718,7 +743,74 @@ export function createWhopClient(config, options = {}) {
     return { status: mapTransferStatus(answer.status) };
   }
 
-  return { createCheckout, createCoachOnboardingLink, cancelSubscription, transferToCoach, getPayoutStatus };
+  // Looks for a transfer sent under OUR key (the payout's own key). The answer
+  // is one of:
+  //   { found: true, providerReference, status }  - it exists
+  //   { found: false }                            - we looked at EVERYTHING sent to
+  //                                                 that account and it is not there
+  // Anything that stops us being sure (an error, too many pages, entries we
+  // cannot read) THROWS, because "I could not look" must never be mistaken for
+  // "it was never sent". UNCONFIRMED against the live service: the list's
+  // paging names and whether each entry echoes the key; until confirmed in the
+  // sandbox this errs on the side of throwing, which only keeps money held.
+  const LOOKUP_MAX_PAGES = 10;
+  async function findTransferByKey({ idempotencyKey, providerAccountId } = {}) {
+    if (typeof idempotencyKey !== 'string' || idempotencyKey.length === 0) {
+      throw new BillingError('A payout lookup needs the payout key.');
+    }
+    const destination = requireId(providerAccountId, 'coach account');
+    if (!config.companyId) throw new BillingError('Payments are not fully set up yet.');
+    let cursor = null;
+    for (let page = 0; page < LOOKUP_MAX_PAGES; page += 1) {
+      const query = new URLSearchParams({ origin_id: config.companyId, destination_id: destination });
+      if (cursor) query.set('after', cursor);
+      const answer = await call('GET', `/transfers?${query.toString()}`);
+      const items = Array.isArray(answer.data) ? answer.data : null;
+      if (!items) throw new BillingError('The payment provider gave an answer we could not read.');
+      for (const item of items) {
+        const record = asRecord(item);
+        const echoedKey = nonEmptyString(record?.idempotence_key);
+        const ourId = nonEmptyString(asRecord(record?.metadata)?.payoutId);
+        if (!echoedKey && !ourId) {
+          throw new BillingError('The payment provider did not say which payout a transfer belongs to.');
+        }
+        if (echoedKey === idempotencyKey || ourId === idempotencyKey) {
+          return {
+            found: true,
+            providerReference: requireId(record.id, 'transfer'),
+            status: mapTransferStatus(record.status),
+          };
+        }
+      }
+      const info = asRecord(answer.page_info);
+      if (!info?.has_next_page) return { found: false };
+      cursor = nonEmptyString(info.end_cursor);
+      if (!cursor) throw new BillingError('The payment provider gave an answer we could not read.');
+    }
+    throw new BillingError('There are too many transfers to check them all.');
+  }
+
+  // ---- Refunds ----
+
+  // Gives a payment back in full. The key makes a repeat harmless.
+  async function refundPayment({ providerPaymentId, idempotencyKey } = {}) {
+    const id = requireId(providerPaymentId, 'payment');
+    await call('POST', `/payments/${encodeURIComponent(id)}/refund`, {
+      body: {},
+      idempotencyKey: idempotencyKey ?? `auto-refund-${id}`,
+    });
+    return { refunded: true };
+  }
+
+  return {
+    createCheckout,
+    createCoachOnboardingLink,
+    cancelSubscription,
+    transferToCoach,
+    getPayoutStatus,
+    findTransferByKey,
+    refundPayment,
+  };
 }
 
 // What index.js needs from a driver.

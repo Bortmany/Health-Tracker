@@ -151,10 +151,10 @@ test('coach-checkout charges the coach\'s saved price on the coach\'s own accoun
   assert.equal(args.coachUserId, coach.id);
 
   // The same link and price always send the same key (pressing pay twice can't open two).
-  assert.equal(args.idempotencyKey, `coach-checkout-${linkId}-4500`);
+  assert.equal(args.idempotencyKey, `coach-checkout-${linkId}-4500-biz_checkout`);
   await kit.call(student, 'POST', '/billing/coach-checkout', { coachId: coach.id });
   const keys = fake.calls.filter((c) => c.method === 'createCheckout').map((c) => c.args.idempotencyKey);
-  assert.deepEqual([...new Set(keys)], [`coach-checkout-${linkId}-4500`]);
+  assert.deepEqual([...new Set(keys)], [`coach-checkout-${linkId}-4500-biz_checkout`]);
 
   // Already holding a live subscription for this link: a second checkout is refused.
   await pool.query(

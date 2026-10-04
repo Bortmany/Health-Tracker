@@ -128,3 +128,10 @@ On 30 Sep I asked the owner to approve the money spec (`Agents/docs/specs/cut/co
 - The $49 startup fee is refundable only if the coach never accepted a student.
 
 Everything is built and tested in test mode only, with a stand-in for Whop. No Whop test keys have been shared yet.
+
+## 8. Owner answers after Step 5 review (4 Oct 2026)
+
+The owner's words: "1 yes 2 yes 3 keep paid, continue"
+1. Run a third fix round for the double-payout bug, the coach-switch problem and the smaller gaps.
+2. Disputes: when a student disputes a charge, take back the coach's share, and give it back if Cut wins the dispute.
+3. Email invites stay paid, like coach requests. Only the old invite-code students stay free.

@@ -33,7 +33,12 @@ function Figures({ data }) {
             subTone={owed != null && owed < 0 ? 'warn' : 'neutral'}
           />
         )}
-        <StatCard label={copy.paidOut} hint={copy.hints.paidOut} value={formatCents(data?.paidCents)} />
+        <StatCard
+          label={copy.paidOut}
+          hint={copy.hints.paidOut}
+          value={formatCents(data?.paidCents)}
+          sub={Number.isInteger(data?.beingCheckedCents) && data.beingCheckedCents > 0 ? copy.beingChecked(data.beingCheckedCents) : undefined}
+        />
       </div>
       <p className={styles.explainer}>{copy.explainer}</p>
     </>

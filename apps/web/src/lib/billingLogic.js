@@ -82,6 +82,7 @@ export function getPaidSteps(billing) {
 export function payoutPill(status) {
   if (status === 'paid') return { label: pills.paid, tone: 'accent' };
   if (status === 'failed') return { label: pills.failed, tone: 'warn' };
+  if (status === 'manual_review') return { label: pills.manualReview, tone: 'warn' };
   return { label: pills.pending, tone: 'warn' };
 }
 
@@ -204,6 +205,7 @@ export function normalizeAdminEarnings(raw) {
       identityVerified: c.identityVerified === true,
       owedCents: Number.isInteger(c.owedCents) ? c.owedCents : null,
       paidCents: Number.isInteger(c.paidCents) ? c.paidCents : null,
+      beingCheckedCents: Number.isInteger(c.beingCheckedCents) ? c.beingCheckedCents : 0,
     }));
   const negativeBalances = (Array.isArray(raw?.negativeBalances) ? raw.negativeBalances : [])
     .filter((c) => c && Number.isInteger(c.owedCents) && c.owedCents < 0)
@@ -212,7 +214,12 @@ export function normalizeAdminEarnings(raw) {
       displayName: typeof c.displayName === 'string' ? c.displayName : '—',
       owedCents: c.owedCents,
     }));
+  // Plain-English sentences from the server about money that needs the owner.
+  const needsAttention = (Array.isArray(raw?.needsAttention) ? raw.needsAttention : [])
+    .filter((n) => n && typeof n.message === 'string' && n.message.length > 0)
+    .map((n, i) => ({ id: String(n.id ?? i), message: n.message }));
   return {
+    needsAttention,
     totalOwedCents: int(raw?.totalOwedCents),
     payableCents: int(raw?.payableCents),
     payableCoachCount: int(raw?.payableCoachCount),

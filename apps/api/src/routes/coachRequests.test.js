@@ -296,16 +296,18 @@ test('accepting an invite with a coach already: 409 without replaceCurrent, swit
   assert.equal(switched.status, 200);
   assert.equal((await switched.json()).coach.slug, newCoach.slug);
 
+  // Accepting does NOT end the old coach: only the new coach's paid
+  // subscription does (see billing.webhook.test.js / moneySafety.test.js).
   const old = await linkStatus(oldRows[0].id);
-  assert.equal(old.status, 'ended');
-  assert.ok(old.ended_at);
+  assert.equal(old.status, 'active');
+  assert.equal(old.ended_at, null);
   assert.equal((await linkStatus(coachInvites[0].id)).status, 'pending_payment');
 
   // The old coach's assigned program is still in the student's account.
   const { programs } = await (await json(student.cookie, 'GET', '/programs')).json();
   assert.ok(programs.some((p) => p.id === program.id));
-  // The old coach no longer lists the student.
-  assert.equal((await (await json(oldCoach.cookie, 'GET', '/coach/clients')).json()).clients.length, 0);
+  // The old coach still lists the student until the new coach is paid.
+  assert.equal((await (await json(oldCoach.cookie, 'GET', '/coach/clients')).json()).clients.length, 1);
 
   // Declining an invite marks it declined.
   const third = await makeCoach('switchthird');
