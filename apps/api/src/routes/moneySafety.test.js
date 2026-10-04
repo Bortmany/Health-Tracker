@@ -163,6 +163,59 @@ test('a lookup that ERRORS is not "not found": the money stays held and the owne
   assert.match((await attention()).find((n) => n.id === payout.id).message, /could not check/);
 });
 
+const sentTo = (accountId) => callsOf('transferToCoach').filter((c) => c.args.providerAccountId === accountId).length;
+
+test('a keyless transfer to the same account within 24 hours (different amount and note) keeps the money held and flags the owner', async () => {
+  const coach = await coachWithOwedMoney('ms-keyless-near');
+  const payout = await pendingPayout(coach, { ageMinutes: 60 });
+  useFake();
+  fake.plantKeylessTransfer(payout.accountId, new Date(Date.now() - 30 * 60 * 1000));
+  await runPay();
+  await runPay();
+  const rows = await payoutsOf(coach.id);
+  assert.equal(rows.length, 1, 'no second payout');
+  assert.equal(rows[0].status, 'pending');
+  assert.equal(rows[0].attention, 'keyless_transfer_nearby');
+  assert.equal(sentTo(payout.accountId), 0, 'nothing sent');
+  assert.equal((await ledgerFor(coach.id))[0].payout_id, payout.id);
+  assert.match((await attention()).find((n) => n.id === payout.id).message, /without our reference/);
+});
+
+test('a keyless transfer to a DIFFERENT account is ignored: the money is released once', async () => {
+  const coach = await coachWithOwedMoney('ms-keyless-other');
+  const payout = await pendingPayout(coach, { ageMinutes: 60 });
+  useFake();
+  fake.plantKeylessTransfer('biz_someone_else', new Date(Date.now() - 30 * 60 * 1000));
+  await runPay();
+  const rows = await payoutsOf(coach.id);
+  assert.equal(rows.find((r) => r.id === payout.id).status, 'failed');
+  assert.equal(sentTo(payout.accountId), 1);
+});
+
+test('a keyless transfer more than 24 hours before the payout is ignored', async () => {
+  const coach = await coachWithOwedMoney('ms-keyless-old');
+  const payout = await pendingPayout(coach, { ageMinutes: 60 });
+  useFake();
+  fake.plantKeylessTransfer(payout.accountId, new Date(Date.now() - 60 * 60 * 1000 - 25 * 60 * 60 * 1000));
+  await runPay();
+  const rows = await payoutsOf(coach.id);
+  assert.equal(rows.find((r) => r.id === payout.id).status, 'failed');
+  assert.equal(sentTo(payout.accountId), 1);
+});
+
+test('a truly empty list on a payout 10+ minutes old releases the money once; replaying never pays twice', async () => {
+  const coach = await coachWithOwedMoney('ms-empty-replay');
+  const payout = await pendingPayout(coach, { ageMinutes: 15 });
+  useFake();
+  await runPay();
+  await runPay();
+  await runPay();
+  const rows = await payoutsOf(coach.id);
+  assert.equal(rows.length, 2);
+  assert.equal(rows.filter((r) => r.status === 'paid').length, 1);
+  assert.equal(sentTo(payout.accountId), 1, 'paid once in total');
+});
+
 test('a payout older than 3 days is looked up first; if nothing is found it goes to manual review, money held, nothing re-sent', async () => {
   const coach = await coachWithOwedMoney('ms-stale');
   const payout = await pendingPayout(coach, { ageMinutes: 4 * 24 * 60 });
@@ -850,4 +903,76 @@ test('a payout the owner marked not sent, later found paid by the payment compan
   useFake();
   await runPay();
   assert.equal((await payoutsOf(other.coach.id)).find((r) => r.id === other.payout.id).attention, null);
+});
+
+test('a payout Cut released itself (lookup found nothing), later found paid, is flagged once and money is untouched', async () => {
+  const coach = await coachWithOwedMoney('ms-auto-released');
+  const payout = await pendingPayout(coach, { ageMinutes: 60 });
+  // Nothing found after the waiting time: Cut frees the money itself. The new payout that follows stays pending.
+  useFake({ failOn: { transferToCoach: unknownError() } });
+  await runPay();
+  const released = (await payoutsOf(coach.id)).find((r) => r.id === payout.id);
+  assert.equal(released.status, 'failed');
+  assert.equal(released.resolution_note, null, 'released by Cut, not by the owner');
+
+  // The transfer turns up late. The re-check looks at a limited number of
+  // payouts per press, least-recently-checked first; other tests leave many
+  // failed payouts behind, so put those at the back of the queue.
+  await pool.query(`UPDATE payouts SET recheck_at = now() WHERE status = 'failed' AND id <> $1`, [payout.id]);
+  fake.plantTransfer(payout.id, 'paid');
+  await runPay();
+  await runPay(); // not flagged twice
+  const row = (await payoutsOf(coach.id)).find((r) => r.id === payout.id);
+  assert.equal(row.status, 'failed', 'status untouched');
+  assert.equal(row.attention, 'paid_after_marked_failed');
+  assert.equal((await pool.query('SELECT 1 FROM commission_ledger WHERE payout_id = $1', [payout.id])).rowCount, 0);
+  const flags = (await attention()).filter((n) => n.id === payout.id);
+  assert.equal(flags.length, 1);
+  assert.match(flags[0].message, /Cut released itself/);
+  assert.match(flags[0].message, /may be paid twice/);
+
+  // An auto-released payout older than 30 days is no longer re-checked.
+  const old = await coachWithOwedMoney('ms-auto-old');
+  const oldPayout = await pendingPayout(old, { ageMinutes: 60 });
+  useFake({ failOn: { transferToCoach: unknownError() } });
+  await runPay();
+  await pool.query(`UPDATE payouts SET updated_at = now() - interval '31 days' WHERE id = $1`, [oldPayout.id]);
+  fake.plantTransfer(oldPayout.id, 'paid');
+  await runPay();
+  assert.equal((await payoutsOf(old.id)).find((r) => r.id === oldPayout.id).attention, null);
+});
+
+test('a coaching payment with no usable amount leaves a held, flagged row for the owner', async () => {
+  useFake();
+  const coach = await kit.makeCoach('ms-noamount', { ready: true });
+  const student = await kit.register('ms-noamount-stu');
+  const link = await kit.acceptedLink(coach, student);
+  const fields = paymentFields(coach, student, link, { total: null });
+  assert.equal((await kit.webhook('payment.succeeded', fields)).status, 200);
+  const rows = await ledgerFor(coach.id);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].owner_flag, 'non_usd_payment');
+  assert.equal(rows[0].coach_cents, 0);
+  assert.ok((await attention()).some((n) => n.id === rows[0].id));
+  // A replay changes nothing.
+  assert.equal((await kit.webhook('payment.succeeded', fields)).status, 200);
+  assert.equal((await ledgerFor(coach.id)).length, 1);
+});
+
+test('an automatic reversal with no payment id to refund with is flagged for the owner', async () => {
+  useFake();
+  const { parseWebhookEvent } = await import('../lib/billing/index.js');
+  const { applyBillingEvent } = await import('../lib/billingEvents.js');
+  const s = await blockedSetup('ms-noid');
+  const fields = paymentFields(s.second, s.student, s.secondLink);
+  const event = parseWebhookEvent(buildFakeEvent('payment.succeeded', fields, { id: `msg_${kit.run}_noid` }));
+  event.providerPaymentId = null;
+  await applyBillingEvent(event);
+  const rows = await ledgerFor(s.second.id);
+  assert.equal(rows.length, 2, 'payment and its reversal');
+  assert.equal(await coachTotal(s.second.id), 0);
+  const flagged = rows.filter((r) => r.owner_flag === 'non_usd_reversal');
+  assert.equal(flagged.length, 1);
+  assert.ok((await attention()).some((n) => n.id === flagged[0].id && n.kind === 'reversal_needs_attention'));
+  assert.equal(callsOf('refundPayment').length, 0, 'nothing could be refunded');
 });

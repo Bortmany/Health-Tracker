@@ -17,12 +17,14 @@
 // (a timeout, a dropped connection, a 5xx) — callers moving money must treat
 // that as "maybe paid", not "not paid".
 export class BillingError extends Error {
-  constructor(message, { status = null, providerCode = null, outcomeUnknown = false } = {}) {
+  constructor(message, { status = null, providerCode = null, outcomeUnknown = false, possibleMatch = false } = {}) {
     super(message);
     this.name = 'BillingError';
     this.status = status;
     this.providerCode = providerCode;
     this.outcomeUnknown = outcomeUnknown;
+    // True when a lookup found a transfer without our reference near the payout's time.
+    this.possibleMatch = possibleMatch;
   }
 }
 

@@ -754,12 +754,32 @@ export function createWhopClient(config, options = {}) {
   // paging names and whether each entry echoes the key; until confirmed in the
   // sandbox this errs on the side of throwing, which only keeps money held.
   const LOOKUP_MAX_PAGES = 10;
-  async function findTransferByKey({ idempotencyKey, providerAccountId } = {}) {
+  //
+  // "Not found" is only ever answered when the list has PROVED it echoes our
+  // keys (at least one entry carried a key or our payout id), or when the list
+  // was empty. If entries came back but none carried a key, we cannot tell
+  // whether ours is among them, so it throws and the money stays held.
+  //
+  // A keyless entry (no key, no payout id) is a POSSIBLE match for our payout
+  // if it carries our note text, or if it was created within 24 hours of the
+  // payout's creation (before or after), whatever its amount or note. A keyless
+  // entry whose time we cannot read counts as possible too. Any possible match
+  // makes the lookup throw (with possibleMatch set) so the money stays held and
+  // the owner is told. The list is already limited to this coach's account.
+  // createdAt is an optional hint from the payout row; without it every keyless
+  // entry counts as possible. Every page is read; a page we cannot continue
+  // from, or more pages than the limit, also throws.
+  const LOOKALIKE_WINDOW_MS = 24 * 60 * 60 * 1000;
+  async function findTransferByKey({ idempotencyKey, providerAccountId, createdAt } = {}) {
     if (typeof idempotencyKey !== 'string' || idempotencyKey.length === 0) {
       throw new BillingError('A payout lookup needs the payout key.');
     }
     const destination = requireId(providerAccountId, 'coach account');
     if (!config.companyId) throw new BillingError('Payments are not fully set up yet.');
+    const createdMs = createdAt ? new Date(createdAt).getTime() : NaN;
+    let sawEntry = false;
+    let sawKeyProof = false;
+    let sawLookalike = false;
     let cursor = null;
     for (let page = 0; page < LOOKUP_MAX_PAGES; page += 1) {
       const query = new URLSearchParams({ origin_id: config.companyId, destination_id: destination });
@@ -771,9 +791,19 @@ export function createWhopClient(config, options = {}) {
         const record = asRecord(item);
         const echoedKey = nonEmptyString(record?.idempotence_key);
         const ourId = nonEmptyString(asRecord(record?.metadata)?.payoutId);
+        sawEntry = true;
         if (!echoedKey && !ourId) {
-          throw new BillingError('The payment provider did not say which payout a transfer belongs to.');
+          // No key on this entry. Skip it, but remember if it could be ours:
+          // then "not found" can no longer be trusted.
+          const when = new Date(record?.created_at).getTime();
+          if (record?.notes === 'Cut coach payout'
+            || !Number.isFinite(createdMs) || !Number.isFinite(when)
+            || Math.abs(when - createdMs) <= LOOKALIKE_WINDOW_MS) {
+            sawLookalike = true;
+          }
+          continue;
         }
+        sawKeyProof = true;
         if (echoedKey === idempotencyKey || ourId === idempotencyKey) {
           return {
             found: true,
@@ -783,7 +813,13 @@ export function createWhopClient(config, options = {}) {
         }
       }
       const info = asRecord(answer.page_info);
-      if (!info?.has_next_page) return { found: false };
+      if (!info?.has_next_page) {
+        if (sawEntry && !sawKeyProof) {
+          throw new BillingError('We cannot yet tell whether the payment provider lists our payout keys.');
+        }
+        if (sawLookalike) throw new BillingError('A transfer without our reference was found near this payout\'s time, so we cannot be sure.', { possibleMatch: true });
+        return { found: false };
+      }
       cursor = nonEmptyString(info.end_cursor);
       if (!cursor) throw new BillingError('The payment provider gave an answer we could not read.');
     }

@@ -63,6 +63,13 @@ only move to live keys after every sandbox check passes.
 - [ ] Replay the same webhook from Whop's dashboard: the earnings ledger must
   still show that payment exactly once.
 - [ ] Refund a payment in the sandbox: a negative line appears.
+- [ ] Check Whop's transfer list in the sandbox: that it pages (next-page
+  cursor works), that the idempotency key / our payout id metadata is echoed
+  back on each transfer, and whether transfer amounts are gross (before Whop's
+  fees) or net. Cut's "did the payout go through?" check depends on all three.
+  Until the key echo is confirmed, a lookup that sees transfers without keys
+  stays safe-held (it answers "cannot tell", never "not sent"), so no payout is
+  freed or repeated on that basis.
 - [ ] Press **Pay coaches now** on `/admin/coaches` and see the payout appear
   with Whop's reference (or Whop's payout status, under Method A).
 - [ ] The student cancels in one tap and keeps access to the end of the period.

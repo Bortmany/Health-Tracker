@@ -347,9 +347,75 @@ test('finding a transfer by key: found, not found, and "could not tell" are thre
     () => createWhopClient(config(), { fetch: fakeFetch({ status: 500, body: {} }) }).findTransferByKey({ idempotencyKey: 'mine', providerAccountId: 'biz_coach1' }),
     BillingError
   );
-  const f3 = fakeFetch({ body: { data: [{ id: 'xfer_x', status: 'succeeded' }], page_info: { has_next_page: false } } });
+  // A transfer with no key at all (hand-sent or older) is skipped, not an error.
+  const keyless = { id: 'xfer_x', status: 'succeeded' };
+  const f3 = fakeFetch(
+    { body: { data: [keyless], page_info: { has_next_page: true, end_cursor: 'c1' } } },
+    { body: { data: [keyless, entry('xfer_m', 'mine')], page_info: { has_next_page: false } } }
+  );
+  assert.deepEqual(
+    await createWhopClient(config(), { fetch: f3 }).findTransferByKey({ idempotencyKey: 'mine', providerAccountId: 'biz_coach1' }),
+    { found: true, providerReference: 'xfer_m', status: 'paid' }
+  );
+  // Fully read, only keyless entries: the list never proved it echoes keys, so
+  // this is "cannot tell" (money stays held), NOT "not found".
+  const f4 = fakeFetch({ body: { data: [keyless], page_info: { has_next_page: false } } });
   await assert.rejects(
-    () => createWhopClient(config(), { fetch: f3 }).findTransferByKey({ idempotencyKey: 'mine', providerAccountId: 'biz_coach1' }),
+    () => createWhopClient(config(), { fetch: f4 }).findTransferByKey({ idempotencyKey: 'mine', providerAccountId: 'biz_coach1' }),
+    BillingError
+  );
+  // Mixed list: another entry carried a key (proof keys are echoed). A keyless
+  // entry whose time we cannot read could be ours: cannot tell.
+  const f4b = fakeFetch({ body: { data: [keyless, entry('xfer_a', 'other')], page_info: { has_next_page: false } } });
+  await assert.rejects(
+    () => createWhopClient(config(), { fetch: f4b }).findTransferByKey({ idempotencyKey: 'mine', providerAccountId: 'biz_coach1' }),
+    (err) => err instanceof BillingError && err.possibleMatch === true
+  );
+  // A keyless entry that looks like ours by note: cannot tell.
+  const byNote = { id: 'xfer_n', status: 'succeeded', notes: 'Cut coach payout' };
+  const f4c = fakeFetch({ body: { data: [byNote, entry('xfer_a', 'other')], page_info: { has_next_page: false } } });
+  await assert.rejects(
+    () => createWhopClient(config(), { fetch: f4c }).findTransferByKey({ idempotencyKey: 'mine', providerAccountId: 'biz_coach1' }),
+    BillingError
+  );
+  // A keyless entry within 24 hours of the payout counts, even with a different amount and note.
+  const near = { id: 'xfer_m2', status: 'succeeded', amount: 99.99, notes: 'something else', created_at: '2026-10-01T10:00:00Z' };
+  const f4d = fakeFetch({ body: { data: [near, entry('xfer_a', 'other')], page_info: { has_next_page: false } } });
+  await assert.rejects(
+    () => createWhopClient(config(), { fetch: f4d }).findTransferByKey({
+      idempotencyKey: 'mine', providerAccountId: 'biz_coach1', amountCents: 1250, createdAt: '2026-10-01T09:00:00Z',
+    }),
+    (err) => err instanceof BillingError && err.possibleMatch === true
+  );
+  // A keyless entry more than 24 hours away is ignored.
+  const f4e = fakeFetch({ body: { data: [near, entry('xfer_a', 'other')], page_info: { has_next_page: false } } });
+  assert.deepEqual(
+    await createWhopClient(config(), { fetch: f4e }).findTransferByKey({
+      idempotencyKey: 'mine', providerAccountId: 'biz_coach1', amountCents: 1250, createdAt: '2026-08-01T09:00:00Z',
+    }),
+    { found: false }
+  );
+  // A near keyless entry on a LATER page is still seen (every page is read).
+  const f4g = fakeFetch(
+    { body: { data: [entry('xfer_a', 'other')], page_info: { has_next_page: true, end_cursor: 'c1' } } },
+    { body: { data: [near], page_info: { has_next_page: false } } }
+  );
+  await assert.rejects(
+    () => createWhopClient(config(), { fetch: f4g }).findTransferByKey({
+      idempotencyKey: 'mine', providerAccountId: 'biz_coach1', createdAt: '2026-10-01T09:00:00Z',
+    }),
+    (err) => err.possibleMatch === true
+  );
+  // An empty, fully read list is a trusted "not found".
+  const f4f = fakeFetch({ body: { data: [], page_info: { has_next_page: false } } });
+  assert.deepEqual(
+    await createWhopClient(config(), { fetch: f4f }).findTransferByKey({ idempotencyKey: 'mine', providerAccountId: 'biz_coach1' }),
+    { found: false }
+  );
+  // Not found AND the list was cut off (no cursor to continue): NOT "not found".
+  const f5 = fakeFetch({ body: { data: [keyless], page_info: { has_next_page: true } } });
+  await assert.rejects(
+    () => createWhopClient(config(), { fetch: f5 }).findTransferByKey({ idempotencyKey: 'mine', providerAccountId: 'biz_coach1' }),
     BillingError
   );
 });

@@ -13,7 +13,7 @@ export async function loadOwnerAttention() {
   const items = [];
 
   const { rows: payouts } = await pool.query(
-    `SELECT p.id, p.amount_cents, p.status, p.attention, u.display_name
+    `SELECT p.id, p.amount_cents, p.status, p.attention, p.resolution_note, u.display_name
      FROM payouts p JOIN users u ON u.id = p.coach_id
      WHERE p.status = 'manual_review' OR (p.status = 'pending' AND p.attention IS NOT NULL)
         OR (p.status = 'failed' AND p.attention = 'paid_after_marked_failed')
@@ -23,9 +23,12 @@ export async function loadOwnerAttention() {
     const who = p.display_name || 'A coach';
     let message;
     if (p.status === 'failed') {
-      message = `A payout you marked as not sent was actually sent by the payment company; the coach may be paid twice. Check now. (${who}, ${dollars(p.amount_cents)})`;
+      const how = p.resolution_note ? 'you marked as not sent' : 'Cut released itself after it could not find the transfer';
+      message = `A payout ${how} was actually sent by the payment company; the coach may be paid twice. Check now. (${who}, ${dollars(p.amount_cents)})`;
     } else if (p.status === 'manual_review') {
       message = `${who}'s payout of ${dollars(p.amount_cents)} has been waiting more than ${MANUAL_REVIEW_AFTER_DAYS} days, so Cut will not retry it by itself. Cut checks again every time you press Pay coaches now. Or check with the payment company yourself, then mark it as sent or not sent in the payout list below. The money stays on hold until then.`;
+    } else if (p.attention === 'keyless_transfer_nearby') {
+      message = `A transfer without our reference was found near the time of ${who}'s payout of ${dollars(p.amount_cents)}, so Cut cannot tell whether it is the same payout. The money stays on hold. Please check in Whop and mark it sent or not sent.`;
     } else if (p.attention === 'lookup_failed') {
       message = `Cut could not check whether ${who}'s payout of ${dollars(p.amount_cents)} went through. The money stays on hold and Cut will check again next time you press Pay coaches now.`;
     } else {
@@ -74,7 +77,20 @@ export async function loadOwnerAttention() {
     items.push({
       id: f.id,
       kind: 'non_usd_payment',
-      message: `A payment${f.coach ? ` for ${f.coach}` : ''} came in in a currency other than US dollars. Cut did not credit the coach anything for it. Please work out their share by hand.`,
+      message: `A payment${f.coach ? ` for ${f.coach}` : ''} could not be turned into a clear US dollar amount (another currency, or no usable amount). Cut did not credit the coach anything for it. Please work out their share by hand, and refund the student if needed.`,
+    });
+  }
+
+  const { rows: reversals } = await pool.query(
+    `SELECT l.id, u.display_name AS coach
+     FROM commission_ledger l LEFT JOIN users u ON u.id = l.coach_id
+     WHERE l.owner_flag = 'non_usd_reversal' ORDER BY l.created_at DESC LIMIT 50`
+  );
+  for (const r of reversals) {
+    items.push({
+      id: r.id,
+      kind: 'reversal_needs_attention',
+      message: `A refund or payment reversal${r.coach ? ` for ${r.coach}` : ''} needs a look by hand: it was in another currency, or Cut had no payment number to send the student's refund with. The coach was not credited. Please check the student has been refunded.`,
     });
   }
 

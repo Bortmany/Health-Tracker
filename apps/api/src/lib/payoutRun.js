@@ -136,6 +136,8 @@ async function lookupAndSettle(billing, payout) {
     const lookup = await billing.findTransferByKey({
       idempotencyKey: payout.idempotency_key,
       providerAccountId: payout.provider_account_id,
+      amountCents: payout.amount_cents,
+      createdAt: payout.created_at,
     });
     if (!lookup?.found) return null;
     return await applyTransferResult(payout.id, { status: lookup.status, providerReference: lookup.providerReference });
@@ -149,7 +151,7 @@ async function lookupAndSettle(billing, payout) {
 // heard back) retry with the SAME key and the SAME coach account.
 async function settleInFlight(billing) {
   const { rows } = await pool.query(
-    `SELECT id, status, amount_cents, provider_reference, provider_account_id, idempotency_key,
+    `SELECT id, status, amount_cents, created_at, provider_reference, provider_account_id, idempotency_key,
             (created_at < now() - ($1::int * interval '1 minute')) AS old_enough_to_trust_not_found,
             (created_at < now() - ($2::int * interval '1 day')) AS too_old
      FROM payouts
@@ -180,22 +182,27 @@ async function settleInFlight(billing) {
   }
 }
 
-// A payout the OWNER marked "not sent" (it has their note) is checked again,
-// read-only. If the payment company says it WAS sent, the coach may be paid
+// A payout marked "not sent" (by the OWNER, or released by Cut itself after
+// "lookup found nothing") is checked again, read-only, for 30 days. If the payment company says it WAS sent, the coach may be paid
 // twice (the money was freed when it was marked failed), so it is only flagged
 // for the owner: no money is changed here. The flag lives in `attention`, so a
-// payout already flagged is not looked at or flagged again.
+// payout already flagged is not looked at or flagged again. Each press checks
+// at most 25, the least-recently-checked first, so the number of calls to the
+// payment company stays small and every payout gets its turn.
 async function checkMarkedFailedPayouts(billing) {
   const { rows } = await pool.query(
-    `SELECT id, provider_reference, provider_account_id, idempotency_key
+    `SELECT id, amount_cents, created_at, provider_reference, provider_account_id, idempotency_key
      FROM payouts
-     WHERE status = 'failed' AND resolution_note IS NOT NULL AND attention IS NULL
+     WHERE status = 'failed' AND attention IS NULL
        AND updated_at > now() - interval '30 days'
-     ORDER BY updated_at DESC
-     LIMIT 50`
+     ORDER BY recheck_at ASC NULLS FIRST, updated_at ASC
+     LIMIT 25`
   );
   for (const payout of rows) {
     try {
+      // Mark it as looked at first, so a payout whose check keeps failing
+      // does not hog the front of the queue every time.
+      await pool.query('UPDATE payouts SET recheck_at = now() WHERE id = $1', [payout.id]);
       let status = null;
       if (payout.provider_reference) {
         status = (await billing.getPayoutStatus({ providerReference: payout.provider_reference }))?.status;
@@ -203,6 +210,8 @@ async function checkMarkedFailedPayouts(billing) {
         const lookup = await billing.findTransferByKey({
           idempotencyKey: payout.idempotency_key,
           providerAccountId: payout.provider_account_id,
+          amountCents: payout.amount_cents,
+          createdAt: payout.created_at,
         });
         if (lookup?.found) status = lookup.status;
       }
@@ -243,11 +252,18 @@ async function settleOne(billing, payout) {
   // 1. Did the original request go through? Look by the ORIGINAL key.
   let lookup;
   try {
-    lookup = await billing.findTransferByKey({ idempotencyKey: key, providerAccountId: account });
+    lookup = await billing.findTransferByKey({
+      idempotencyKey: key,
+      providerAccountId: account,
+      amountCents: payout.amount_cents,
+      createdAt: payout.created_at,
+    });
   } catch (err) {
     // "Could not look" is NOT "not found".
     logger.error('Could not look up a payout with the payment company', { payoutId: payout.id, error: err });
-    await flagPayout(payout.id, 'lookup_failed');
+    // A transfer without our reference near this payout's time may be ours:
+    // tell the owner exactly that. Money stays held either way.
+    await flagPayout(payout.id, err?.possibleMatch ? 'keyless_transfer_nearby' : 'lookup_failed');
     return;
   }
   if (lookup?.found) {

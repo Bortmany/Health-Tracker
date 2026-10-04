@@ -39,6 +39,7 @@ export function createFakeBillingClient({
   const calls = [];
   const transfers = new Map(); // idempotency key -> reference, so repeats don't pay twice
   const refunded = new Set(); // payment ids already refunded
+  const keylessTransfers = []; // planted transfers that carry no key: { providerAccountId, createdAt }
   const knownTransfers = new Map(); // key -> { providerReference, status }: what a lookup can find
 
   const failures =
@@ -99,7 +100,18 @@ export function createFakeBillingClient({
   client.findTransferByKey = async (args) => {
     record('findTransferByKey', args);
     const hit = knownTransfers.get(args?.idempotencyKey);
+    if (!hit) {
+      // Same rule as the real client: a keyless transfer to the same account
+      // within 24 hours of the payout is a possible match, so we cannot say "not found".
+      const created = new Date(args?.createdAt).getTime();
+      const near = keylessTransfers.some((t) => t.providerAccountId === args?.providerAccountId
+        && (!Number.isFinite(created) || Math.abs(t.createdAt.getTime() - created) <= 24 * 60 * 60 * 1000));
+      if (near) throw new BillingError('A transfer without our reference was found near this payout\'s time.', { possibleMatch: true });
+    }
     return hit ? { found: true, ...hit } : { found: false };
+  };
+  client.plantKeylessTransfer = (providerAccountId, createdAt) => {
+    keylessTransfers.push({ providerAccountId, createdAt: new Date(createdAt) });
   };
   client.plantTransfer = (key, status = 'paid') => {
     knownTransfers.set(key, { providerReference: `fake_transfer_${key}`, status });

@@ -429,8 +429,21 @@ async function onPaymentSucceeded(client, event, tasks) {
   const gross = positiveCents(event.amountCents);
   const ref = paymentRef;
   if (!gross || !ref) {
+    // Never silent: a HELD, zero-value row flagged for the owner (when there is
+    // any id to key it on), plus the automatic refund where one can be made.
+    // Note: a flagged payment row that has no payment id (keyed on the event id
+    // instead) cannot be matched to a payment automatically; the owner has to
+    // look into it by hand.
+    const flagRef = ref ?? event.eventId;
+    if (flagRef) {
+      await writeLedger(client, {
+        coachId: ctx.coachUserId, studentId: ctx.userId, grossCents: 0, commissionCents: 0, coachCents: 0,
+        rateBps: 0, periodStart: event.periodStart, periodEnd: event.periodEnd,
+        sourceRef: `payment:${flagRef}`, kind: 'payment', settledBy: 'cut', ownerFlag: 'non_usd_payment',
+      });
+    }
     await planRefund();
-    logger.warn('Coaching payment had no usable amount or id; no ledger row written');
+    logger.warn('Coaching payment had no usable amount or id; held for the owner');
     return;
   }
   const students = Math.max(await payingStudentCount(client, ctx.coachUserId), 1);
@@ -462,6 +475,8 @@ async function onPaymentSucceeded(client, event, tasks) {
       kind: 'refund',
       originalRef: `payment:${ref}`,
       settledBy: settledByNow(),
+      // No payment id means no automatic refund can be sent: tell the owner.
+      ownerFlag: event.providerPaymentId ? undefined : 'non_usd_reversal',
     });
     await planRefund();
   }

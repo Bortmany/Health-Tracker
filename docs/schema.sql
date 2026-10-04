@@ -795,3 +795,11 @@ ALTER TABLE payouts ADD COLUMN resolution_note TEXT
 ALTER TABLE payouts DROP CONSTRAINT payouts_attention_check;
 ALTER TABLE payouts ADD CONSTRAINT payouts_attention_check
   CHECK (attention IS NULL OR attention IN ('unconfirmed_reply', 'lookup_failed', 'paid_after_marked_failed'));
+
+-- 031: last re-check of a payout marked not sent. Same DDL as migration 031.
+ALTER TABLE payouts ADD COLUMN recheck_at TIMESTAMPTZ;
+
+-- 032: flag for a keyless transfer found near a payout. Same DDL as migration 032.
+ALTER TABLE payouts DROP CONSTRAINT payouts_attention_check;
+ALTER TABLE payouts ADD CONSTRAINT payouts_attention_check
+  CHECK (attention IS NULL OR attention IN ('unconfirmed_reply', 'lookup_failed', 'paid_after_marked_failed', 'keyless_transfer_nearby'));

@@ -6,7 +6,7 @@ Cut is a fat-loss and training tracker for people who aren't sure what to train,
 
 ## Current state (roadmap complete)
 
-All planned phases are built, tested, reviewed, and merged to `main`. 245/245 backend tests passing (older counts in this file were out of date — re-run `npm test` rather than trusting a number). Features live:
+All planned phases are built, tested, reviewed, and merged to `main`. Run `npm test` rather than trusting a test count written here. Features live:
 
 - Auth (JWT httpOnly cookie), consumer/coach roles, rate-limited login, 8+ char passwords
 - Onboarding quiz → matched against 14 seeded workout plans (progression rules + 52-week phases); everyone gets the full 52-week matched plan free; `plan_tier = 'premium'` now means "AI plan on" — an AI-written plan that re-adjusts weekly when opened 7+ days after `user_plans.last_adjusted_on` (Oct 2026, spec `Agents/docs/specs/cut/solo-ai-plan.md`, migration 023)
@@ -31,7 +31,7 @@ All planned phases are built, tested, reviewed, and merged to `main`. 245/245 ba
 
 ## Conventions (non-negotiable)
 
-- **Migrations:** numbered SQL files in `apps/api/src/db/migrations/` (next is 029). Always append the same DDL to `docs/schema.sql`.
+- **Migrations:** numbered SQL files in `apps/api/src/db/migrations/` (next is 033). Always append the same DDL to `docs/schema.sql`.
 - **Routes:** `router.use(requireAuth)` first; every query parameterized (`$1…`); user-scoped queries filter `user_id = req.userId`; `asyncHandler` wrapper; snake_case → camelCase via `toPublicX(row)` mappers; errors `{ error: { message, code } }` in plain English; literal paths registered before `/:id`.
 - **Nested writes:** transaction — BEGIN, upsert parent, DELETE children, re-INSERT, COMMIT; ROLLBACK in catch; `client.release()` in finally (see `routes/programs.js` `replaceDays`).
 - **Postgres trap:** placeholders in `COALESCE($n, …)` or typed comparisons need explicit casts (`::uuid`, `::boolean`, `::integer`) or you get runtime 42883 errors.
@@ -71,4 +71,4 @@ Possible future work: PayPal as a fallback payment provider, scheduled automatic
 | `docs/mobile.md` | Step-by-step for App Store / Play Store |
 | `railway.json` | Railway deploy config (build, migrate, start, health check) |
 | `Agents` repo, `.claude/agents/` | The generic dev crew (builder, researcher, content-curator in `development/`; verifier, code-reviewer in `quality/` — full roster in that repo's CLAUDE.md) — works on any repo by reading this file's conventions; include the Agents repo in the session |
-| `apps/api/src/db/migrations/` | 29 migrations so far; runner is `src/db/migrate.js` |
+| `apps/api/src/db/migrations/` | 31 migrations so far; runner is `src/db/migrate.js` |
