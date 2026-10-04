@@ -30,6 +30,9 @@ import {
 } from '../hooks/useCoach.js';
 import { useMyApplication } from '../hooks/useCoachApplications.js';
 import { useCoachBilling } from '../hooks/useCoachBilling.js';
+import { useAiPlanStatus } from '../hooks/usePlans.js';
+import { planTierLabel } from '../lib/aiPlan.js';
+import { plainServerMessage } from '../lib/weight.js';
 import { useCoachProfile } from '../hooks/useCoachProfile.js';
 import { useUnread } from '../hooks/useMessages.js';
 import { useSettings, useUpdateSettings } from '../hooks/useSettings.js';
@@ -63,16 +66,18 @@ function buildForm(settings) {
 
 // Free members see the upgrade card right under the Account card.
 function PlanTierLine({ planTier }) {
+  // The same live/asleep answer Train uses, so the two screens never disagree.
+  const { data: aiPlan } = useAiPlanStatus();
   if (planTier === 'premium') {
     return (
       <div className={styles.mutedLine}>
         <Link className={styles.inlineLink} to="/account/subscription">
-          Premium plan — AI plan on
+          {planTierLabel(planTier, Boolean(aiPlan?.enabled))}
         </Link>
       </div>
     );
   }
-  return <div className={styles.mutedLine}>Free plan</div>;
+  return <div className={styles.mutedLine}>{planTierLabel(planTier, false)}</div>;
 }
 
 // Light, dark, or follow the phone. Saved on this device only — it isn't
@@ -622,7 +627,7 @@ export default function More() {
         </Button>
       }
     >
-      {updateSettings.isError && <ErrorText>{updateSettings.error.message}</ErrorText>}
+      {updateSettings.isError && <ErrorText>{plainServerMessage(updateSettings.error.message)}</ErrorText>}
 
       <Card className={styles.stackCard} title="Account">
         <div className={styles.row}>

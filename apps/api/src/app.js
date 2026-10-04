@@ -129,9 +129,20 @@ function makeAuthLimiter(message) {
   });
 }
 const registerLimiter = makeAuthLimiter('Too many attempts. Please wait 15 minutes and try again.');
-// The other password/code-guessing surfaces (logout, me, invite-code redeem,
-// account deletion) share their own separate bucket.
+// The other password/code-guessing surfaces (account deletion, referral-code
+// lookup) share their own separate strict bucket.
 const authLimiter = makeAuthLimiter('Too many attempts. Please wait 15 minutes and try again.');
+// Everyday session calls (logout, invite-code redeem) are not password guesses,
+// so they get a generous budget of their own. /api/auth/me has no limiter at
+// all: every page reload calls it, and it only reads the signed-in session.
+const sessionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitDisabled,
+  message: { error: { message: 'Too many requests. Please wait a few minutes and try again.', code: 'RATE_LIMITED' } },
+});
 
 // Per-IP login throttle that only counts FAILED logins — and, crucially, lets a
 // correct-credential login through even when the bucket is full. A plain
@@ -206,7 +217,7 @@ const registerInviteFailureThrottle = makeIpFailureThrottle({
 // falling through into the shared authLimiter below as well.
 app.use('/api/auth/login', loginIpFailureThrottle);
 app.use('/api/auth/register', registerLimiter, registerInviteFailureThrottle);
-app.use('/api/auth/logout', authLimiter);
+app.use('/api/auth/logout', sessionLimiter);
 app.use('/api/auth/reset-password', resetFailureThrottle);
 
 // "Forgot password": two separate counters, so neither can be used to dodge the
@@ -236,9 +247,17 @@ const forgotEmailLimiter = rateLimit({
   message: resetTooMany,
 });
 app.use('/api/auth/forgot-password', forgotVisitorLimiter, forgotEmailLimiter);
-app.use('/api/auth/me', authLimiter);
 // Invite codes get the same guessing protection as passwords.
-app.use('/api/coach-link/redeem', authLimiter);
+// Everyday use gets the generous session budget; WRONG codes are counted
+// separately per IP (20 wrong guesses in 15 minutes, then a 429), so guessing
+// stays capped without punishing people who simply use the app.
+const redeemFailureThrottle = makeIpFailureThrottle({
+  successStatus: 200,
+  failureStatus: 404,
+  maxFailures: 20,
+  message: 'Too many invite code attempts. Please wait 15 minutes and try again.',
+});
+app.use('/api/coach-link/redeem', sessionLimiter, redeemFailureThrottle);
 // So do coach referral codes (the public "who invited me" lookup).
 app.use('/api/coaches/referral', authLimiter);
 // Deleting an account asks for your password first, so it gets the same

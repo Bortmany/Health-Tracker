@@ -140,3 +140,10 @@ test('a missing or broken last-adjusted date shows a dash', () => {
   assert.equal(nextAdjustmentLabel('2026-02-30', '2026-09-30'), '—');
   assert.equal(nextAdjustmentLabel('not a date', '2026-09-30'), '—');
 });
+
+test('planTierLabel: AI plan on only when premium and the AI is live', async () => {
+  const { planTierLabel, AI_SOON_LINE } = await import('./aiPlan.js');
+  assert.equal(planTierLabel('free', true), 'Free plan');
+  assert.equal(planTierLabel('premium', true), 'Premium plan — AI plan on');
+  assert.equal(planTierLabel('premium', false), `Premium plan — ${AI_SOON_LINE}`);
+});

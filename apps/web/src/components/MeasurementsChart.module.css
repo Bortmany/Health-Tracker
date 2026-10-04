@@ -3,13 +3,12 @@
   gap: var(--space-3);
 }
 
-/* One row of chips that scrolls sideways on a narrow phone. */
+/* The chips wrap onto a second line on a narrow phone. */
 .chips {
   display: flex;
+  flex-wrap: wrap; /* all six chips stay visible on a phone, none cut off */
   gap: var(--space-2);
-  overflow-x: auto;
   padding-bottom: var(--space-1);
-  scrollbar-width: none;
 }
 
 .chips::-webkit-scrollbar {
@@ -18,7 +17,7 @@
 
 .chips > * {
   flex-shrink: 0;
-  min-height: 36px;
+  min-height: 40px;
 }
 
 .latestRow {

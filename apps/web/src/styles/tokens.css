@@ -20,6 +20,7 @@
   --color-accent: #c8f135;         /* the Cut lime — actions, active states */
   --color-accent-strong: #d7fb55;  /* hover / pressed on accent */
   --color-on-accent: #0b0b0d;      /* text/icons on top of accent */
+  --color-link: #c8f135;           /* text links: readable on the dark theme */
 
   /* ---- Color: feedback (used sparingly — never to shame a missed target) ---- */
   --color-success: #6ee787;
@@ -95,6 +96,7 @@
   --color-accent: #9fc716;
   --color-accent-strong: #8db310;
   --color-on-accent: #14150f;
+  --color-link: #4f6a00;           /* darker lime so links read on the light theme */
   --color-chart-line: #86a812;
   --color-chart-line-2: #5e7710;
   --color-chart-raw: #c9c9c2;

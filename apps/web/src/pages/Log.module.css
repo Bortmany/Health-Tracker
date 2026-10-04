@@ -58,8 +58,25 @@
 
 .quickStrip {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-3);
+}
+
+/* On a phone the three boxes are narrow: tighter side padding and no
+   up/down arrows, so a value like 62.5 is never clipped. */
+@media (max-width: 30em) {
+  .quickStrip input {
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  .quickStrip input::-webkit-inner-spin-button,
+  .quickStrip input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
 }
 
 .yesterdayRow {
@@ -111,7 +128,7 @@
 
 .fieldGrid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
 }
 

@@ -103,7 +103,7 @@ router.post('/', asyncHandler(async (req, res) => {
   const body = req.body ?? {};
   const displayName = validate.stringLength(body.displayName, 'displayName', { max: 100 });
   const credentials = validate.stringLength(body.credentials, 'credentials', { max: 1000 });
-  const yearsCoaching = validate.nonNegativeNumber(body.yearsCoaching, 'yearsCoaching', { integer: true, max: 60 });
+  const yearsCoaching = validate.nonNegativeNumber(body.yearsCoaching, 'years of coaching', { integer: true, max: 60 });
   const approach = validate.stringLength(body.approach, 'approach', { max: 500 });
   const link = validateLink(body.link);
   if (body.agreedToTerms !== true) {

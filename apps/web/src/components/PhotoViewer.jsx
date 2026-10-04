@@ -187,17 +187,16 @@ export default function PhotoViewer({
   return createPortal(
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={`Photo from ${dateLabel}`}>
       <div className={styles.topBar}>
-        <Tooltip text="Close photo">
-          <button
-            type="button"
-            ref={closeRef}
-            className={styles.iconButton}
-            onClick={onClose}
-            aria-label="Close photo"
-          >
-            ✕
-          </button>
-        </Tooltip>
+        {/* No hover hint here: the button is focused on open, so a hint would pop up and linger. aria-label names it. */}
+        <button
+          type="button"
+          ref={closeRef}
+          className={styles.iconButton}
+          onClick={onClose}
+          aria-label="Close photo"
+        >
+          ✕
+        </button>
         <span className={styles.date}>{dateLabel}</span>
         <span className={styles.iconSpacer} aria-hidden="true" />
       </div>

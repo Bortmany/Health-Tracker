@@ -8,10 +8,10 @@ import {
   buildThreadItems,
   canSend,
   counterText,
-  isAtLimit,
+  isOverLimit,
   isLinkEnded,
+  threadGoneKind,
   latestUnreadFromOther,
-  MESSAGE_MAX,
   mergeThread,
   pruneConfirmed,
   sendErrorKind,
@@ -68,8 +68,8 @@ function Bubble({ item, onRetry }) {
   );
 }
 
-// The box at the bottom: grows from 1 to 4 lines, counts from 1,800 and stops
-// at 2,000. On a laptop Enter sends (Shift+Enter is a new line); on a phone
+// The box at the bottom: grows from 1 to 4 lines, counts from 1,800 and refuses
+// (nothing is cut silently) past 2,000. On a laptop Enter sends (Shift+Enter is a new line); on a phone
 // Enter is always a new line and the Send button sends.
 function Composer({ value, onChange, onSend, disabled = false, error = null }) {
   const boxRef = useRef(null);
@@ -107,12 +107,11 @@ function Composer({ value, onChange, onSend, disabled = false, error = null }) {
           ref={boxRef}
           className={styles.input}
           rows={1}
-          maxLength={MESSAGE_MAX}
           placeholder="Write a message"
           aria-label="Write a message"
           value={value}
           disabled={disabled}
-          onChange={(e) => onChange(e.target.value.slice(0, MESSAGE_MAX))}
+          onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
         />
         <span className={styles.sendSlot}>
@@ -122,8 +121,9 @@ function Composer({ value, onChange, onSend, disabled = false, error = null }) {
         </span>
       </div>
       {counter && (
-        <div className={isAtLimit(value.length) ? styles.counterOver : styles.counter} aria-live="polite">
+        <div className={isOverLimit(value.length) ? styles.counterOver : styles.counter} aria-live="polite">
           {counter}
+          {isOverLimit(value.length) && ' · Too long to send. Shorten it to send.'}
         </div>
       )}
       <p className={styles.hint}>Enter to send, Shift+Enter for a new line</p>
@@ -320,6 +320,7 @@ export default function MessageThread({ clientId = null, backTo, backLabel, ende
   const thread = useThread(clientId);
   const refreshUnread = useRefreshUnread();
   const [sendEnded, setSendEnded] = useState(false);
+  const goneKind = sendEnded ? (clientId ? 'notFound' : 'ended') : threadGoneKind(thread.error, { asCoach: Boolean(clientId) });
   const linkEnded = sendEnded || isLinkEnded(thread.error);
 
   // Closing the thread refreshes the dots (nav, More, Clients rows).
@@ -336,7 +337,33 @@ export default function MessageThread({ clientId = null, backTo, backLabel, ende
 
   let title = 'Messages';
   let body;
-  if (linkEnded) {
+  if (goneKind === 'noCoach') {
+    body = (
+      <EmptyState
+        action={
+          <Link className={styles.linkAsButton} to="/coaches">
+            Find a coach
+          </Link>
+        }
+      >
+        <p className={styles.emptyTitle}>You don&apos;t have a coach yet.</p>
+        <p className={styles.emptyBody}>Once you train with a coach, your messages with them show up here.</p>
+      </EmptyState>
+    );
+  } else if (goneKind === 'notFound') {
+    body = (
+      <EmptyState
+        action={
+          <Link className={styles.linkAsButton} to={backTo}>
+            {endedLabel}
+          </Link>
+        }
+      >
+        <p className={styles.emptyTitle}>We couldn&apos;t find that student.</p>
+        <p className={styles.emptyBody}>They may not be one of your students any more.</p>
+      </EmptyState>
+    );
+  } else if (linkEnded) {
     body = (
       <EmptyState
         action={

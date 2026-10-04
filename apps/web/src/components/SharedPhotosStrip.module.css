@@ -28,3 +28,18 @@
   display: grid;
   gap: var(--space-2);
 }
+
+/* Laptop: a wrapping 3-column grid instead of a sideways scroll row. */
+@media (min-width: 1024px) {
+  .strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    overflow-x: visible;
+  }
+
+  .strip .tile {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 3 / 4;
+  }
+}

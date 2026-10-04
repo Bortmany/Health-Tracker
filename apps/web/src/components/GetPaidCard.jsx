@@ -38,7 +38,10 @@ function PriceForm({ billing, onToast }) {
 
   const parsed = parsePriceInput(text, billing.minPriceCents, billing.maxPriceCents);
   const changed = parsed.error == null && parsed.cents !== billing.priceCents;
-  const fieldError = touched && parsed.error ? getPaid.priceErrors[parsed.error] : '';
+  // The line shows once the coach has typed or left the box, so a price like 5
+  // or 501 says why Save is greyed out instead of leaving them guessing.
+  const edited = text !== centsToInput(billing.priceCents);
+  const fieldError = (touched || edited) && parsed.error ? getPaid.priceErrors[parsed.error] : '';
   const serverError = setPrice.isError ? billingErrorMessage(setPrice.error, getPaid.saveError) : '';
   const rate = commissionPercent(billing.ratePercent, billing.payingStudents);
   const keepLine = parsed.error == null ? getPaid.keepLine(parsed.cents, rate) : null;
@@ -46,7 +49,8 @@ function PriceForm({ billing, onToast }) {
   function handleSubmit(e) {
     e.preventDefault();
     setTouched(true);
-    if (!changed) return;
+    // One request at a time: a second click or Enter while saving does nothing.
+    if (!changed || setPrice.isPending) return;
     setPrice.mutate(parsed.cents, { onSuccess: () => onToast(getPaid.priceSavedToast(parsed.cents)) });
   }
 

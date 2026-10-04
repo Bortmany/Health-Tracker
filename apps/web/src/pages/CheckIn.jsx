@@ -21,6 +21,8 @@ import {
   MOODS,
   NOTE_COUNTER_FROM,
   NOTE_MAX,
+  SPACES_ONLY_MESSAGE,
+  spacesOnlyAnswers,
   toCheckinBody,
 } from '../lib/checkin.js';
 import { dayOfMoment, formatShortDay } from '../lib/localDate.js';
@@ -115,6 +117,11 @@ function CheckinForm({ data, notice, onQuestionsChanged }) {
   const [start] = useState(() => initialForm(questions, existing));
   const [draft, setDraft] = useState(start);
   const [linkEnded, setLinkEnded] = useState(false);
+  const [tried, setTried] = useState(false);
+  // A second tap in the same instant lands before React shows "sending", so
+  // a ref guards against a double send.
+  const sendingRef = useRef(false);
+  const blankAnswers = spacesOnlyAnswers(draft.answers);
 
   const editing = Boolean(existing);
   const dirty = isFormDirty(start, draft);
@@ -125,8 +132,14 @@ function CheckinForm({ data, notice, onQuestionsChanged }) {
   }
 
   function submit() {
-    if (!canSend) return;
+    if (!canSend || sendingRef.current) return;
+    setTried(true);
+    if (blankAnswers.length > 0) return;
+    sendingRef.current = true;
     save.mutate(toCheckinBody(draft, questions), {
+      onSettled: () => {
+        sendingRef.current = false;
+      },
       onSuccess: () => navigate('/', { state: { toast: editing ? 'Check-in updated' : 'Sent to your coach' } }),
       onError: (error) => {
         if (error?.code === 'NO_COACH') setLinkEnded(true);
@@ -170,7 +183,7 @@ function CheckinForm({ data, notice, onQuestionsChanged }) {
           <div className={styles.questions}>
             {questions.map((question, i) => (
               <div key={`${i}-${question}`}>
-                <Field label={question}>
+                <Field label={question} error={tried && blankAnswers.includes(i) ? SPACES_ONLY_MESSAGE : ''}>
                   <TextArea
                     rows={3}
                     maxLength={ANSWER_MAX}

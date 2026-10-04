@@ -230,11 +230,13 @@ export default function Progress() {
   const toast = useToast();
 
   return (
-    <Screen title="Progress">
+    <Screen title="Progress" wide>
       <div className={styles.stack}>
-        <WeekStrip />
+        <div className={styles.cWeek}>
+          <WeekStrip />
+        </div>
 
-        <Card title="Weight — last 60 days">
+        <Card className={styles.cWeight} title="Weight — last 60 days">
           {logsLoading ? (
             <Skeleton height={160} />
           ) : weighIns.length > 0 ? (
@@ -251,13 +253,19 @@ export default function Progress() {
           )}
         </Card>
 
-        <MeasurementsCard />
+        <div className={styles.cMeasure}>
+          <MeasurementsCard />
+        </div>
 
-        <PhotoGallery onToast={toast.show} />
+        <div className={styles.cPhotos}>
+          <PhotoGallery onToast={toast.show} />
+        </div>
 
-        <ConsistencyCalendar />
+        <div className={styles.cCalendar}>
+          <ConsistencyCalendar />
+        </div>
 
-        <Card title="Muscle heat">
+        <Card className={styles.cHeat} title="Muscle heat">
           <p className={styles.heatmapTeaser}>
             See which muscles you have been hitting — and which you have been skipping.
           </p>
@@ -266,7 +274,7 @@ export default function Progress() {
           </Link>
         </Card>
 
-        <Card title="Personal records">
+        <Card className={styles.cRecords} title="Personal records">
           {recordsLoading ? (
             <Skeleton height="2.5rem" count={3} />
           ) : records.length > 0 ? (

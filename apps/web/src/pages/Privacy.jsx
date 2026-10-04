@@ -227,8 +227,8 @@ export default function Privacy() {
               plan and adjust it each week, we send Anthropic (the company
               that makes the Claude AI) your training-quiz answers, your
               workout logs, your weigh-ins, and your recovery entries (sleep,
-              steps and injuries). Nothing is sent for free members, and no
-              food data is ever sent.
+              steps and injuries). Nothing is sent for free members, and
+              nothing beyond those items is ever sent.
             </li>
             <li>
               <strong>Fonts:</strong> the app's fonts load from Google Fonts,

@@ -17,6 +17,7 @@ import {
 import EarningsCard from '../components/EarningsCard.jsx';
 import GetPaidCard from '../components/GetPaidCard.jsx';
 import { useCoachProfile, useUpdateCoachProfile } from '../hooks/useCoachProfile.js';
+import { absoluteProfileLink } from '../lib/coachLink.js';
 import { earnings as earningsCopy } from '../lib/billingCopy.js';
 import { SPECIALTIES, hasVisibleSpecialty } from '../lib/specialties.js';
 import styles from './CoachProfileEditor.module.css';
@@ -51,7 +52,7 @@ function selectText(el) {
 // The coach's shareable profile link (used by the Share card and by the
 // "Copy my profile link" button in the empty payout history).
 function profileLinkOf(profile) {
-  return profile.referralLink || `${window.location.origin}/coach/${profile.slug}?ref=${profile.referralCode}`;
+  return absoluteProfileLink(profile, window.location.origin);
 }
 
 function ProfileForm({ profile, onSaved }) {

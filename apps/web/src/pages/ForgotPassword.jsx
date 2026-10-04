@@ -117,7 +117,7 @@ export default function ForgotPassword() {
       <div className={styles.shell}>
         <Card className={styles.card}>
           <h1 className={styles.wordmark}>Cut</h1>
-          <p className={styles.subtitle}>{copy.forgotSubtitle}</p>
+          <p className={styles.subtitle}>{emailOff ? copy.forgotSubtitleOff : copy.forgotSubtitle}</p>
           {body}
           {!sent && (
             <p className={styles.switch}>

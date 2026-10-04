@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as authApi from '../api/auth.js';
 import { ApiError } from '../api/client.js';
+import { isSignedOutError, ME_REASK_MS, meRetryDelay, shouldRetryMe } from '../lib/authErrors.js';
 
 const ME_KEY = ['auth', 'me'];
 
@@ -12,11 +13,17 @@ export function useMe() {
         const { user } = await authApi.me();
         return user;
       } catch (err) {
-        if (err instanceof ApiError && err.status === 401) return null;
+        if (err instanceof ApiError && isSignedOutError(err.status)) return null;
         throw err;
       }
     },
-    retry: false,
+    // Only a 401 means signed out. A busy server (429) or a dropped
+    // connection is retried with growing waits, and the saved user is kept.
+    retry: shouldRetryMe,
+    retryDelay: meRetryDelay,
+    // No saved user and the retries ran out: keep asking quietly.
+    refetchInterval: (query) =>
+      query.state.status === 'error' && query.state.data === undefined ? ME_REASK_MS : false,
     staleTime: Infinity,
   });
 }

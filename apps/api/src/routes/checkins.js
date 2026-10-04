@@ -74,6 +74,11 @@ router.put('/current', asyncHandler(async (req, res) => {
   if (!Array.isArray(answers) || answers.some((a) => typeof a !== 'string')) {
     throw invalid('Your answers must be a list of text.');
   }
+  // Nothing typed is fine (that question is simply skipped), but an answer of
+  // only spaces is refused rather than saved as if it were an answer.
+  if (answers.some((a) => a !== '' && a.trim() === '')) {
+    throw invalid('Please type an answer or leave it empty. A blank space is not an answer.');
+  }
   const cleanAnswers = answers.map((a) => a.trim());
   if (cleanAnswers.some((a) => [...a].length > MAX_ANSWER_LENGTH)) {
     throw invalid(`Each answer must be no more than ${MAX_ANSWER_LENGTH} characters long.`);

@@ -35,7 +35,7 @@ router.post('/', asyncHandler(async (req, res) => {
     const date = validate.isoDate(entry?.date);
     return {
       date,
-      weight: validate.nonNegativeNumber(entry?.weight, `weight (entry for ${date})`, { optional: true, max: 2000 }),
+      weight: validate.bodyWeight(entry?.weight, `Weight (entry for ${date})`),
       sleep: validate.nonNegativeNumber(entry?.sleep, `sleep (entry for ${date})`, { optional: true, max: 48 }),
       steps: validate.nonNegativeNumber(entry?.steps, `steps (entry for ${date})`, { optional: true, integer: true, max: 1000000 }),
       calories: validate.nonNegativeNumber(entry?.calories, `calories (entry for ${date})`, { optional: true, integer: true, max: 100000 }),

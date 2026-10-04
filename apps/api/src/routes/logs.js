@@ -149,7 +149,7 @@ router.put('/:date', asyncHandler(async (req, res) => {
   // Every stored number is optional, but if given it must be a finite,
   // non-negative value inside a sane range. This rejects text, NaN, Infinity
   // (e.g. 1e400) and absurd values that would otherwise break the charts.
-  const cleanWeight = validate.nonNegativeNumber(weight, 'weight', { optional: true, max: 2000 });
+  const cleanWeight = validate.bodyWeight(weight);
   const cleanWaist = validate.nonNegativeNumber(waist, 'waist', { optional: true, max: 500 });
   const cleanSleep = validate.nonNegativeNumber(sleep, 'sleep', { optional: true, max: 48 });
   const cleanHrv = validate.nonNegativeNumber(hrv, 'HRV', { optional: true, max: 1000 });

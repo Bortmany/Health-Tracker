@@ -22,6 +22,7 @@ import { useMyCoach } from '../hooks/useCoach.js';
 import { useCreateHabit, useDeleteHabit } from '../hooks/useHabits.js';
 import { useLog, usePutLog } from '../hooks/useLogs.js';
 import styles from './Log.module.css';
+import { plainServerMessage, weightError, weightToPayload } from '../lib/weight.js';
 import { addDays, localToday } from '../lib/localDate.js';
 import { MEASUREMENTS, MEASUREMENT_KEYS, measurementPayload, rangeError, rangeErrors } from '../lib/measurements.js';
 
@@ -128,6 +129,7 @@ export default function Log() {
   // Out-of-range measurement boxes, checked when you tap away from one.
   const [measureErrors, setMeasureErrors] = useState({});
   const [measureFormError, setMeasureFormError] = useState(false);
+  const [weightMessage, setWeightMessage] = useState('');
 
   // Which sections are expanded. Defaults re-evaluate when the date changes:
   // a section that already has data for that day starts open.
@@ -293,8 +295,11 @@ export default function Log() {
     e.preventDefault();
     if (!form) return;
 
-    // Out-of-range measurements are pointed out here instead of sent.
+    // Out-of-range weight and measurements are pointed out here instead of sent.
+    const weightProblem = weightError(form.weight);
+    setWeightMessage(weightProblem ?? '');
     const problems = rangeErrors(form);
+    if (weightProblem) return;
     if (Object.keys(problems).length > 0) {
       setMeasureErrors(problems);
       setMeasureFormError(true);
@@ -304,7 +309,7 @@ export default function Log() {
     setMeasureFormError(false);
 
     const savingLog = putLog.mutateAsync({
-      weight: form.weight === '' ? null : Number(form.weight),
+      weight: weightToPayload(form.weight),
       ...measurementPayload(form),
       sleep: form.sleep === '' ? null : Number(form.sleep),
       hrv: form.hrv === '' ? null : Number(form.hrv),
@@ -387,7 +392,8 @@ export default function Log() {
       </div>
 
       {measureFormError && <ErrorText>Some measurements need a look before saving.</ErrorText>}
-      {putLog.isError && <ErrorText>{putLog.error.message}</ErrorText>}
+      {weightMessage && <ErrorText>{weightMessage}</ErrorText>}
+      {putLog.isError && <ErrorText>{plainServerMessage(putLog.error.message)}</ErrorText>}
 
       {isLoading || !form ? (
         <div className={styles.stack}>
@@ -400,14 +406,19 @@ export default function Log() {
           <Card>
             <div className={styles.quickStrip} ref={quickRef}>
               {QUICK_FIELDS.map(({ key, label, step, inputMode }) => (
-                <Field label={label} key={key}>
+                <Field label={label} key={key} error={key === 'weight' ? weightMessage : ''}>
                   <Input
                     type="number"
                     name={key}
                     inputMode={inputMode}
                     step={step}
                     value={form[key]}
-                    onChange={(e) => updateField(key, e.target.value)}
+                    aria-invalid={key === 'weight' && weightMessage ? 'true' : undefined}
+                    onChange={(e) => {
+                      if (key === 'weight' && weightMessage) setWeightMessage('');
+                      updateField(key, e.target.value);
+                    }}
+                    onBlur={key === 'weight' ? () => setWeightMessage(weightError(form.weight) ?? '') : undefined}
                   />
                 </Field>
               ))}

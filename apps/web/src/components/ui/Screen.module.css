@@ -4,6 +4,10 @@
   margin: 0 auto;
 }
 
+.wide {
+  max-width: 960px;
+}
+
 .header {
   display: flex;
   align-items: flex-end;

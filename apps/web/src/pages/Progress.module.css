@@ -187,10 +187,32 @@
 }
 
 .heatmapLink {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem; /* a text link still gets a 40px tap area */
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   letter-spacing: var(--tracking-label);
   color: var(--color-accent);
   text-decoration: none;
+}
+
+/* ---- Laptop layout (the page is 960px wide) ----
+   Rows: This week | Consistency, Weight | Measurements, Progress photos
+   across the full width, Muscle heat | Personal records. On a phone it stays
+   one column in the order written in the page. */
+@media (min-width: 1024px) {
+  .stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-5);
+    align-items: start;
+  }
+
+  .cWeek { order: 1; }
+  .cCalendar { order: 2; }
+  .cWeight { order: 3; }
+  .cMeasure { order: 4; }
+  .cPhotos { order: 5; grid-column: 1 / -1; }
+  .cHeat { order: 6; }
+  .cRecords { order: 7; }
 }

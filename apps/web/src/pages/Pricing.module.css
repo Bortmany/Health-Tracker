@@ -178,7 +178,10 @@
 
 .reassure a,
 .footer a {
-  color: var(--color-accent);
+  color: var(--color-link);
+  display: inline-block;
+  padding: 0.5rem 0.125rem;
+  margin: -0.5rem -0.125rem;
 }
 
 .footer {

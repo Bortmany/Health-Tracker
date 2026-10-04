@@ -214,7 +214,7 @@
   color: var(--color-danger);
   border-radius: var(--radius-sm);
   min-height: 2.75rem;
-  min-width: 2rem;
+  min-width: 2.75rem;
   cursor: pointer;
   font-size: var(--text-sm);
 }
@@ -501,4 +501,57 @@
   color: var(--color-text-muted);
   font-size: var(--text-sm);
   margin: 0;
+}
+
+/* ---- Student summary layout ----
+   Phone: one column in a fixed reading order (the order1..order10 numbers).
+   The two column wrappers vanish (display: contents) so every section is a
+   direct child of the grid and sorts by its number. */
+.detailGrid {
+  display: flex;
+  flex-direction: column;
+}
+
+.detailColumn {
+  display: contents;
+}
+
+.order1 { order: 1; }
+.order2 { order: 2; }
+.order3 { order: 3; }
+.order4 { order: 4; }
+.order5 { order: 5; }
+.order6 { order: 6; }
+.order7 { order: 7; }
+.order8 { order: 8; }
+.order9 { order: 9; }
+.order10 { order: 10; }
+
+/* Rows get a soft hover fill on a laptop (there is no hover on a phone). */
+@media (hover: hover) {
+  .clientHead:hover {
+    background: var(--color-surface-2);
+    border-radius: var(--radius-sm);
+  }
+}
+
+/* Laptop: left column has this week, check-in, weight and sessions; right
+   column has messages, shared photos, measurements and programs. Assign and
+   notes run across the bottom. */
+@media (min-width: 1024px) {
+  .detailGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: var(--space-6);
+    align-items: start;
+  }
+
+  .detailColumn {
+    display: block;
+    min-width: 0;
+  }
+
+  .fullRow {
+    grid-column: 1 / -1;
+  }
 }

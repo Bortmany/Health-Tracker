@@ -76,8 +76,12 @@
 }
 
 .switch a {
-  color: var(--color-accent);
+  color: var(--color-link);
   text-decoration: none;
+  /* grows the tap area to about 40px without moving the text */
+  display: inline-block;
+  padding: 0.5rem 0.25rem;
+  margin: -0.5rem -0.25rem;
 }
 
 /* One-line helper under the signup invite code input. */
@@ -108,6 +112,9 @@
 
 .legalNote a {
   color: var(--color-text-muted);
+  display: inline-block;
+  padding: 0.5rem 0.125rem;
+  margin: -0.5rem -0.125rem;
 }
 
 /* "Forgot password?" under the password field. */
@@ -137,8 +144,9 @@
   gap: var(--space-4);
 }
 
-.noticeStack a {
-  color: var(--color-accent);
+.noticeStack a,
+.notice a {
+  color: var(--color-link);
 }
 
 .fieldHint {

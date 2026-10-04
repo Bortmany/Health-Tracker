@@ -72,10 +72,10 @@ async function unread(who) {
   return (await res.json()).unread;
 }
 
-async function assertNotFound(res) {
+async function assertNotFound(res, code = 'NOT_FOUND') {
   assert.equal(res.status, 404);
   const body = await res.json();
-  assert.equal(body.error.code, 'NOT_FOUND');
+  assert.equal(body.error.code, code);
   assert.equal(body.messages, undefined);
   assert.equal(body.thread, undefined);
 }
@@ -193,9 +193,9 @@ test('a thread is visible only to its two people', async () => {
   await assertNotFound(await api('/coach/clients/not-a-uuid/messages', coachA));
 
   // A student with no coach gets not found on every student route.
-  await assertNotFound(await api('/messages', loner));
-  await assertNotFound(await studentSend(loner, 'Anyone there?'));
-  await assertNotFound(await api('/messages/read', loner, { method: 'POST' }));
+  await assertNotFound(await api('/messages', loner), 'NO_COACH');
+  await assertNotFound(await studentSend(loner, 'Anyone there?'), 'NO_COACH');
+  await assertNotFound(await api('/messages/read', loner, { method: 'POST' }), 'NO_COACH');
   assert.equal(await unread(loner), false);
 
   // Another student sees only their own (empty) thread with their own coach.

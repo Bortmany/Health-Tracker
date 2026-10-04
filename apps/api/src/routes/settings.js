@@ -39,8 +39,8 @@ router.put('/', asyncHandler(async (req, res) => {
   // sensible value. This rejects text, negatives, impossible dates (e.g.
   // 2026-13-45) and absurd/huge numbers with a clean 400 instead of a server
   // error or a silently-stored bad value — matching the daily-log endpoints.
-  const cleanStartWeight = validate.nonNegativeNumber(startWeight, 'start weight', { optional: true, max: 2000 });
-  const cleanTargetWeight = validate.nonNegativeNumber(targetWeight, 'target weight', { optional: true, max: 2000 });
+  const cleanStartWeight = validate.bodyWeight(startWeight, 'Start weight');
+  const cleanTargetWeight = validate.bodyWeight(targetWeight, 'Target weight');
   const cleanTargetDate = targetDate == null || targetDate === '' ? null : validate.isoDate(targetDate, 'target date');
   const cleanHeight = validate.nonNegativeNumber(height, 'height', { optional: true, max: 400 });
   const cleanAge = validate.nonNegativeNumber(age, 'age', { optional: true, integer: true, max: 150 });

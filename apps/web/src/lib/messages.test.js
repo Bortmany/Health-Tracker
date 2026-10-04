@@ -9,6 +9,7 @@ import {
   dayLabel,
   formatTime,
   isAtLimit,
+  isOverLimit,
   latestUnreadFromOther,
   mergeThread,
   pruneConfirmed,
@@ -127,4 +128,19 @@ test('sendErrorKind picks the right words for each failure', () => {
   assert.equal(sendErrorKind({ status: 400, message: 'Messages can be up to 2,000 characters.' }), 'tooLong');
   assert.equal(sendErrorKind({ status: 500 }), 'failed');
   assert.equal(sendErrorKind(new TypeError('Failed to fetch')), 'failed');
+});
+
+test('isOverLimit: only past 2,000 characters', () => {
+  assert.equal(isOverLimit(2000), false);
+  assert.equal(isOverLimit(2001), true);
+  assert.equal(canSend('a'.repeat(2001)), false);
+});
+
+test('threadGoneKind tells the three "no thread" situations apart', async () => {
+  const { threadGoneKind } = await import('./messages.js');
+  assert.equal(threadGoneKind({ status: 404, code: 'NO_COACH' }), 'noCoach');
+  assert.equal(threadGoneKind({ status: 404, code: 'NOT_FOUND' }), 'ended');
+  assert.equal(threadGoneKind({ status: 404, code: 'NO_COACH' }, { asCoach: true }), 'notFound');
+  assert.equal(threadGoneKind({ status: 500 }), null);
+  assert.equal(threadGoneKind(null), null);
 });

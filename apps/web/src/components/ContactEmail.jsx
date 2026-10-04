@@ -15,5 +15,5 @@ export default function ContactEmail() {
   }
 
   const email = data?.email || FALLBACK_EMAIL;
-  return <a href={`mailto:${email}`}>{email}</a>;
+  return <a className="textLink" href={`mailto:${email}`}>{email}</a>;
 }

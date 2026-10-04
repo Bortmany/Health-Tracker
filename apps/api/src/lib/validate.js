@@ -17,6 +17,8 @@ export class ValidationError extends Error {
   }
 }
 
+const cap = (text) => String(text).charAt(0).toUpperCase() + String(text).slice(1);
+
 // A finite, non-negative number, optionally bounded and/or whole.
 // Pass { optional: true } to allow null/undefined/'' — returns null in that case.
 export function nonNegativeNumber(value, name, { max = Number.MAX_SAFE_INTEGER, integer = false, optional = false } = {}) {
@@ -32,27 +34,45 @@ export function nonNegativeNumber(value, name, { max = Number.MAX_SAFE_INTEGER, 
     throw new ValidationError(`${name} must be a whole number`);
   }
   if (n < 0) {
-    throw new ValidationError(`${name} cannot be negative`);
+    throw new ValidationError(`${cap(name)} can't be below 0.`);
   }
   if (n > max) {
-    throw new ValidationError(`${name} must be no more than ${max}`);
+    throw new ValidationError(`${cap(name)} can't be above ${max}.`);
+  }
+  return n;
+}
+
+// A body weight in kilograms. Blank or spaces-only counts as "nothing entered"
+// (null), never 0. Anything outside a believable human range is refused with a
+// plain message, so a typo like 0 or 999 can't reach the charts.
+export const MIN_BODY_WEIGHT_KG = 20;
+export const MAX_BODY_WEIGHT_KG = 400;
+export function bodyWeight(value, name = 'Weight') {
+  if (value == null || (typeof value === 'string' && value.trim() === '')) return null;
+  const n = typeof value === 'string' ? Number(value.trim()) : value;
+  if (typeof n !== 'number' || !Number.isFinite(n)) {
+    throw new ValidationError(`${name} must be a number.`);
+  }
+  if (n < MIN_BODY_WEIGHT_KG || n > MAX_BODY_WEIGHT_KG) {
+    throw new ValidationError(`${name} should be between ${MIN_BODY_WEIGHT_KG} and ${MAX_BODY_WEIGHT_KG} kg.`);
   }
   return n;
 }
 
 // A trimmed string within a length range.
 // Pass { optional: true } to allow null/undefined/'' — returns null in that case.
-export function stringLength(value, name, { min = 1, max = 255, optional = false } = {}) {
+export function stringLength(value, name, { min = 1, max = 255, optional = false, label = null } = {}) {
   if (value == null || value === '') {
     if (optional) return null;
-    throw new ValidationError(`${name} is required`);
+    throw new ValidationError(label ? `Please enter ${label}.` : `${name} is required`);
   }
   if (typeof value !== 'string') {
     throw new ValidationError(`${name} must be text`);
   }
   const trimmed = value.trim();
   if (trimmed.length < min) {
-    throw new ValidationError(`${name} must be at least ${min} character${min === 1 ? '' : 's'} long`);
+    if (min === 1) throw new ValidationError(label ? `Please enter ${label}.` : `${name} can't be blank.`);
+    throw new ValidationError(`${name} must be at least ${min} characters long`);
   }
   if (trimmed.length > max) {
     throw new ValidationError(`${name} must be no more than ${max} characters long`);

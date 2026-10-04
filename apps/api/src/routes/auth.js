@@ -98,7 +98,7 @@ router.post('/register', asyncHandler(async (req, res) => {
 
   if (!email || !password || !displayName) {
     return res.status(400).json({
-      error: { message: 'email, password, and displayName are required', code: 'INVALID_INPUT' },
+      error: { message: 'Please enter your name, email and password.', code: 'INVALID_INPUT' },
     });
   }
   // Reject malformed addresses up front (returns it trimmed + lower-cased).
@@ -108,7 +108,7 @@ router.post('/register', asyncHandler(async (req, res) => {
       error: { message: 'Password must be at least 8 characters long', code: 'WEAK_PASSWORD' },
     });
   }
-  const cleanDisplayName = validate.stringLength(displayName, 'displayName', { max: 100 });
+  const cleanDisplayName = validate.stringLength(displayName, 'name', { max: 100, label: 'a name' });
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
 

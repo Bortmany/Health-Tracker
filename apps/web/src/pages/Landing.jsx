@@ -42,6 +42,10 @@ const FEATURES = [
     title: 'Coach mode',
     body: 'Coaches can assign and edit programs directly inside a client’s account.',
   },
+  {
+    title: 'Check-ins & messages',
+    body: 'Send your coach a quick weekly check-in and keep the conversation in one place, inside the app.',
+  },
 ];
 
 const GOALS = ['Lose fat', 'Build muscle', 'Get fitter'];

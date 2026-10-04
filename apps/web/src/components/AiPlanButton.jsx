@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, ErrorText } from './ui/index.js';
 import { useCreateAiPlan } from '../hooks/usePlans.js';
-import { aiPlanErrorView } from '../lib/aiPlan.js';
+import { AI_SOON_LINE, aiPlanErrorView } from '../lib/aiPlan.js';
 import styles from './AiPlanButton.module.css';
 
 // "Get my AI plan" for paid members. `enabled` is whether the AI is switched
@@ -56,7 +56,7 @@ export default function AiPlanButton({ enabled, lead, variant = 'secondary', onR
 
       <div aria-live="polite">
         {notEnabled && !heldNote && (
-          <p className={styles.note}>The AI plan isn&apos;t switched on yet. Your library plan keeps working.</p>
+          <p className={styles.note}>{AI_SOON_LINE}. Your library plan keeps working.</p>
         )}
         {heldNote && <p className={styles.note}>{heldNote.message}</p>}
         {failure && <ErrorText>{failure}</ErrorText>}

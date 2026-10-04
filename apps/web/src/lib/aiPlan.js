@@ -45,6 +45,17 @@ export function shouldShowNotice(plan, storage) {
   return !isNoticeDismissed(storage, latest.id);
 }
 
+// ---- The plan line on More (and the matching note on Train) ----
+export const AI_SOON_LINE = 'AI plan included - switches on soon';
+
+// What More says under the name. "AI plan on" only when the member is premium
+// AND the AI is really live; premium while the AI is still asleep says it is
+// included and coming. `aiEnabled` is false until the server says otherwise.
+export function planTierLabel(planTier, aiEnabled) {
+  if (planTier !== 'premium') return 'Free plan';
+  return aiEnabled ? 'Premium plan — AI plan on' : `Premium plan — ${AI_SOON_LINE}`;
+}
+
 // ---- Plan history dates ----
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 

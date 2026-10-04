@@ -124,6 +124,11 @@ export function isAtLimit(length) {
   return length >= MESSAGE_MAX;
 }
 
+// Past the limit: the text is kept as typed, but Send is off until it's shorter.
+export function isOverLimit(length) {
+  return length > MESSAGE_MAX;
+}
+
 // Something other than spaces, and within the limit.
 export function canSend(text) {
   return typeof text === 'string' && text.trim().length > 0 && text.length <= MESSAGE_MAX;
@@ -142,4 +147,15 @@ export function sendErrorKind(error) {
 // A thread answer of 404 means the coaching connection has ended.
 export function isLinkEnded(error) {
   return error?.status === 404;
+}
+
+// Which "no thread" screen a failed thread load should show, or null when
+// the failure is something else (a hiccup, to retry).
+// - 'noCoach': a student who has never had a coach (the server says NO_COACH).
+// - 'ended': a student whose coach connection ended.
+// - 'notFound': a coach opening a student who isn't theirs (or no longer is).
+export function threadGoneKind(error, { asCoach = false } = {}) {
+  if (!isLinkEnded(error)) return null;
+  if (asCoach) return 'notFound';
+  return error?.code === 'NO_COACH' ? 'noCoach' : 'ended';
 }

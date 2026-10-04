@@ -25,6 +25,7 @@ import {
   useToast,
   Tooltip,
 } from '../components/ui/index.js';
+import { useMe } from '../hooks/useAuth.js';
 import { useCoachBilling } from '../hooks/useCoachBilling.js';
 import { useCheckinQuestions } from '../hooks/useCheckins.js';
 import { useClientMeasurements } from '../hooks/useMeasurements.js';
@@ -556,42 +557,21 @@ function ClientDetail({ clientId, clientName, unread = false, onToast }) {
   const checkinWeek = summary.thisWeek?.weekStart ?? summary.checkinThisWeek?.weekStart ?? null;
 
   return (
-    <div className={styles.clientDetail}>
+    <div className={`${styles.clientDetail} ${styles.detailGrid}`}>
+      <div className={styles.detailColumn}>
       {summary.thisWeek && (
-        <div className={styles.detailSection}>
+        <div className={`${styles.detailSection} ${styles.order1}`}>
           <SectionTitle>This week</SectionTitle>
           <ThisWeekGrid week={summary.thisWeek} firstWeighIn={weighIns[0]?.date ?? null} />
         </div>
       )}
 
-      <div className={styles.detailSection}>
+      <div className={`${styles.detailSection} ${styles.order2}`}>
         <SectionTitle>{checkinWeek ? `Check-in · Week of ${formatShortDay(checkinWeek)}` : 'Check-in'}</SectionTitle>
         <CheckinAnswers checkin={summary.checkinThisWeek ?? null} clientId={clientId} clientName={clientName} />
       </div>
 
-      <div className={styles.detailSection}>
-        <SectionTitle>Messages</SectionTitle>
-        <span className={styles.dotAnchor}>
-          <Button variant="secondary" block onClick={() => navigate(messagesPath(clientId))}>
-            Message {firstName(clientName, 'client')}
-          </Button>
-          {unread && <UnreadDot corner />}
-        </span>
-      </div>
-
-      <SharedPhotosStrip
-        clientId={clientId}
-        firstName={firstName(clientName, 'This client')}
-        sectionClass={styles.detailSection}
-        onToast={onToast}
-      />
-
-      <div className={styles.detailSection}>
-        <SectionTitle>Measurements</SectionTitle>
-        <ClientMeasurements clientId={clientId} clientName={clientName} />
-      </div>
-
-      <div className={styles.detailSection}>
+      <div className={`${styles.detailSection} ${styles.order6}`}>
         <SectionTitle>Weight trend</SectionTitle>
         {weighIns.length > 0 ? (
           <>
@@ -608,7 +588,7 @@ function ClientDetail({ clientId, clientName, unread = false, onToast }) {
         )}
       </div>
 
-      <div className={styles.detailSection}>
+      <div className={`${styles.detailSection} ${styles.order7}`}>
         <SectionTitle>Recent sessions</SectionTitle>
         {recentSessions.length > 0 ? (
           recentSessions.map((s) => (
@@ -622,7 +602,31 @@ function ClientDetail({ clientId, clientName, unread = false, onToast }) {
         )}
       </div>
 
-      <div className={styles.detailSection}>
+      </div>
+      <div className={styles.detailColumn}>
+      <div className={`${styles.detailSection} ${styles.order3}`}>
+        <SectionTitle>Messages</SectionTitle>
+        <span className={styles.dotAnchor}>
+          <Button variant="secondary" block onClick={() => navigate(messagesPath(clientId))}>
+            Message {firstName(clientName, 'client')}
+          </Button>
+          {unread && <UnreadDot corner />}
+        </span>
+      </div>
+
+      <SharedPhotosStrip
+        clientId={clientId}
+        firstName={firstName(clientName, 'This client')}
+        sectionClass={`${styles.detailSection} ${styles.order4}`}
+        onToast={onToast}
+      />
+
+      <div className={`${styles.detailSection} ${styles.order5}`}>
+        <SectionTitle>Measurements</SectionTitle>
+        <ClientMeasurements clientId={clientId} clientName={clientName} />
+      </div>
+
+      <div className={`${styles.detailSection} ${styles.order8}`}>
         <SectionTitle>Programs</SectionTitle>
         {programs.length > 0 ? (
           programs.map((p) => (
@@ -636,12 +640,13 @@ function ClientDetail({ clientId, clientName, unread = false, onToast }) {
         )}
       </div>
 
-      <div className={styles.detailSection}>
+      </div>
+      <div className={`${styles.detailSection} ${styles.order9} ${styles.fullRow}`}>
         <SectionTitle>Assign a program</SectionTitle>
         <AssignProgramBuilder clientId={clientId} />
       </div>
 
-      <div className={styles.detailSection}>
+      <div className={`${styles.detailSection} ${styles.order10} ${styles.fullRow}`}>
         <SectionTitle>Notes (only you see these)</SectionTitle>
         <ClientNotes clientId={clientId} onSaved={onToast} />
       </div>
@@ -699,7 +704,7 @@ function RequestRow({ request, onDone }) {
       </div>
       {(notReady || notReadyFromServer) && (
         <p className={styles.clientEmail}>
-          {inboxCopy.notReadyLine} <Link to="/coach/profile#get-paid">{inboxCopy.goToGetPaid}</Link>
+          {inboxCopy.notReadyLine} <Link to="/coach/profile#get-paid" className="textLink">{inboxCopy.goToGetPaid}</Link>
         </p>
       )}
       {takenElsewhere && <ErrorText>This student now has another coach — nothing to do here.</ErrorText>}
@@ -855,7 +860,7 @@ function ClientRow({ client, expanded, onToggle, onRemove, onToast, removing = f
   );
 }
 
-export default function Clients() {
+function CoachClients() {
   const { data, isLoading, isError, refetch } = useClients();
   const requests = useCoachRequests();
   const createInvite = useCreateInvite();
@@ -903,7 +908,7 @@ export default function Clients() {
   const onTrackCount = clients.filter(isOnTrack).length;
 
   return (
-    <Screen title="Clients">
+    <Screen title="Clients" wide>
       {showSummary && (
         <div className={styles.summaryStrip}>
           <StatCard label="Clients" value={clients.length} />
@@ -1034,4 +1039,33 @@ export default function Clients() {
       <Toast message={toast.message} />
     </Screen>
   );
+}
+
+// The Clients tab is for coaches. Anyone else who types the address gets a
+// plain note and a way back, never the coach screen with an error on it.
+export default function Clients() {
+  const { data: user, isLoading } = useMe();
+  if (isLoading) {
+    return (
+      <Screen title="Clients">
+        <Skeleton height={120} />
+      </Screen>
+    );
+  }
+  if (user?.role !== 'coach') {
+    return (
+      <Screen title="Clients">
+        <EmptyState
+          action={
+            <Link className={styles.linkAsButton} to="/more">
+              Back to More
+            </Link>
+          }
+        >
+          This page is for coaches.
+        </EmptyState>
+      </Screen>
+    );
+  }
+  return <CoachClients />;
 }

@@ -1,6 +1,10 @@
 .backLink {
   color: var(--color-text-muted);
   text-decoration: none;
+  /* A text link still gets a 40px tap area. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
 }
 
 .backLink:hover {

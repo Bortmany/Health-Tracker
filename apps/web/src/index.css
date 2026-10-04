@@ -56,3 +56,24 @@ button {
     animation: none;
   }
 }
+
+/* Shared text-link look: use className="textLink" on any <a> or <Link> that
+   sits in running text. The colour is readable on dark and light themes; the
+   padding trick grows the tap area to about 40px without moving the text. */
+.textLink,
+.textLink:visited {
+  color: var(--color-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0.5rem 0.125rem;
+  margin: -0.5rem -0.125rem;
+}
+
+.textLink:hover {
+  color: var(--color-accent-strong);
+}
+
+.textLink:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

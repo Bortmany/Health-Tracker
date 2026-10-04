@@ -86,6 +86,14 @@ export function toCheckinBody(draft, questions = []) {
   };
 }
 
+// The positions of answers that hold only spaces (something was typed, but
+// nothing real). A truly empty box is fine: that question is just skipped.
+export function spacesOnlyAnswers(answers) {
+  return answers.reduce((out, a, i) => (a.length > 0 && a.trim() === '' ? [...out, i] : out), []);
+}
+
+export const SPACES_ONLY_MESSAGE = 'Type an answer, or clear this box.';
+
 // For the coach's question list: the positions of rows that are blank.
 export function blankQuestionRows(questions) {
   return questions.reduce((out, q, i) => (q.trim() === '' ? [...out, i] : out), []);

@@ -32,6 +32,7 @@ import Privacy from './pages/Privacy.jsx';
 import Progress from './pages/Progress.jsx';
 import Refunds from './pages/Refunds.jsx';
 import Register from './pages/Register.jsx';
+import ReconnectNotice from './components/ReconnectNotice.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import Subscription from './pages/Subscription.jsx';
 import Terms from './pages/Terms.jsx';
@@ -42,12 +43,13 @@ import Train from './pages/Train.jsx';
 // bottom nav as every other in-app screen). Kept outside ProtectedRoute
 // so a logged-out visit to "/" doesn't get redirected to /login.
 function RootRoute() {
-  const { data: user, isLoading } = useMe();
+  const { data: user, isLoading, isError, refetch } = useMe();
   // The home screen sits outside AppLayout, so it starts the Apple Health
   // sync too (only once per app open, and only when signed in).
   useHealthSync();
 
   if (isLoading) return null;
+  if (!user && isError) return <ReconnectNotice onRetry={() => refetch()} />;
   if (!user) return <Landing />;
 
   return (

@@ -94,3 +94,9 @@ test('rate limits are spotted by status or code', () => {
   assert.equal(isRateLimited({ status: 400 }), false);
   assert.equal(isRateLimited(null), false);
 });
+
+test("spacesOnlyAnswers: flags typed-but-blank boxes, not empty ones", async () => {
+  const { spacesOnlyAnswers } = await import("./checkin.js");
+  assert.deepEqual(spacesOnlyAnswers(["", "   ", "ok", " \n "]), [1, 3]);
+  assert.deepEqual(spacesOnlyAnswers(["", "a"]), []);
+});
