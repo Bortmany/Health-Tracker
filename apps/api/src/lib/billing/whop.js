@@ -795,7 +795,10 @@ export function createWhopClient(config, options = {}) {
         if (!echoedKey && !ourId) {
           // No key on this entry. Skip it, but remember if it could be ours:
           // then "not found" can no longer be trusted.
-          const when = new Date(record?.created_at).getTime();
+          // toIso reads ISO text, unix seconds and unix milliseconds; anything
+          // it cannot read is UNREADABLE, which counts as a possible match.
+          const whenIso = toIso(record?.created_at);
+          const when = whenIso ? Date.parse(whenIso) : NaN;
           if (record?.notes === 'Cut coach payout'
             || !Number.isFinite(createdMs) || !Number.isFinite(when)
             || Math.abs(when - createdMs) <= LOOKALIKE_WINDOW_MS) {

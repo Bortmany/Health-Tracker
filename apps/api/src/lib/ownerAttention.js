@@ -16,15 +16,21 @@ export async function loadOwnerAttention() {
     `SELECT p.id, p.amount_cents, p.status, p.attention, p.resolution_note, u.display_name
      FROM payouts p JOIN users u ON u.id = p.coach_id
      WHERE p.status = 'manual_review' OR (p.status = 'pending' AND p.attention IS NOT NULL)
-        OR (p.status = 'failed' AND p.attention = 'paid_after_marked_failed')
+        OR (p.status = 'failed' AND p.attention IN ('paid_after_marked_failed', 'keyless_transfer_nearby'))
      ORDER BY p.created_at`
   );
   for (const p of payouts) {
     const who = p.display_name || 'A coach';
     let message;
-    if (p.status === 'failed') {
+    if (p.status === 'failed' && p.attention === 'keyless_transfer_nearby') {
+      message = `A transfer without our reference was found near the time of ${who}'s payout of ${dollars(p.amount_cents)}, which was marked as not sent, so it may really have been sent and the coach may be paid twice. Please check in Whop.`;
+    } else if (p.status === 'failed') {
       const how = p.resolution_note ? 'you marked as not sent' : 'Cut released itself after it could not find the transfer';
       message = `A payout ${how} was actually sent by the payment company; the coach may be paid twice. Check now. (${who}, ${dollars(p.amount_cents)})`;
+    } else if (p.status === 'manual_review' && p.attention === 'keyless_transfer_nearby') {
+      message = `A transfer without our reference was found near the time of ${who}'s payout of ${dollars(p.amount_cents)}, so Cut cannot tell whether it is the same payout. The money stays on hold. Please check in Whop and mark it sent or not sent.`;
+    } else if (p.status === 'manual_review' && p.attention === 'processing_too_long') {
+      message = `${who}'s payout of ${dollars(p.amount_cents)} has been "processing" at the payment company for more than ${MANUAL_REVIEW_AFTER_DAYS} days. Cut keeps checking each time you press Pay coaches now. Please look at it in Whop and mark it sent or not sent. The money stays on hold until then.`;
     } else if (p.status === 'manual_review') {
       message = `${who}'s payout of ${dollars(p.amount_cents)} has been waiting more than ${MANUAL_REVIEW_AFTER_DAYS} days, so Cut will not retry it by itself. Cut checks again every time you press Pay coaches now. Or check with the payment company yourself, then mark it as sent or not sent in the payout list below. The money stays on hold until then.`;
     } else if (p.attention === 'keyless_transfer_nearby') {

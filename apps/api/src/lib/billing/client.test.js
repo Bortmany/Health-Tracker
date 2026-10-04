@@ -395,6 +395,22 @@ test('finding a transfer by key: found, not found, and "could not tell" are thre
     }),
     { found: false }
   );
+  // The time is read like the rest of the file: unix seconds and milliseconds
+  // both work, and a missing or unreadable time is "could be ours", not 1970.
+  const nearMs = Date.parse('2026-10-01T10:00:00Z');
+  const asEntry = (created_at) => ({ id: 'xfer_t', status: 'succeeded', created_at });
+  const lookWith = (created_at, createdAt = '2026-10-01T09:00:00Z') => createWhopClient(config(), {
+    fetch: fakeFetch({ body: { data: [asEntry(created_at), entry('xfer_a', 'other')], page_info: { has_next_page: false } } }),
+  }).findTransferByKey({ idempotencyKey: 'mine', providerAccountId: 'biz_coach1', createdAt });
+  const possible = (err) => err instanceof BillingError && err.possibleMatch === true;
+  await assert.rejects(() => lookWith(null), possible);
+  await assert.rejects(() => lookWith(undefined), possible);
+  await assert.rejects(() => lookWith('not a date'), possible);
+  await assert.rejects(() => lookWith(Math.floor(nearMs / 1000)), possible); // seconds, near
+  await assert.rejects(() => lookWith(nearMs), possible); // milliseconds, near
+  // Seconds, far away (more than 24 hours), with a keyed entry present: ignored.
+  assert.deepEqual(await lookWith(Math.floor(Date.parse('2026-08-01T09:00:00Z') / 1000)), { found: false });
+  assert.deepEqual(await lookWith(Date.parse('2026-08-01T09:00:00Z')), { found: false });
   // A near keyless entry on a LATER page is still seen (every page is read).
   const f4g = fakeFetch(
     { body: { data: [entry('xfer_a', 'other')], page_info: { has_next_page: true, end_cursor: 'c1' } } },

@@ -101,11 +101,19 @@ export function createFakeBillingClient({
     record('findTransferByKey', args);
     const hit = knownTransfers.get(args?.idempotencyKey);
     if (!hit) {
-      // Same rule as the real client: a keyless transfer to the same account
-      // within 24 hours of the payout is a possible match, so we cannot say "not found".
+      // Same rule as the real client. The list for this account is its keyless
+      // transfers plus every keyed transfer. "Not found" is only answered when
+      // the list is empty or at least one entry carries a key (proof that keys
+      // are echoed). Only keyless entries (even old ones) = cannot tell.
+      const mine = keylessTransfers.filter((t) => t.providerAccountId === args?.providerAccountId);
+      const sawKeyProof = knownTransfers.size > 0;
+      if (mine.length > 0 && !sawKeyProof) {
+        throw new BillingError('We cannot yet tell whether the payment provider lists our payout keys.');
+      }
+      // A keyless transfer within 24 hours of the payout is a possible match.
       const created = new Date(args?.createdAt).getTime();
-      const near = keylessTransfers.some((t) => t.providerAccountId === args?.providerAccountId
-        && (!Number.isFinite(created) || Math.abs(t.createdAt.getTime() - created) <= 24 * 60 * 60 * 1000));
+      const near = mine.some((t) => !Number.isFinite(created)
+        || Math.abs(t.createdAt.getTime() - created) <= 24 * 60 * 60 * 1000);
       if (near) throw new BillingError('A transfer without our reference was found near this payout\'s time.', { possibleMatch: true });
     }
     return hit ? { found: true, ...hit } : { found: false };

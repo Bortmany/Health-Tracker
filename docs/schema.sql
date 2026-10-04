@@ -803,3 +803,8 @@ ALTER TABLE payouts ADD COLUMN recheck_at TIMESTAMPTZ;
 ALTER TABLE payouts DROP CONSTRAINT payouts_attention_check;
 ALTER TABLE payouts ADD CONSTRAINT payouts_attention_check
   CHECK (attention IS NULL OR attention IN ('unconfirmed_reply', 'lookup_failed', 'paid_after_marked_failed', 'keyless_transfer_nearby'));
+
+-- 033: a payout stuck "processing" for days is parked with its own reason. Same DDL as migration 033.
+ALTER TABLE payouts DROP CONSTRAINT payouts_attention_check;
+ALTER TABLE payouts ADD CONSTRAINT payouts_attention_check
+  CHECK (attention IS NULL OR attention IN ('unconfirmed_reply', 'lookup_failed', 'paid_after_marked_failed', 'keyless_transfer_nearby', 'processing_too_long'));

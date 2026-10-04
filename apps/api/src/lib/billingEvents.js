@@ -416,11 +416,12 @@ async function onPaymentSucceeded(client, event, tasks) {
     // Not guessed at: a HELD, zero-value row flagged for the owner so it shows
     // on the money screen instead of only being logged.
     logger.warn('Coaching payment is not in US dollars; held for the owner', { currency: event.currency });
-    if (paymentRef) {
+    const nonUsdRef = paymentRef ?? event.eventId;
+    if (nonUsdRef) {
       await writeLedger(client, {
         coachId: ctx.coachUserId, studentId: ctx.userId, grossCents: 0, commissionCents: 0, coachCents: 0,
         rateBps: 0, periodStart: event.periodStart, periodEnd: event.periodEnd,
-        sourceRef: `payment:${paymentRef}`, kind: 'payment', settledBy: 'cut', ownerFlag: 'non_usd_payment',
+        sourceRef: `payment:${nonUsdRef}`, kind: 'payment', settledBy: 'cut', ownerFlag: 'non_usd_payment',
       });
     }
     await planRefund();

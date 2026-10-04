@@ -113,10 +113,21 @@ export async function resolveManualReviewPayout(payoutId, outcome, note) {
 }
 
 // Parks a pending payout for a person; its money stays held.
-async function parkPayout(payoutId) {
+// `attention` says why, when there is a specific reason the owner should see.
+async function parkPayout(payoutId, attention = null) {
   await pool.query(
-    `UPDATE payouts SET status = 'manual_review', attention = NULL, updated_at = now()
+    `UPDATE payouts SET status = 'manual_review', attention = $2, updated_at = now()
      WHERE id = $1 AND status = 'pending'`,
+    [payoutId, attention]
+  );
+}
+
+// A lookup found a transfer without our reference near this payout's time:
+// tell the owner (a payout still open, or parked). The money stays held.
+async function flagKeylessNearby(payoutId) {
+  await pool.query(
+    `UPDATE payouts SET attention = 'keyless_transfer_nearby', updated_at = now()
+     WHERE id = $1 AND status IN ('pending', 'manual_review')`,
     [payoutId]
   );
 }
@@ -124,8 +135,9 @@ async function parkPayout(payoutId) {
 // Read-only look at how a payout went: by its transfer reference if we have
 // one, otherwise by our own key and the original account. Moves no money. An
 // error (or no answer) is NOT an answer: it returns null and releases nothing.
-// Returns the status ('paid' | 'failed' | 'pending') or null when nothing
-// could be found out.
+// Returns the status ('paid' | 'failed' | 'pending'), 'possible_match' when a
+// transfer without our reference was found near the payout's time (the owner is
+// flagged), or null when nothing could be found out.
 async function lookupAndSettle(billing, payout) {
   try {
     if (payout.provider_reference) {
@@ -143,6 +155,10 @@ async function lookupAndSettle(billing, payout) {
     return await applyTransferResult(payout.id, { status: lookup.status, providerReference: lookup.providerReference });
   } catch (err) {
     logger.error('Could not look up a payout with the payment company', { payoutId: payout.id, error: err });
+    if (err?.possibleMatch) {
+      await flagKeylessNearby(payout.id);
+      return 'possible_match';
+    }
     return null;
   }
 }
@@ -168,10 +184,19 @@ async function settleInFlight(billing) {
       } else if (payout.too_old && !payout.provider_reference) {
         // Too old to retry by machine. But look first: if the transfer exists,
         // settle it; only if we still cannot tell is it parked for a person.
-        // (A payout with a known transfer reference is never parked: asking
-        // about a known transfer is reliable at any age.)
+        // (A payout with a known transfer reference is only parked when the
+        // payment company still says "processing" after all that time.)
         const settled = await lookupAndSettle(billing, payout);
-        if (settled !== 'paid' && settled !== 'failed') await parkPayout(payout.id);
+        if (settled !== 'paid' && settled !== 'failed') {
+          await parkPayout(payout.id, settled === 'possible_match' ? 'keyless_transfer_nearby' : null);
+        }
+      } else if (payout.too_old && payout.provider_reference) {
+        // We know the transfer and the payment company has kept saying
+        // "processing" for days. Asking is reliable, so nothing is re-sent, but
+        // a person must not be left unaware: park it with a reason.
+        const settled = await lookupAndSettle(billing, payout);
+        if (settled === 'pending') await parkPayout(payout.id, 'processing_too_long');
+        else if (settled === null) await flagPayout(payout.id, 'lookup_failed');
       } else {
         await settleOne(billing, payout);
       }
@@ -224,6 +249,14 @@ async function checkMarkedFailedPayouts(billing) {
       }
     } catch (err) {
       logger.error('Could not re-check a payout marked as not sent', { payoutId: payout.id, error: err });
+      if (err?.possibleMatch) {
+        // It may really have been sent (the money was freed): tell the owner.
+        await pool.query(
+          `UPDATE payouts SET attention = 'keyless_transfer_nearby'
+           WHERE id = $1 AND status = 'failed' AND attention IS NULL`,
+          [payout.id]
+        );
+      }
     }
   }
 }

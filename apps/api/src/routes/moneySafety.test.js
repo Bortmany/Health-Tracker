@@ -192,15 +192,86 @@ test('a keyless transfer to a DIFFERENT account is ignored: the money is release
   assert.equal(sentTo(payout.accountId), 1);
 });
 
-test('a keyless transfer more than 24 hours before the payout is ignored', async () => {
+test('a keyless transfer more than 24 hours before the payout is ignored when a keyed transfer proves keys are listed', async () => {
   const coach = await coachWithOwedMoney('ms-keyless-old');
+  const payout = await pendingPayout(coach, { ageMinutes: 60 });
+  useFake();
+  fake.plantKeylessTransfer(payout.accountId, new Date(Date.now() - 60 * 60 * 1000 - 25 * 60 * 60 * 1000));
+  fake.plantTransfer(`other-key-${kit.run}-old`, 'paid'); // a keyed entry: proof keys are echoed
+  await runPay();
+  const rows = await payoutsOf(coach.id);
+  assert.equal(rows.find((r) => r.id === payout.id).status, 'failed');
+  assert.equal(sentTo(payout.accountId), 1);
+});
+
+test('only old keyless transfers and no keyed proof: we cannot tell, so the money is held', async () => {
+  const coach = await coachWithOwedMoney('ms-keyless-onlyold');
   const payout = await pendingPayout(coach, { ageMinutes: 60 });
   useFake();
   fake.plantKeylessTransfer(payout.accountId, new Date(Date.now() - 60 * 60 * 1000 - 25 * 60 * 60 * 1000));
   await runPay();
   const rows = await payoutsOf(coach.id);
-  assert.equal(rows.find((r) => r.id === payout.id).status, 'failed');
-  assert.equal(sentTo(payout.accountId), 1);
+  assert.equal(rows.length, 1, 'no second payout');
+  assert.equal(rows[0].status, 'pending');
+  assert.equal(rows[0].attention, 'lookup_failed');
+  assert.equal(sentTo(payout.accountId), 0, 'nothing sent');
+  assert.equal((await ledgerFor(coach.id))[0].payout_id, payout.id);
+});
+
+test('a too-old payout with a keyless transfer nearby is parked with the keyless flag and a plain sentence', async () => {
+  const coach = await coachWithOwedMoney('ms-stale-keyless');
+  const payout = await pendingPayout(coach, { ageMinutes: 4 * 24 * 60 });
+  useFake();
+  fake.plantKeylessTransfer(payout.accountId, new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000));
+  await runPay();
+  await runPay();
+  const rows = await payoutsOf(coach.id);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].status, 'manual_review');
+  assert.equal(rows[0].attention, 'keyless_transfer_nearby');
+  assert.equal(sentTo(payout.accountId), 0);
+  assert.equal((await ledgerFor(coach.id))[0].payout_id, payout.id);
+  assert.match((await attention()).find((n) => n.id === payout.id).message, /without our reference/);
+});
+
+test('a payout released as not sent, re-checked and a keyless transfer is nearby, is flagged for the owner and money is untouched', async () => {
+  const coach = await coachWithOwedMoney('ms-recheck-keyless');
+  const payout = await pendingPayout(coach, { ageMinutes: 60 });
+  useFake({ failOn: { transferToCoach: unknownError() } });
+  await runPay();
+  assert.equal((await payoutsOf(coach.id)).find((r) => r.id === payout.id).status, 'failed');
+  await pool.query(`UPDATE payouts SET recheck_at = now() WHERE status = 'failed' AND id <> $1`, [payout.id]);
+  fake.plantKeylessTransfer(payout.accountId, new Date(Date.now() - 30 * 60 * 1000));
+  fake.plantTransfer(`other-key-${kit.run}-recheck`, 'paid'); // keyed proof
+  await runPay();
+  const row = (await payoutsOf(coach.id)).find((r) => r.id === payout.id);
+  assert.equal(row.status, 'failed');
+  assert.equal(row.attention, 'keyless_transfer_nearby');
+  const flags = (await attention()).filter((n) => n.id === payout.id);
+  assert.equal(flags.length, 1);
+  assert.match(flags[0].message, /may really have been sent/);
+});
+
+test('a payout with a transfer reference still "processing" after 3 days is parked with a reason, nothing re-sent', async () => {
+  const coach = await coachWithOwedMoney('ms-stale-processing');
+  const payout = await pendingPayout(coach, { ageMinutes: 4 * 24 * 60, reference: 'wdrl_slow1' });
+  useFake({ transferStatus: 'processing' });
+  await runPay();
+  await runPay();
+  const rows = await payoutsOf(coach.id);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].status, 'manual_review');
+  assert.equal(rows[0].attention, 'processing_too_long');
+  assert.equal(sentTo(payout.accountId), 0);
+  assert.equal((await ledgerFor(coach.id))[0].payout_id, payout.id);
+  assert.match((await attention()).find((n) => n.id === payout.id).message, /"processing"/);
+  // A young payout that is still processing is not parked.
+  const young = await coachWithOwedMoney('ms-young-processing');
+  const youngPayout = await pendingPayout(young, { ageMinutes: 60, reference: 'wdrl_slow2' });
+  await runPay();
+  const youngRow = (await payoutsOf(young.id)).find((r) => r.id === youngPayout.id);
+  assert.equal(youngRow.status, 'pending');
+  assert.equal(youngRow.attention, null);
 });
 
 test('a truly empty list on a payout 10+ minutes old releases the money once; replaying never pays twice', async () => {
@@ -940,6 +1011,21 @@ test('a payout Cut released itself (lookup found nothing), later found paid, is 
   fake.plantTransfer(oldPayout.id, 'paid');
   await runPay();
   assert.equal((await payoutsOf(old.id)).find((r) => r.id === oldPayout.id).attention, null);
+});
+
+test('a payment in another currency with no payment id is still flagged, keyed on the event id', async () => {
+  useFake();
+  const coach = await kit.makeCoach('ms-eur-noref', { ready: true });
+  const student = await kit.register('ms-eur-noref-stu');
+  const link = await kit.acceptedLink(coach, student);
+  const fields = paymentFields(coach, student, link, { currency: 'eur', id: undefined });
+  const eventId = `msg_${kit.run}_eur_noref`;
+  assert.equal((await kit.webhook('payment.succeeded', fields, { id: eventId })).status, 200);
+  const rows = await ledgerFor(coach.id);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].owner_flag, 'non_usd_payment');
+  assert.equal(rows[0].source_ref, `payment:${eventId}`);
+  assert.equal(rows[0].coach_cents, 0);
 });
 
 test('a coaching payment with no usable amount leaves a held, flagged row for the owner', async () => {
