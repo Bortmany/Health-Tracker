@@ -168,6 +168,9 @@ export default function Register() {
           </p>
         </Card>
       </div>
+      <div className={styles.art} aria-hidden="true">
+        <img src="/img/auth.webp" alt="" width="800" height="1200" loading="lazy" decoding="async" />
+      </div>
     </div>
   );
 }

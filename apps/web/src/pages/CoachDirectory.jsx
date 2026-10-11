@@ -92,6 +92,15 @@ export default function CoachDirectory() {
         )
       }
     >
+      <img
+        className={styles.banner}
+        src="/img/coaches.webp"
+        alt=""
+        width="1200"
+        height="400"
+        loading="lazy"
+        decoding="async"
+      />
       <div className={styles.filterRow} role="group" aria-label="Filter by specialty">
         <ChipToggle selected={specialty === null} onToggle={() => setSpecialty(null)}>
           All

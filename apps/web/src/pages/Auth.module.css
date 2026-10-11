@@ -153,3 +153,39 @@
   font-size: var(--text-xs);
   color: var(--color-text-muted);
 }
+
+/* ---- Picture panel: hidden on phones, shown beside the form from tablet width ---- */
+.art {
+  display: none;
+}
+
+@media (min-width: 48em) {
+  .screen {
+    gap: var(--space-8);
+    padding: var(--space-6) var(--space-8);
+  }
+
+  .art {
+    display: block;
+    flex: 0 1 22rem;
+    align-self: stretch;
+    max-height: 100vh;
+    overflow: hidden;
+    /* soft edges so the black picture melts into the page */
+    -webkit-mask-image: radial-gradient(ellipse at center, #000 45%, transparent 75%);
+    mask-image: radial-gradient(ellipse at center, #000 45%, transparent 75%);
+  }
+
+  .art img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+}
+
+:root[data-theme='light'] .art {
+  /* black-backed picture on a light page: multiply lets the black darken, not box, the page */
+  mix-blend-mode: multiply;
+  opacity: 0.9;
+}

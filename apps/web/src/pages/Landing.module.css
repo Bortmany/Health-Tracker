@@ -143,7 +143,7 @@
 }
 
 .primaryCta {
-  background: var(--color-accent);
+  background: var(--gradient-brand);
   color: var(--color-on-accent);
 }
 
@@ -151,6 +151,53 @@
   background: var(--color-surface);
   color: var(--color-text);
   border: var(--surface-outline);
+}
+
+/* Last words of the headline fade from lime into orange. */
+.heroAccent {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* The mannequin picture sits behind a soft lime/orange glow. */
+.heroArt {
+  position: relative;
+  align-self: center;
+  width: 100%;
+  max-width: 28rem;
+  order: -1; /* on phones the picture sits above the headline */
+}
+
+.heroGlow {
+  position: absolute;
+  inset: 5% 5%;
+  background: radial-gradient(circle at 40% 50%, color-mix(in srgb, var(--color-accent) 28%, transparent), transparent 55%),
+    radial-gradient(circle at 65% 55%, color-mix(in srgb, var(--color-accent-2) 32%, transparent), transparent 60%);
+  filter: blur(32px);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .heroGlow {
+    animation: glowPulse 6s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes glowPulse {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
+
+.heroImg {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: auto;
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 55%, transparent 82%);
+  mask-image: radial-gradient(ellipse at center, #000 55%, transparent 82%);
 }
 
 /* ---- Phone demo ---- */
@@ -273,7 +320,7 @@
 }
 
 .featureCardNew {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-2);
 }
 
 .featureTag {
@@ -282,8 +329,8 @@
   font-size: var(--text-xs);
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+  background: var(--color-accent-2);
+  color: var(--color-on-accent-2);
   border-radius: var(--radius-full);
   padding: var(--space-1) var(--space-3);
   margin-bottom: var(--space-3);
@@ -299,6 +346,17 @@
   color: var(--color-text-muted);
   font-size: var(--text-sm);
   margin: 0;
+}
+
+/* Feature picture: black-backed, so edges fade into the card. */
+.featureImg {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-md);
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
 }
 
 /* ---- Plan match quiz ---- */
@@ -472,18 +530,23 @@
 
 /* ---- Desktop layout ---- */
 @media (min-width: 56.25em) {
+  /* Laptop: words on the left, picture on the right, phone demo underneath */
   .hero {
-    flex-direction: row;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     align-items: center;
+    gap: var(--space-7);
     padding-top: var(--space-9);
   }
 
-  .heroCopy {
-    flex: 1;
+  .heroArt {
+    order: 0; /* back to normal order: words left, picture right */
+    max-width: none;
   }
 
   .phone {
-    flex: 0 0 21.25rem;
+    grid-column: 1 / -1;
+    justify-self: center;
   }
 
   .featureGrid {
@@ -493,4 +556,16 @@
   .pricingGrid {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+:root[data-theme='light'] .heroImg {
+  /* black-backed picture on a light page: multiply lets the black darken, not box, the page */
+  mix-blend-mode: multiply;
+  opacity: 0.9;
+}
+
+:root[data-theme='light'] .featureImg {
+  /* black-backed picture on a light page: multiply lets the black darken, not box, the page */
+  mix-blend-mode: multiply;
+  opacity: 0.9;
 }

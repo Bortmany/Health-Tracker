@@ -22,7 +22,12 @@
 }
 
 .valueAccent {
+  /* lime-to-orange gradient text; plain lime is the fallback colour */
   color: var(--color-accent);
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .valueWarn {
