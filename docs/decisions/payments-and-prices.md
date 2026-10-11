@@ -135,3 +135,7 @@ The owner's words: "1 yes 2 yes 3 keep paid, continue"
 1. Run a third fix round for the double-payout bug, the coach-switch problem and the smaller gaps.
 2. Disputes: when a student disputes a charge, take back the coach's share, and give it back if Cut wins the dispute.
 3. Email invites stay paid, like coach requests. Only the old invite-code students stay free.
+
+## 9. Step 7 decision (11 Oct 2026)
+
+The owner compared the two versions on their phone and said: "keep new, ship it". Merging waits only on the owner confirming the Railway database backup. Step 8 (deleting the old food data) is not part of this ship. It needs a separate "delete it".
