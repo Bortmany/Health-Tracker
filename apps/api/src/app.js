@@ -7,15 +7,20 @@ import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { pool } from './db/pool.js';
+import { healthSummary } from './lib/billing/index.js';
 import { verifyToken } from './lib/jwt.js';
 import { logger } from './lib/logger.js';
-import { captureException, initSentry } from './lib/sentry.js';
+import { initSentry } from './lib/sentry.js';
+import { storageMode } from './lib/photoStorage.js';
+import { isAiPlanGenerationEnabled } from './lib/aiPlanGenerator.js';
 import { getSignupMode } from './lib/signupMode.js';
 import accountRouter from './routes/account.js';
 import adminRouter from './routes/admin.js';
 import activitiesRouter from './routes/activities.js';
 import authRouter from './routes/auth.js';
 import billingRouter from './routes/billing.js';
+import checkinsRouter from './routes/checkins.js';
+import coachBillingRouter from './routes/coachBilling.js';
 import coachRouter from './routes/coach.js';
 import coachLinkRouter from './routes/coachLink.js';
 import coachesRouter from './routes/coaches.js';
@@ -27,8 +32,10 @@ import healthSyncRouter from './routes/healthSync.js';
 import injuriesRouter from './routes/injuries.js';
 import legalRouter from './routes/legal.js';
 import logsRouter from './routes/logs.js';
+import measurementsRouter from './routes/measurements.js';
+import messagesRouter from './routes/messages.js';
 import muscleHeatmapRouter from './routes/muscleHeatmap.js';
-import nutritionRouter from './routes/nutrition.js';
+import photosRouter from './routes/photos.js';
 import plansRouter from './routes/plans.js';
 import programsRouter from './routes/programs.js';
 import settingsRouter from './routes/settings.js';
@@ -58,8 +65,8 @@ if (trustedProxy) {
 // Content-Security-Policy: tells the browser exactly which sources it may load
 // from, which blocks most injected-script attacks. These values are scoped to
 // what the Cut frontend actually uses: its own scripts/styles (same origin),
-// Google Fonts, and same-origin API calls. Paddle checkout is a full-page
-// redirect (no embedded script), so it needs nothing extra here.
+// Google Fonts, and same-origin API calls. Checkout is a full-page redirect to
+// the payment company (no embedded script), so it needs nothing extra here.
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -80,9 +87,13 @@ app.use(helmet({
   },
 }));
 app.use(compression());
-// Paddle's webhook signature is checked against the raw request bytes, so
-// that one path must skip JSON parsing. It's registered before express.json.
-app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
+// The payment company's webhook signature is checked against the raw request
+// bytes, so that one path must skip JSON parsing (whatever content type the
+// sender uses). It's registered before express.json.
+app.use('/api/billing/webhook', express.raw({ type: () => true, limit: '1mb' }));
+// Photo uploads (POST /api/photos) send the image itself as the body. This
+// JSON parser only reads JSON bodies, so the image passes by untouched and the
+// photos route reads it itself, capped at 8 MB (routes/photos.js).
 // Cap the request body so a huge (or malicious) payload can't tie up memory.
 // 1 MB is far more than any real form here sends; going over it makes the JSON
 // parser throw, which the error handler below turns into a clean 413.
@@ -118,9 +129,20 @@ function makeAuthLimiter(message) {
   });
 }
 const registerLimiter = makeAuthLimiter('Too many attempts. Please wait 15 minutes and try again.');
-// The other password/code-guessing surfaces (logout, me, invite-code redeem,
-// account deletion) share their own separate bucket.
+// The other password/code-guessing surfaces (account deletion, referral-code
+// lookup) share their own separate strict bucket.
 const authLimiter = makeAuthLimiter('Too many attempts. Please wait 15 minutes and try again.');
+// Everyday session calls (logout, invite-code redeem) are not password guesses,
+// so they get a generous budget of their own. /api/auth/me has no limiter at
+// all: every page reload calls it, and it only reads the signed-in session.
+const sessionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitDisabled,
+  message: { error: { message: 'Too many requests. Please wait a few minutes and try again.', code: 'RATE_LIMITED' } },
+});
 
 // Per-IP login throttle that only counts FAILED logins — and, crucially, lets a
 // correct-credential login through even when the bucket is full. A plain
@@ -177,6 +199,12 @@ const loginIpFailureThrottle = makeIpFailureThrottle({
   maxFailures: 20,
   message: 'Too many login attempts. Please wait 15 minutes and try again.',
 });
+const resetFailureThrottle = makeIpFailureThrottle({
+  successStatus: 200,
+  failureStatus: 400,
+  maxFailures: 10,
+  message: 'Too many tries. Please wait a few minutes and try again.',
+});
 const registerInviteFailureThrottle = makeIpFailureThrottle({
   successStatus: 201,
   failureStatus: 403,
@@ -189,10 +217,72 @@ const registerInviteFailureThrottle = makeIpFailureThrottle({
 // falling through into the shared authLimiter below as well.
 app.use('/api/auth/login', loginIpFailureThrottle);
 app.use('/api/auth/register', registerLimiter, registerInviteFailureThrottle);
-app.use('/api/auth/logout', authLimiter);
-app.use('/api/auth/me', authLimiter);
+app.use('/api/auth/logout', sessionLimiter);
+app.use('/api/auth/reset-password', resetFailureThrottle);
+
+// "Forgot password": two separate counters, so neither can be used to dodge the
+// other. One is per visitor (5 per 15 minutes); the other per email address
+// typed (3 per hour). Both answer with the same wording, so nothing reveals
+// which one tripped or whether the address has an account.
+const resetTooMany = { error: { message: 'Too many tries. Please wait a few minutes and try again.', code: 'RATE_LIMITED' } };
+const forgotVisitorLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: rateLimitDisabled,
+  message: resetTooMany,
+});
+const forgotEmailLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: (req) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    return email ? `email:${email}` : `ip:${req.ip}`;
+  },
+  skip: rateLimitDisabled,
+  message: resetTooMany,
+});
+app.use('/api/auth/forgot-password', forgotVisitorLimiter, forgotEmailLimiter);
 // Invite codes get the same guessing protection as passwords.
-app.use('/api/coach-link/redeem', authLimiter);
+// Everyday use gets the generous session budget; WRONG codes are counted
+// separately per IP. Once an IP has made 20 wrong guesses in 15 minutes it is
+// locked out BEFORE the redeem route runs, so every request (right or wrong)
+// gets the same 429 and the answer never reveals whether a guess was correct.
+// Only wrong codes (404) count; a success does not clear the count, so a
+// guesser can't reset their budget by redeeming a code they own.
+const REDEEM_MAX_WRONG = 20;
+const redeemFailuresByIp = new Map();
+function redeemLockout(req, res, next) {
+  if (rateLimitDisabled()) return next();
+  const key = req.ip;
+  const now = Date.now();
+  const existing = redeemFailuresByIp.get(key);
+  if (existing && existing.resetAt <= now) redeemFailuresByIp.delete(key);
+  const entry = redeemFailuresByIp.get(key);
+  if (entry && entry.count >= REDEEM_MAX_WRONG) {
+    return res.status(429).json({
+      error: { message: 'Too many invite code attempts. Please wait 15 minutes and try again.', code: 'RATE_LIMITED' },
+    });
+  }
+  const originalJson = res.json.bind(res);
+  res.json = (body) => {
+    if (res.statusCode === 404) {
+      const current = redeemFailuresByIp.get(key);
+      const fresh = current && current.resetAt > now
+        ? current
+        : { count: 0, resetAt: now + FAILURE_WINDOW_MS };
+      fresh.count += 1;
+      redeemFailuresByIp.set(key, fresh);
+    }
+    return originalJson(body);
+  };
+  next();
+}
+app.use('/api/coach-link/redeem', sessionLimiter, redeemLockout);
 // So do coach referral codes (the public "who invited me" lookup).
 app.use('/api/coaches/referral', authLimiter);
 // Deleting an account asks for your password first, so it gets the same
@@ -253,7 +343,14 @@ const writeLimiter = rateLimit({
   skip: (req) => rateLimitDisabled() || req.method === 'GET',
   message: { error: { message: 'You are saving changes too quickly. Please slow down and try again shortly.', code: 'RATE_LIMITED' } },
 });
-for (const path of ['/api/logs', '/api/nutrition', '/api/training-logs', '/api/programs', '/api/health-sync', '/api/coach', '/api/coach-link']) {
+// /api/plans joined in Oct 2026: adopting a plan and writing an AI plan are
+// saves too. (The AI plan also has its own stricter daily cap, counted in the
+// database by the plans route.) /api/checkins joined with weekly check-ins,
+// /api/messages with coach messages, /api/photos and /api/measurements with
+// progress photos and body measurements.
+// Money routes join too (not the webhook: the signature is its protection, and
+// the payment company must never be throttled).
+for (const path of ['/api/billing/checkout', '/api/billing/ai-checkout', '/api/billing/coach-checkout', '/api/billing/subscriptions', '/api/admin', '/api/logs', '/api/training-logs', '/api/programs', '/api/plans', '/api/health-sync', '/api/coach', '/api/coach-link', '/api/checkins', '/api/messages', '/api/photos', '/api/measurements']) {
   app.use(path, writeLimiter);
 }
 
@@ -287,6 +384,62 @@ const applicationLimiter = rateLimit({
 });
 app.use('/api/coach-applications', applicationLimiter);
 
+// Anything that opens a payment page or calls the payment company: 10 per
+// person per rolling hour, on its own counter, so a stuck button or a script
+// can't hammer checkout. Only POSTs count; reading is free.
+const checkoutLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: writeLimiterKey,
+  skip: (req) => rateLimitDisabled() || req.method !== 'POST',
+  message: { error: { message: 'Too many payment attempts. Please wait a while and try again.', code: 'RATE_LIMITED' } },
+});
+for (const path of [
+  '/api/billing/checkout',
+  '/api/billing/ai-checkout',
+  '/api/billing/coach-checkout',
+  '/api/coach/billing/startup-fee',
+  '/api/coach/billing/onboarding',
+  '/api/admin/payouts/run',
+]) {
+  app.use(path, checkoutLimiter);
+}
+
+// Sending coach messages: 60 per person per rolling hour, on its own counter.
+// The student's send and the coach's send share ONE limiter (so one budget per
+// person), and only the send itself counts — reading a thread, marking it
+// read and the unread check are free.
+const messageSendLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: writeLimiterKey,
+  // Mounted on the thread's own path, so the send is exactly the POST to '/'.
+  skip: (req) => rateLimitDisabled() || req.method !== 'POST' || req.path !== '/',
+  message: { error: { message: "You're sending messages very quickly. Please wait a few minutes.", code: 'RATE_LIMITED' } },
+});
+app.use('/api/messages', messageSendLimiter);
+app.use('/api/coach/clients/:clientId/messages', messageSendLimiter);
+
+// Adding progress photos: 20 per person per rolling 24 hours, on its own
+// counter. Only the upload counts — looking, sharing and deleting are free.
+const photoUploadLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: writeLimiterKey,
+  skip: (req) => rateLimitDisabled() || req.method !== 'POST' || req.path !== '/',
+  message: { error: { message: "You've added a lot of photos today. Please try again tomorrow.", code: 'RATE_LIMITED' } },
+});
+app.use('/api/photos', photoUploadLimiter);
+
 app.get('/api/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -298,6 +451,13 @@ app.get('/api/health', async (_req, res) => {
       signups: getSignupMode(),
       // Whether ADMIN_EMAIL is set — the switch for the coach-application review screen.
       admin: process.env.ADMIN_EMAIL ? 'configured' : 'dormant',
+      // "s3" (a storage bucket) | "local" (a folder, dev only) | "dormant".
+      photos: storageMode(),
+      // The AI plan writer: "configured" once ANTHROPIC_API_KEY is set. Words only.
+      ai: isAiPlanGenerationEnabled() ? 'configured' : 'dormant',
+      // Money and email switches: words only (configured/dormant, provider and
+      // environment names, payout method) — never a key or secret.
+      ...healthSummary(),
     });
   } catch (err) {
     // Log the real reason for us; the public response stays a fixed message so
@@ -311,10 +471,12 @@ app.use('/api/account', accountRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/billing', billingRouter);
+app.use('/api/checkins', checkinsRouter);
 app.use('/api/export', exportRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/habits', habitsRouter);
 app.use('/api/activities', activitiesRouter);
+app.use('/api/coach', coachBillingRouter); // the coach's money screens; other paths fall through
 app.use('/api/coach', coachRouter);
 app.use('/api/coach-link', coachLinkRouter);
 app.use('/api/coaches', coachesRouter); // public — the coach directory and profile pages
@@ -324,8 +486,10 @@ app.use('/api/health-sync', healthSyncRouter);
 app.use('/api/injuries', injuriesRouter);
 app.use('/api/legal', legalRouter); // public — contact address for the legal pages
 app.use('/api/logs', logsRouter);
+app.use('/api/measurements', measurementsRouter);
+app.use('/api/messages', messagesRouter);
 app.use('/api/muscle-heatmap', muscleHeatmapRouter);
-app.use('/api/nutrition', nutritionRouter);
+app.use('/api/photos', photosRouter);
 app.use('/api/plans', plansRouter);
 app.use('/api/programs', programsRouter);
 app.use('/api/training-logs', trainingLogsRouter);
@@ -371,6 +535,5 @@ app.use((err, req, res, _next) => {
   // Anything else is a real server error: log it (secrets redacted) and, if
   // Sentry is switched on, report it — then return the standard shape.
   logger.error('Unhandled server error', { method: req.method, path: req.path, error: err });
-  captureException(err);
   res.status(500).json({ error: { message: 'Internal server error', code: 'INTERNAL_ERROR' } });
 });

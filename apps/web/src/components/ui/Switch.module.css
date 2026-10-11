@@ -1,0 +1,75 @@
+/* A labelled on/off switch. Only existing tokens: the off track is the
+   nested-surface grey with the border colour, the on track is the accent. */
+
+.switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.switch[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.label {
+  flex: 1;
+}
+
+.track {
+  position: relative;
+  flex-shrink: 0;
+  width: 48px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--color-text);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.on .track {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.on .knob {
+  transform: translateX(20px);
+  background: var(--color-on-accent);
+}
+
+/* Pressed: the knob squashes a little so a tap is felt before the result. */
+.switch:active:not([disabled]) .knob {
+  width: 24px;
+}
+
+.on:active:not([disabled]) .knob {
+  transform: translateX(16px);
+}

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as authApi from '../api/auth.js';
 import { ApiError } from '../api/client.js';
+import { isSignedOutError, ME_REASK_MS, meRetryDelay, shouldRetryMe } from '../lib/authErrors.js';
 
 const ME_KEY = ['auth', 'me'];
 
@@ -12,11 +13,17 @@ export function useMe() {
         const { user } = await authApi.me();
         return user;
       } catch (err) {
-        if (err instanceof ApiError && err.status === 401) return null;
+        if (err instanceof ApiError && isSignedOutError(err.status)) return null;
         throw err;
       }
     },
-    retry: false,
+    // Only a 401 means signed out. A busy server (429) or a dropped
+    // connection is retried with growing waits, and the saved user is kept.
+    retry: shouldRetryMe,
+    retryDelay: meRetryDelay,
+    // No saved user and the retries ran out: keep asking quietly.
+    refetchInterval: (query) =>
+      query.state.status === 'error' && query.state.data === undefined ? ME_REASK_MS : false,
     staleTime: Infinity,
   });
 }
@@ -49,6 +56,22 @@ export function useSignupMode() {
     },
     retry: false,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+// Asks for a reset link. No cache to refresh: nothing about the signed-in
+// state changes (the person isn't signed in).
+export function useForgotPassword() {
+  return useMutation({ mutationFn: authApi.forgotPassword });
+}
+
+// Choosing a new password signs the person out everywhere, so any cached
+// "who am I" is cleared too.
+export function useResetPassword() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: authApi.resetPassword,
+    onSuccess: () => queryClient.setQueryData(ME_KEY, null),
   });
 }
 

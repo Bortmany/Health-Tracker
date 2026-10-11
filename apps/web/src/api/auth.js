@@ -34,3 +34,14 @@ export function logout() {
 export function me() {
   return request('/auth/me');
 }
+
+// Always answers { ok: true } for any well-formed email (registered or not),
+// so nobody can use it to find out who has an account. 429 when tried too often.
+export function forgotPassword(email) {
+  return request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) });
+}
+
+// Error code LINK_INVALID when the link is expired, used or wrong.
+export function resetPassword({ token, password }) {
+  return request('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) });
+}

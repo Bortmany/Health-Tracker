@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import LineChart from '../components/LineChart.jsx';
-import { Card, EmptyState, Screen, Skeleton } from '../components/ui/index.js';
+import MeasurementsChart from '../components/MeasurementsChart.jsx';
+import PhotoGallery from '../components/PhotoGallery.jsx';
+import { Card, EmptyState, Screen, Skeleton, Toast, useToast, Tooltip } from '../components/ui/index.js';
 import { useHabitSummary, useLogsRange, useStreak } from '../hooks/useLogs.js';
-import { useNutritionRange } from '../hooks/useNutrition.js';
+import { useMyMeasurements } from '../hooks/useMeasurements.js';
 import { usePersonalRecords, useTrainingLogs } from '../hooks/useTrainingLogs.js';
 import { smoothSeries, trendCaption } from '../lib/trend.js';
 import styles from './Progress.module.css';
@@ -128,23 +130,27 @@ function ConsistencyCalendar() {
   return (
     <Card title="Consistency">
       <div className={styles.calHeader}>
-        <button
-          type="button"
-          className={styles.calNavButton}
-          onClick={() => setMonthStart((m) => shiftMonth(m, -1))}
-          aria-label="Previous month"
-        >
-          ←
-        </button>
+        <Tooltip text="Previous month">
+          <button
+            type="button"
+            className={styles.calNavButton}
+            onClick={() => setMonthStart((m) => shiftMonth(m, -1))}
+            aria-label="Previous month"
+          >
+            ←
+          </button>
+        </Tooltip>
         <span className={styles.calMonthLabel}>{monthLabel}</span>
-        <button
-          type="button"
-          className={styles.calNavButton}
-          onClick={() => setMonthStart((m) => shiftMonth(m, 1))}
-          aria-label="Next month"
-        >
-          →
-        </button>
+        <Tooltip text="Next month">
+          <button
+            type="button"
+            className={styles.calNavButton}
+            onClick={() => setMonthStart((m) => shiftMonth(m, 1))}
+            aria-label="Next month"
+          >
+            →
+          </button>
+        </Tooltip>
       </div>
 
       <div className={styles.calGrid}>
@@ -195,11 +201,25 @@ function ConsistencyCalendar() {
   );
 }
 
+// The student's own body measurements, under the weight chart.
+function MeasurementsCard() {
+  const measurements = useMyMeasurements();
+  return (
+    <Card title="Measurements">
+      <MeasurementsChart
+        measurements={measurements.data}
+        isLoading={measurements.isLoading}
+        isError={measurements.isError}
+        onRetry={() => measurements.refetch()}
+      />
+    </Card>
+  );
+}
+
 export default function Progress() {
   const today = localToday();
   const from = localDaysAgo(59);
   const { data: logs = [], isLoading: logsLoading } = useLogsRange({ from, to: today });
-  const { data: nutritionLogs = [], isLoading: nutritionLoading } = useNutritionRange({ from, to: today });
   const { data: records = [], isLoading: recordsLoading } = usePersonalRecords();
 
   const weighIns = logs
@@ -207,14 +227,19 @@ export default function Progress() {
     .map((l) => ({ date: l.date, weight: Number(l.weight) }));
   const smoothed = smoothSeries(weighIns.map((w) => w.weight));
   const caption = trendCaption(weighIns, smoothed);
-  const calorieDays = nutritionLogs.filter((l) => l.calories != null);
+  const toast = useToast();
 
   return (
-    <Screen title="Progress">
+    <Screen title="Progress" wide>
       <div className={styles.stack}>
-        <WeekStrip />
+        {/* On a laptop "This week" and "Weight" stack in the left column beside
+            the tall calendar; on a phone this wrapper disappears. */}
+        <div className={styles.cLeft}>
+        <div className={styles.cWeek}>
+          <WeekStrip />
+        </div>
 
-        <Card title="Weight — last 60 days">
+        <Card className={styles.cWeight} title="Weight — last 60 days">
           {logsLoading ? (
             <Skeleton height={160} />
           ) : weighIns.length > 0 ? (
@@ -230,26 +255,22 @@ export default function Progress() {
             <EmptyState>Nothing to chart yet — weigh-ins you log will show up here.</EmptyState>
           )}
         </Card>
+        </div>
 
-        <Card title="Calories eaten — last 60 days">
-          {nutritionLoading ? (
-            <Skeleton height={160} />
-          ) : calorieDays.length > 0 ? (
-            <LineChart
-              labels={calorieDays.map((l) => l.date.slice(5, 10))}
-              values={calorieDays.map((l) => l.calories)}
-              color="--color-chart-line-2"
-            />
-          ) : (
-            <EmptyState>
-              No food logged yet — log a few days and your calorie trend will appear here.
-            </EmptyState>
-          )}
-        </Card>
+        <div className={styles.cMeasure}>
+          <MeasurementsCard />
+        </div>
 
-        <ConsistencyCalendar />
+        <div className={styles.cPhotos}>
+          <PhotoGallery onToast={toast.show} />
+        </div>
 
-        <Card title="Muscle heat">
+        <div className={styles.cCalendar}>
+          <ConsistencyCalendar />
+        </div>
+
+        <div className={styles.cLower}>
+        <Card className={styles.cHeat} title="Muscle heat">
           <p className={styles.heatmapTeaser}>
             See which muscles you have been hitting — and which you have been skipping.
           </p>
@@ -258,7 +279,7 @@ export default function Progress() {
           </Link>
         </Card>
 
-        <Card title="Personal records">
+        <Card className={styles.cRecords} title="Personal records">
           {recordsLoading ? (
             <Skeleton height="2.5rem" count={3} />
           ) : records.length > 0 ? (
@@ -277,7 +298,9 @@ export default function Progress() {
             <EmptyState>Log some weighted sets and your best lifts will land here.</EmptyState>
           )}
         </Card>
+        </div>
       </div>
+      <Toast message={toast.message} />
     </Screen>
   );
 }

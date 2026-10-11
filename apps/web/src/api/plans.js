@@ -29,3 +29,18 @@ export function getMyPlan(today) {
 export function deleteMyPlan() {
   return request('/plans/my-plan', { method: 'DELETE' });
 }
+
+// Asks the server to write an AI plan (paid members only). `today` is this
+// device's own day, so the new plan's first week starts on it. Can take up to
+// about 30 seconds.
+export function createAiPlan(today, payload = {}) {
+  return request(`/plans/ai${today ? `?today=${today}` : ''}`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+// The signed-in member's weekly plan adjustments, newest first.
+export function getAiPlanHistory() {
+  return request('/plans/ai/history');
+}

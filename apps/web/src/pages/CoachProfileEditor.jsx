@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Button,
   Card,
@@ -14,8 +14,12 @@ import {
   Toast,
   useToast,
 } from '../components/ui/index.js';
+import EarningsCard from '../components/EarningsCard.jsx';
+import GetPaidCard from '../components/GetPaidCard.jsx';
 import { useCoachProfile, useUpdateCoachProfile } from '../hooks/useCoachProfile.js';
-import { SPECIALTIES } from '../lib/specialties.js';
+import { absoluteProfileLink } from '../lib/coachLink.js';
+import { earnings as earningsCopy } from '../lib/billingCopy.js';
+import { SPECIALTIES, hasVisibleSpecialty } from '../lib/specialties.js';
 import styles from './CoachProfileEditor.module.css';
 
 const HEADLINE_MAX = 80;
@@ -45,9 +49,16 @@ function selectText(el) {
   selection.addRange(range);
 }
 
+// The coach's shareable profile link (used by the Share card and by the
+// "Copy my profile link" button in the empty payout history).
+function profileLinkOf(profile) {
+  return absoluteProfileLink(profile, window.location.origin);
+}
+
 function ProfileForm({ profile, onSaved }) {
   const update = useUpdateCoachProfile();
   const [form, setForm] = useState(buildForm(profile));
+  const [needsSpecialty, setNeedsSpecialty] = useState(false);
 
   // Server-loaded values win over a stale draft when the profile refreshes
   // (e.g. after a save), same as the Goals form on More.
@@ -60,6 +71,7 @@ function ProfileForm({ profile, onSaved }) {
   }
 
   function toggleSpecialty(code) {
+    setNeedsSpecialty(false);
     setForm((f) => ({
       ...f,
       specialties: f.specialties.includes(code)
@@ -70,6 +82,14 @@ function ProfileForm({ profile, onSaved }) {
 
   function handleSubmit(e) {
     e.preventDefault();
+    // Only current specialties count: a coach whose sole saved code is a
+    // retired one (e.g. nutrition) shows no chips, so they must pick a real
+    // one before going public. Retired codes stay in the saved list.
+    if (form.isPublic && !hasVisibleSpecialty(form.specialties)) {
+      setNeedsSpecialty(true);
+      return;
+    }
+    setNeedsSpecialty(false);
     update.mutate(
       {
         headline: form.headline.trim(),
@@ -82,7 +102,8 @@ function ProfileForm({ profile, onSaved }) {
     );
   }
 
-  const incomplete = update.isError && update.error?.code === 'PROFILE_INCOMPLETE';
+  const incomplete = needsSpecialty || (update.isError && update.error?.code === 'PROFILE_INCOMPLETE');
+  const noSpecialtyPicked = !hasVisibleSpecialty(form.specialties);
   const otherError = update.isError && !incomplete;
   const years = profile.yearsCoaching;
 
@@ -133,7 +154,13 @@ function ProfileForm({ profile, onSaved }) {
               </ChipToggle>
             ))}
           </div>
-          <div className={styles.hint}>Pick at least one to go public.</div>
+          {form.isPublic && noSpecialtyPicked ? (
+            <div className={styles.hint} aria-live="polite">
+              No specialty picked yet — choose at least one so your profile can be public.
+            </div>
+          ) : (
+            <div className={styles.hint}>Pick at least one to go public.</div>
+          )}
         </div>
 
         <Checkbox checked={form.acceptingClients} onChange={(e) => set('acceptingClients', e.target.checked)}>
@@ -141,7 +168,13 @@ function ProfileForm({ profile, onSaved }) {
         </Checkbox>
 
         <div>
-          <Checkbox checked={form.isPublic} onChange={(e) => set('isPublic', e.target.checked)}>
+          <Checkbox
+            checked={form.isPublic}
+            onChange={(e) => {
+              setNeedsSpecialty(false);
+              set('isPublic', e.target.checked);
+            }}
+          >
             Show my profile in the public directory
           </Checkbox>
           <div className={styles.hint}>
@@ -168,8 +201,7 @@ function ShareCard({ profile, onCopied }) {
   const copiedTimerRef = useRef(null);
   useEffect(() => () => window.clearTimeout(copiedTimerRef.current), []);
 
-  const link =
-    profile.referralLink || `${window.location.origin}/coach/${profile.slug}?ref=${profile.referralCode}`;
+  const link = profileLinkOf(profile);
 
   async function copyLink() {
     try {
@@ -214,12 +246,32 @@ function ShareCard({ profile, onCopied }) {
 export default function CoachProfileEditor() {
   const { data: profile, isLoading, isError, refetch, isFetching } = useCoachProfile();
   const toast = useToast();
+  const location = useLocation();
 
-  let content;
+  // "/coach/profile#get-paid" (from More and from the Clients inbox) jumps
+  // straight to the money steps.
+  useEffect(() => {
+    if (location.hash === '#get-paid') {
+      document.getElementById('get-paid')?.scrollIntoView({ block: 'start' });
+    }
+  }, [location.hash]);
+
+  async function copyProfileLink() {
+    if (!profile) return;
+    try {
+      await navigator.clipboard.writeText(profileLinkOf(profile));
+      toast.show(earningsCopy.linkCopied);
+    } catch {
+      // No clipboard access: the Share card below still shows the link to copy by hand.
+    }
+  }
+
+  let formContent;
+  let shareContent = null;
   if (isLoading) {
-    content = <Skeleton height={300} />;
+    formContent = <Skeleton height={300} />;
   } else if (isError || !profile) {
-    content = (
+    formContent = (
       <Card>
         <ErrorText>Couldn&apos;t load your profile — please try again.</ErrorText>
         <Button variant="secondary" onClick={() => refetch()} disabled={isFetching}>
@@ -228,16 +280,13 @@ export default function CoachProfileEditor() {
       </Card>
     );
   } else {
-    content = (
-      <div className={styles.stack}>
-        <ProfileForm profile={profile} onSaved={() => toast.show('Saved')} />
-        <ShareCard profile={profile} onCopied={() => toast.show('Link copied')} />
-      </div>
-    );
+    formContent = <ProfileForm profile={profile} onSaved={() => toast.show('Saved')} />;
+    shareContent = <ShareCard profile={profile} onCopied={() => toast.show('Link copied')} />;
   }
 
   return (
     <Screen
+      width={1040}
       title="Your coach profile"
       label={
         <Link className={styles.backLink} to="/more">
@@ -245,7 +294,16 @@ export default function CoachProfileEditor() {
         </Link>
       }
     >
-      {content}
+      <div className={styles.grid}>
+        <div className={styles.stack}>
+          <GetPaidCard onToast={toast.show} />
+          {formContent}
+        </div>
+        <div className={`${styles.stack} ${styles.side}`}>
+          <EarningsCard onCopyLink={copyProfileLink} />
+          {shareContent}
+        </div>
+      </div>
       <Toast message={toast.message} />
     </Screen>
   );

@@ -100,7 +100,7 @@ export default function Register() {
           )}
           <form className={styles.form} onSubmit={handleSubmit} noValidate>
             {showInviteField && (
-              <Field label="Invite code" error={inviteError ? register.error.message : false}>
+              <Field htmlFor="inviteCode" label="Invite code" error={inviteError ? register.error.message : false}>
                 <Input
                   id="inviteCode"
                   type="text"
@@ -116,7 +116,7 @@ export default function Register() {
                 <p className={styles.hint}>Cut is invitation-only right now. Ask whoever invited you for the code.</p>
               </Field>
             )}
-            <Field label="Name">
+            <Field htmlFor="displayName" label="Name">
               <Input
                 id="displayName"
                 type="text"
@@ -127,7 +127,7 @@ export default function Register() {
                 required
               />
             </Field>
-            <Field label="Email" error={emailMessage || (register.isError && !inviteError)}>
+            <Field htmlFor="email" label="Email" error={emailMessage || (register.isError && !inviteError)}>
               <Input
                 id="email"
                 type="email"
@@ -140,7 +140,7 @@ export default function Register() {
                 required
               />
             </Field>
-            <Field label="Password" error={register.isError && !inviteError}>
+            <Field htmlFor="password" label="Password" error={register.isError && !inviteError}>
               <Input
                 id="password"
                 type="password"

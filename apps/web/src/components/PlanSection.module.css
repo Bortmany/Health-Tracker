@@ -21,6 +21,13 @@
   margin-bottom: var(--space-2);
 }
 
+/* Small, honest label under an AI-written plan's name. */
+.aiDisclosure {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-faint);
+}
+
 /* The progression note is the line people act on — keep it prominent. */
 .guidance {
   font-size: var(--text-base);
@@ -63,6 +70,15 @@
   gap: var(--space-2);
   flex-wrap: wrap;
   margin-bottom: var(--space-3);
+}
+
+/* "Get my AI plan" above the library list, for paid members with no plan. */
+.aiRow {
+  margin-bottom: var(--space-4);
+}
+
+.aiRow > div {
+  margin-top: 0;
 }
 
 .browseRow {

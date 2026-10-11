@@ -77,11 +77,16 @@ test('adopting a plan creates a program and tracks the plan', async () => {
   });
   assert.equal(res.status, 201);
   const body = await res.json();
-  assert.equal(body.durationWeeks, 4);
+  // Everyone gets the whole plan now, free accounts included.
+  assert.equal(body.durationWeeks, 52);
 
   const planRes = await fetch(`${baseUrl}/plans/my-plan`, { headers: { Cookie: cookie } });
-  const { plan } = await planRes.json();
+  const { plan, aiPlan } = await planRes.json();
   assert.equal(plan.weekNumber, 1);
+  assert.equal(plan.source, 'library');
+  assert.equal(plan.latestAdjustment, null);
+  assert.equal(plan.adjustedThisWeek, false);
+  assert.equal(aiPlan.paid, false);
   assert.equal(plan.programId, body.programId);
   assert.ok(plan.guidance.length > 0);
 
@@ -106,18 +111,30 @@ test('a malformed template id returns a clean 404, not a server error', async ()
   assert.equal(adoptRes.status, 404);
 });
 
-test('a free account cannot start the 52-week plan', async () => {
+test('a free account gets the full-length plan, whatever length it asks for', async () => {
   const res = await fetch(`${baseUrl}/plans/templates/${templateId}/adopt`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: cookie },
-    body: JSON.stringify({ durationWeeks: 52 }),
+    body: JSON.stringify({ durationWeeks: 4 }),
   });
-  assert.equal(res.status, 402);
+  assert.equal(res.status, 201);
   const body = await res.json();
-  assert.equal(body.error.code, 'PREMIUM_REQUIRED');
+  assert.equal(body.durationWeeks, 52);
+
+  const planRes = await fetch(`${baseUrl}/plans/my-plan`, { headers: { Cookie: cookie } });
+  const { plan } = await planRes.json();
+  assert.equal(plan.durationWeeks, 52);
+  assert.equal(plan.phase.name, 'Foundation');
 });
 
-test('a premium account gets the 52-week plan with phases', async () => {
+test('templates no longer carry free/premium week counts', async () => {
+  const res = await fetch(`${baseUrl}/plans/templates/${templateId}`, { headers: { Cookie: cookie } });
+  const { template } = await res.json();
+  assert.equal('freeWeeks' in template, false);
+  assert.equal('premiumWeeks' in template, false);
+});
+
+test('a premium account gets the same full plan with phases', async () => {
   const email = `plans-premium-${Date.now()}@example.com`;
   const registerRes = await fetch(`${baseUrl}/auth/register`, {
     method: 'POST',

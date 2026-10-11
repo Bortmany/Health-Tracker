@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Card, ErrorText, Field, Input } from '../components/ui/index.js';
 import { useLogin } from '../hooks/useAuth.js';
+import { auth as authCopy } from '../lib/billingCopy.js';
 import { emailError } from '../lib/validation.js';
 import styles from './Auth.module.css';
 
@@ -39,7 +40,7 @@ export default function Login() {
           <h1 className={styles.wordmark}>Cut</h1>
           <p className={styles.subtitle}>Log in to your tracker</p>
           <form className={styles.form} onSubmit={handleSubmit} noValidate>
-            <Field label="Email" error={emailMessage || login.isError}>
+            <Field htmlFor="email" label="Email" error={emailMessage || login.isError}>
               <Input
                 id="email"
                 type="email"
@@ -52,7 +53,7 @@ export default function Login() {
                 required
               />
             </Field>
-            <Field label="Password" error={login.isError}>
+            <Field htmlFor="password" label="Password" error={login.isError}>
               <Input
                 id="password"
                 type="password"
@@ -62,6 +63,11 @@ export default function Login() {
                 required
               />
             </Field>
+            <div className={styles.forgotRow}>
+              <Link className={styles.forgotLink} to="/forgot-password">
+                {authCopy.forgotLink}
+              </Link>
+            </div>
             {login.isError && <ErrorText>{login.error.message}</ErrorText>}
             <Button type="submit" block disabled={login.isPending}>
               {login.isPending ? 'Logging in...' : 'Log in'}

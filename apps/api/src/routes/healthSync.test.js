@@ -74,7 +74,7 @@ test('device data fills empty fields but never overwrites a manual entry', async
 });
 
 test('POST /health-sync rejects negative readings with a clean 400', async () => {
-  for (const bad of [{ weight: -5 }, { sleep: -2 }, { steps: -100 }, { calories: -50 }]) {
+  for (const bad of [{ sleep: -2 }, { steps: -100 }, { calories: -50 }]) {
     const res = await fetch(`${baseUrl}/health-sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Cookie: cookie },
@@ -96,6 +96,28 @@ test('POST /health-sync rejects a huge step/calorie count instead of overflowing
   assert.equal(res.status, 400);
   const body = await res.json();
   assert.equal(body.error.code, 'INVALID_INPUT');
+});
+
+test('POST /health-sync skips a 0 or out-of-range weight instead of failing the batch', async () => {
+  const entries = [
+    { date: '2026-05-01', weight: 0, steps: 1000 },
+    { date: '2026-05-02', weight: -5, steps: 2000 },
+    { date: '2026-05-03', weight: 5, steps: 3000 },
+    { date: '2026-05-04', weight: '', steps: 4000 },
+    { date: '2026-05-05', weight: 78.5, steps: 5000 },
+  ];
+  const res = await fetch(`${baseUrl}/health-sync`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ entries }),
+  });
+  assert.equal(res.status, 200);
+  for (const [i, e] of entries.entries()) {
+    const body = await (await fetch(`${baseUrl}/logs/${e.date}`, { headers: { Cookie: cookie } })).json();
+    assert.equal(body.log.steps, e.steps, `steps for ${e.date}`);
+    if (i === 4) assert.equal(body.log.weight, '78.5');
+    else assert.equal(body.log.weight, null, `weight for ${e.date} should be skipped`);
+  }
 });
 
 test('POST /health-sync rejects an impossible date', async () => {

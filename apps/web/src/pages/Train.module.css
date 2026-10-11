@@ -106,7 +106,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.75rem;
+  min-height: 44px;
   cursor: pointer;
 }
 
@@ -118,11 +118,12 @@
 }
 
 .removeButton {
+  min-width: 2.75rem; /* wide enough to tap, not just tall enough */
   background: none;
   border: var(--surface-outline);
   color: var(--color-text-muted);
   border-radius: var(--radius-sm);
-  min-height: 2.75rem;
+  min-height: 44px;
   cursor: pointer;
 }
 
@@ -216,7 +217,7 @@
   justify-content: space-between;
   border-bottom: var(--surface-outline);
   padding: var(--space-2) 0;
-  min-height: 2.75rem;
+  min-height: 44px;
 }
 
 .sessionRow:last-child {
@@ -235,7 +236,9 @@
 }
 
 .heatmapLink {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px; /* a text link still gets a 40px tap area */
   margin-bottom: var(--space-3);
   font-family: var(--font-mono);
   font-size: var(--text-xs);

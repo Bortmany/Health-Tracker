@@ -50,3 +50,35 @@ export function daysBetween(from, to) {
   if (!a || !b) return null;
   return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
 }
+
+// The Monday that starts the week a 'YYYY-MM-DD' day falls in (weeks run
+// Monday to Sunday), or null when the day isn't a real date.
+export function weekStartOf(day) {
+  const clean = toCalendarDay(day);
+  if (!clean) return null;
+  const [y, m, d] = clean.split('-').map(Number);
+  // getDay(): Sunday is 0, so Sunday steps back 6 days and Monday stays put.
+  const weekday = new Date(y, m - 1, d).getDay();
+  return addDays(clean, -((weekday + 6) % 7));
+}
+
+// The device's own day a moment (an ISO timestamp from the server) falls on,
+// or null when it can't be read. A plain 'YYYY-MM-DD' day is kept as it is.
+export function dayOfMoment(value) {
+  if (typeof value !== 'string') return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return toCalendarDay(value);
+  const moment = new Date(value);
+  return Number.isNaN(moment.getTime()) ? null : localDayKey(moment);
+}
+
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+
+// A day written the Cut way: "8 Sept", day first, with the year added only
+// when it isn't this year ("8 Sept 2025"). A missing or broken day shows "—".
+export function formatShortDay(day, today = localToday()) {
+  const clean = toCalendarDay(day);
+  if (!clean) return '—';
+  const [y, m, d] = clean.split('-').map(Number);
+  const label = `${d} ${SHORT_MONTHS[m - 1]}`;
+  return String(y) === today.slice(0, 4) ? label : `${label} ${y}`;
+}

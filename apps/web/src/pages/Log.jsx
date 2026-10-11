@@ -15,13 +15,16 @@ import {
   Skeleton,
   Toast,
   useToast,
+  Tooltip,
 } from '../components/ui/index.js';
 import { useActivities } from '../hooks/useActivities.js';
+import { useMyCoach } from '../hooks/useCoach.js';
 import { useCreateHabit, useDeleteHabit } from '../hooks/useHabits.js';
 import { useLog, usePutLog } from '../hooks/useLogs.js';
-import { useNutrition, usePutNutrition } from '../hooks/useNutrition.js';
 import styles from './Log.module.css';
+import { plainServerMessage, weightError, weightToPayload } from '../lib/weight.js';
 import { addDays, localToday } from '../lib/localDate.js';
+import { MEASUREMENTS, MEASUREMENT_KEYS, measurementPayload, rangeError, rangeErrors } from '../lib/measurements.js';
 
 const DURATIONS = [5, 10, 15, 20, 30, 45, 60, 75, 90, 120];
 
@@ -40,9 +43,9 @@ const QUICK_FIELDS = [
   { key: 'steps', label: 'Steps', step: '1', inputMode: 'numeric' },
 ];
 
-// Everything else goes in the collapsible "More metrics" group.
+// Everything else goes in the collapsible "More metrics" group. Waist lives
+// with the other body measurements in "Body measurements (cm)".
 const MORE_FIELDS = [
-  { key: 'waist', label: 'Waist (cm)', step: '0.1', inputMode: 'decimal' },
   { key: 'hrv', label: 'HRV', step: '1', inputMode: 'numeric' },
   { key: 'recovery', label: 'Recovery %', step: '1', inputMode: 'numeric' },
   { key: 'strain', label: 'Strain', step: '0.1', inputMode: 'decimal' },
@@ -52,19 +55,9 @@ const MORE_FIELDS = [
 // All metric keys "Use yesterday's numbers" is allowed to fill.
 const METRIC_KEYS = ['weight', 'waist', 'sleep', 'hrv', 'recovery', 'strain', 'steps', 'calories'];
 
-function buildFormFromData(data, nutritionData) {
+function buildFormFromData(data) {
   return {
     weight: data.log?.weight ?? '',
-    foodCalories: nutritionData?.log?.calories ?? '',
-    protein: nutritionData?.log?.protein ?? '',
-    carbs: nutritionData?.log?.carbs ?? '',
-    fat: nutritionData?.log?.fat ?? '',
-    meals: (nutritionData?.meals ?? []).map((m, i) => ({
-      key: m.id ?? `new-${i}`,
-      name: m.name ?? '',
-      calories: m.calories ?? '',
-      protein: m.protein ?? '',
-    })),
     waist: data.log?.waist ?? '',
     sleep: data.log?.sleep ?? '',
     hrv: data.log?.hrv ?? '',
@@ -72,6 +65,11 @@ function buildFormFromData(data, nutritionData) {
     strain: data.log?.strain ?? '',
     steps: data.log?.steps ?? '',
     calories: data.log?.calories ?? '',
+    chest: data.log?.chest ?? '',
+    arms: data.log?.arms ?? '',
+    hips: data.log?.hips ?? '',
+    thighs: data.log?.thighs ?? '',
+    neck: data.log?.neck ?? '',
     notes: data.log?.notes ?? '',
     habits: data.habits.map((h) => ({ habitId: h.habitId, label: h.label, completed: h.completed })),
     activities: data.activities.map((a, i) => ({
@@ -117,11 +115,9 @@ function Group({ title, open, onToggle, hasData = false, children }) {
 export default function Log() {
   const [date, setDate] = useState(localToday());
   const { data, isLoading } = useLog(date);
-  const { data: nutritionData, isLoading: nutritionLoading } = useNutrition(date);
   const { data: yesterdayData } = useLog(addDays(date, -1));
   const { data: activityOptions = [] } = useActivities();
   const putLog = usePutLog(date);
-  const putNutrition = usePutNutrition(date);
   const createHabit = useCreateHabit();
   const deleteHabit = useDeleteHabit();
   const [form, setForm] = useState(null);
@@ -129,12 +125,17 @@ export default function Log() {
   const [habitToDelete, setHabitToDelete] = useState(null);
   const [searchParams] = useSearchParams();
   const toast = useToast();
+  const { data: myCoach } = useMyCoach();
+  // Out-of-range measurement boxes, checked when you tap away from one.
+  const [measureErrors, setMeasureErrors] = useState({});
+  const [measureFormError, setMeasureFormError] = useState(false);
+  const [weightMessage, setWeightMessage] = useState('');
 
   // Which sections are expanded. Defaults re-evaluate when the date changes:
   // a section that already has data for that day starts open.
   const [open, setOpen] = useState({
-    nutrition: true,
     metrics: false,
+    body: false,
     activities: false,
     habits: true,
     injuries: true,
@@ -145,18 +146,18 @@ export default function Log() {
   const focusParam = searchParams.get('focus');
   const focusHandledRef = useRef(false);
   const quickRef = useRef(null);
-  const nutritionRef = useRef(null);
-  const addMealRef = useRef(null);
 
   useEffect(() => {
-    if (data && nutritionData) {
-      const built = buildFormFromData(data, nutritionData);
+    if (data) {
+      const built = buildFormFromData(data);
       setForm(built);
       if (openInitRef.current !== date) {
         openInitRef.current = date;
+        setMeasureErrors({});
+        setMeasureFormError(false);
         setOpen({
-          nutrition: true,
           metrics: MORE_FIELDS.some(({ key }) => built[key] !== ''),
+          body: MEASUREMENT_KEYS.some((key) => built[key] !== ''),
           activities: built.activities.length > 0,
           habits: true,
           injuries: true,
@@ -164,19 +165,13 @@ export default function Log() {
         });
       }
     }
-  }, [date, data, nutritionData]);
+  }, [date, data]);
 
   // Deep-link focus from the Today screen's quick-log chips (/log?focus=...).
   useEffect(() => {
     if (!form || !focusParam || focusHandledRef.current) return;
     focusHandledRef.current = true;
-    if (focusParam === 'meal') {
-      setOpen((o) => ({ ...o, nutrition: true }));
-      setTimeout(() => {
-        nutritionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        addMealRef.current?.querySelector('button')?.focus();
-      }, 0);
-    } else if (QUICK_FIELDS.some(({ key }) => key === focusParam)) {
+    if (QUICK_FIELDS.some(({ key }) => key === focusParam)) {
       window.scrollTo({ top: 0 });
       quickRef.current?.querySelector(`input[name="${focusParam}"]`)?.focus();
     }
@@ -184,6 +179,28 @@ export default function Log() {
 
   function updateField(key, value) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  // A box that's already flagged clears as soon as it's fixed; a new
+  // problem is only pointed out once you tap away (see checkMeasurement).
+  function updateMeasurement(key, value) {
+    updateField(key, value);
+    if (measureErrors[key] && !rangeError(key, value)) {
+      const next = { ...measureErrors };
+      delete next[key];
+      setMeasureErrors(next);
+      if (Object.keys(next).length === 0) setMeasureFormError(false);
+    }
+  }
+
+  function checkMeasurement(key) {
+    const message = rangeError(key, form?.[key]);
+    setMeasureErrors((errs) => {
+      const next = { ...errs };
+      if (message) next[key] = message;
+      else delete next[key];
+      return next;
+    });
   }
 
   function toggleHabit(habitId) {
@@ -248,24 +265,6 @@ export default function Log() {
     setForm((f) => ({ ...f, activities: f.activities.filter((a) => a.key !== key) }));
   }
 
-  function addMealRow() {
-    setForm((f) => ({
-      ...f,
-      meals: [...f.meals, { key: `new-${Date.now()}`, name: '', calories: '', protein: '' }],
-    }));
-  }
-
-  function updateMealRow(key, patch) {
-    setForm((f) => ({
-      ...f,
-      meals: f.meals.map((m) => (m.key === key ? { ...m, ...patch } : m)),
-    }));
-  }
-
-  function removeMealRow(key) {
-    setForm((f) => ({ ...f, meals: f.meals.filter((m) => m.key !== key) }));
-  }
-
   function updateInjuryField(injuryId, key, value) {
     setForm((f) => ({
       ...f,
@@ -296,9 +295,22 @@ export default function Log() {
     e.preventDefault();
     if (!form) return;
 
+    // Out-of-range weight and measurements are pointed out here instead of sent.
+    const weightProblem = weightError(form.weight);
+    setWeightMessage(weightProblem ?? '');
+    const problems = rangeErrors(form);
+    if (weightProblem) return;
+    if (Object.keys(problems).length > 0) {
+      setMeasureErrors(problems);
+      setMeasureFormError(true);
+      setOpen((o) => ({ ...o, body: true }));
+      return;
+    }
+    setMeasureFormError(false);
+
     const savingLog = putLog.mutateAsync({
-      weight: form.weight === '' ? null : Number(form.weight),
-      waist: form.waist === '' ? null : Number(form.waist),
+      weight: weightToPayload(form.weight),
+      ...measurementPayload(form),
       sleep: form.sleep === '' ? null : Number(form.sleep),
       hrv: form.hrv === '' ? null : Number(form.hrv),
       recovery: form.recovery === '' ? null : Number(form.recovery),
@@ -324,34 +336,21 @@ export default function Log() {
       })),
     });
 
-    const savingNutrition = putNutrition.mutateAsync({
-      calories: form.foodCalories === '' ? null : Number(form.foodCalories),
-      protein: form.protein === '' ? null : Number(form.protein),
-      carbs: form.carbs === '' ? null : Number(form.carbs),
-      fat: form.fat === '' ? null : Number(form.fat),
-      meals: form.meals
-        .filter((m) => m.name)
-        .map((m) => ({
-          name: m.name,
-          calories: m.calories === '' ? null : Number(m.calories),
-          protein: m.protein === '' ? null : Number(m.protein),
-        })),
-    });
-
-    // "Saved" only appears once the day's numbers AND the food entries are
-    // both stored. If either fails, the red message below the form says so.
+    // "Saved" only appears once the day is stored. If it fails, the red
+    // message below the form says so.
     try {
-      await Promise.all([savingLog, savingNutrition]);
+      await savingLog;
       toast.show('Saved');
     } catch {
       // The failed mutation already shows its own message on screen.
     }
   }
 
-  const saving = putLog.isPending || putNutrition.isPending;
+  const saving = putLog.isPending;
 
   // Dots for collapsed groups that already hold entries for this day.
   const metricsHaveData = Boolean(form) && MORE_FIELDS.some(({ key }) => form[key] !== '');
+  const bodyHasData = Boolean(form) && MEASUREMENT_KEYS.some((key) => form[key] !== '');
   const injuriesHaveData =
     Boolean(form) &&
     form.injuryCheckins.some(
@@ -362,36 +361,40 @@ export default function Log() {
     <Screen>
       <div className={styles.header}>
         <div className={styles.dateNav}>
-          <button
-            type="button"
-            className={styles.dateNavButton}
-            onClick={() => setDate((d) => addDays(d, -1))}
-            aria-label="Previous day"
-          >
-            ←
-          </button>
+          <Tooltip text="Previous day">
+            <button
+              type="button"
+              className={styles.dateNavButton}
+              onClick={() => setDate((d) => addDays(d, -1))}
+              aria-label="Previous day"
+            >
+              ←
+            </button>
+          </Tooltip>
           <span className={styles.dateLabel}>
             {formatDateLabel(date)}
             {date === localToday() && <Chip tone="accent">Today</Chip>}
           </span>
-          <button
-            type="button"
-            className={styles.dateNavButton}
-            onClick={() => setDate((d) => addDays(d, 1))}
-            aria-label="Next day"
-          >
-            →
-          </button>
+          <Tooltip text="Next day">
+            <button
+              type="button"
+              className={styles.dateNavButton}
+              onClick={() => setDate((d) => addDays(d, 1))}
+              aria-label="Next day"
+            >
+              →
+            </button>
+          </Tooltip>
         </div>
         <Button onClick={handleSubmit} disabled={!form || saving}>
           {saving ? 'Saving...' : 'Save'}
         </Button>
       </div>
 
-      {putLog.isError && <ErrorText>{putLog.error.message}</ErrorText>}
-      {putNutrition.isError && <ErrorText>{putNutrition.error.message}</ErrorText>}
+      {measureFormError && <ErrorText>Some measurements need a look before saving.</ErrorText>}
+      {putLog.isError && <ErrorText>{plainServerMessage(putLog.error.message)}</ErrorText>}
 
-      {isLoading || nutritionLoading || !form ? (
+      {isLoading || !form ? (
         <div className={styles.stack}>
           <Skeleton height={110} />
           <Skeleton height={160} />
@@ -402,14 +405,19 @@ export default function Log() {
           <Card>
             <div className={styles.quickStrip} ref={quickRef}>
               {QUICK_FIELDS.map(({ key, label, step, inputMode }) => (
-                <Field label={label} key={key}>
+                <Field label={label} key={key} error={key === 'weight' ? weightMessage : ''}>
                   <Input
                     type="number"
                     name={key}
                     inputMode={inputMode}
                     step={step}
                     value={form[key]}
-                    onChange={(e) => updateField(key, e.target.value)}
+                    aria-invalid={key === 'weight' && weightMessage ? 'true' : undefined}
+                    onChange={(e) => {
+                      if (key === 'weight' && weightMessage) setWeightMessage('');
+                      updateField(key, e.target.value);
+                    }}
+                    onBlur={key === 'weight' ? () => setWeightMessage(weightError(form.weight) ?? '') : undefined}
                   />
                 </Field>
               ))}
@@ -422,84 +430,6 @@ export default function Log() {
               </div>
             )}
           </Card>
-
-          <div ref={nutritionRef}>
-            <Group
-              title="Nutrition"
-              open={open.nutrition}
-              onToggle={() => setOpen((o) => ({ ...o, nutrition: !o.nutrition }))}
-            >
-              <div className={styles.fieldGrid}>
-                <Field label="Calories eaten">
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="1"
-                    value={form.foodCalories}
-                    onChange={(e) => updateField('foodCalories', e.target.value)}
-                  />
-                </Field>
-                <Field label="Protein (g)">
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="1"
-                    value={form.protein}
-                    onChange={(e) => updateField('protein', e.target.value)}
-                  />
-                </Field>
-                <Field label="Carbs (g)">
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="1"
-                    value={form.carbs}
-                    onChange={(e) => updateField('carbs', e.target.value)}
-                  />
-                </Field>
-                <Field label="Fat (g)">
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="1"
-                    value={form.fat}
-                    onChange={(e) => updateField('fat', e.target.value)}
-                  />
-                </Field>
-              </div>
-
-              {form.meals.map((m) => (
-                <div className={styles.rowGrid} key={m.key}>
-                  <Input
-                    type="text"
-                    placeholder="Meal name"
-                    value={m.name}
-                    onChange={(e) => updateMealRow(m.key, { name: e.target.value })}
-                  />
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    placeholder="kcal"
-                    value={m.calories}
-                    onChange={(e) => updateMealRow(m.key, { calories: e.target.value })}
-                  />
-                  <button
-                    type="button"
-                    className={styles.removeButton}
-                    onClick={() => removeMealRow(m.key)}
-                    aria-label="Remove meal"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-              <div ref={addMealRef}>
-                <Button variant="ghost" size="sm" onClick={addMealRow}>
-                  + Add meal
-                </Button>
-              </div>
-            </Group>
-          </div>
 
           <Group
             title="More metrics"
@@ -521,6 +451,34 @@ export default function Log() {
                 </Field>
               ))}
             </div>
+          </Group>
+
+          <Group
+            title="Body measurements (cm)"
+            open={open.body}
+            hasData={bodyHasData}
+            onToggle={() => setOpen((o) => ({ ...o, body: !o.body }))}
+          >
+            <div className={`${styles.fieldGrid} ${styles.bodyGrid}`}>
+              {MEASUREMENTS.map(({ key, label, placeholder }) => (
+                <Field label={label} key={key} error={measureErrors[key]}>
+                  <Input
+                    type="number"
+                    name={key}
+                    inputMode="decimal"
+                    step="0.1"
+                    placeholder={placeholder}
+                    value={form[key]}
+                    aria-invalid={Boolean(measureErrors[key])}
+                    onChange={(e) => updateMeasurement(key, e.target.value)}
+                    onBlur={() => checkMeasurement(key)}
+                  />
+                </Field>
+              ))}
+            </div>
+            {myCoach?.coach && (
+              <p className={styles.bodyPrivacy}>Your coach can see these measurements, like your weight.</p>
+            )}
           </Group>
 
           <Group
@@ -560,14 +518,16 @@ export default function Log() {
                     </option>
                   ))}
                 </Select>
-                <button
-                  type="button"
-                  className={styles.removeButton}
-                  onClick={() => removeActivityRow(a.key)}
-                  aria-label="Remove activity"
-                >
-                  ✕
-                </button>
+                <Tooltip text="Remove activity">
+                  <button
+                    type="button"
+                    className={styles.removeButton}
+                    onClick={() => removeActivityRow(a.key)}
+                    aria-label="Remove activity"
+                  >
+                    ✕
+                  </button>
+                </Tooltip>
               </div>
             ))}
             <Button variant="ghost" size="sm" onClick={addActivityRow}>
@@ -596,15 +556,17 @@ export default function Log() {
                       />
                       {h.label}
                     </label>
-                    <button
-                      type="button"
-                      className={`${styles.removeButton} ${styles.habitRemove}`}
-                      onClick={() => setHabitToDelete(h)}
-                      disabled={deleteHabit.isPending}
-                      aria-label={`Remove habit ${h.label}`}
-                    >
-                      ✕
-                    </button>
+                    <Tooltip text={`Remove habit ${h.label}`}>
+                      <button
+                        type="button"
+                        className={`${styles.removeButton} ${styles.habitRemove}`}
+                        onClick={() => setHabitToDelete(h)}
+                        disabled={deleteHabit.isPending}
+                        aria-label={`Remove habit ${h.label}`}
+                      >
+                        ✕
+                      </button>
+                    </Tooltip>
                   </div>
                 ))}
               </div>

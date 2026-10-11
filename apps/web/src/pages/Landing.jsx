@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import ProgressRing from '../components/ui/ProgressRing.jsx';
 import { useSignupMode } from '../hooks/useAuth.js';
 import useReveal from '../hooks/useReveal.js';
+import { pricing as pricingCopy } from '../lib/billingCopy.js';
+import { priceLine } from '../lib/pricing.js';
 import styles from './Landing.module.css';
 
 // Public marketing page shown at "/" to signed-out visitors (see App.jsx's
@@ -14,7 +16,7 @@ import styles from './Landing.module.css';
 const HABITS = [
   { id: 'water', label: 'Water' },
   { id: 'steps', label: 'Steps' },
-  { id: 'protein', label: 'Protein' },
+  { id: 'stretch', label: 'Stretch' },
   { id: 'sleep', label: 'Sleep' },
 ];
 
@@ -33,16 +35,16 @@ const FEATURES = [
     body: 'Follow a real program with a built-in timer between sets, not a blank notebook.',
   },
   {
-    title: 'Nutrition & macros',
-    body: 'Log meals and macros without spreadsheets or guesswork.',
-  },
-  {
     title: 'Charts & personal records',
     body: 'See your trend lines and every PR you have hit, tracked automatically.',
   },
   {
     title: 'Coach mode',
     body: 'Coaches can assign and edit programs directly inside a client’s account.',
+  },
+  {
+    title: 'Check-ins & messages',
+    body: 'Send your coach a quick weekly check-in and keep the conversation in one place, inside the app.',
   },
 ];
 
@@ -62,7 +64,7 @@ function matchPlan(goal, days, equipment) {
 }
 
 function PhoneDemo() {
-  const [done, setDone] = useState({ water: true, steps: false, protein: true, sleep: false });
+  const [done, setDone] = useState({ water: true, steps: false, stretch: true, sleep: false });
   const [sets, setSets] = useState(0);
   const doneCount = Object.values(done).filter(Boolean).length;
   const percent = Math.round((doneCount / HABITS.length) * 100);
@@ -175,7 +177,7 @@ function useJoinCta() {
   return { label: 'Join Cut' };
 }
 
-function JoinCta({ className, showNote = false }) {
+export function JoinCta({ className, showNote = false }) {
   const cta = useJoinCta();
   if (cta.closed) {
     return <p className={styles.ctaNote}>Sign-up is closed for now. Check back soon.</p>;
@@ -212,7 +214,7 @@ export default function Landing() {
         <div className={styles.heroCopy}>
           <h1 className={styles.heroHeadline}>Know what to train. Every day.</h1>
           <p className={styles.heroSub}>
-            Cut matches you to a real workout plan, then tracks your weight, food, sleep and streaks in
+            Cut matches you to a real workout plan, then tracks your weight, sleep, training and streaks in
             one place — so you stop guessing and start showing up.
           </p>
           <div className={styles.heroActions}>
@@ -265,22 +267,26 @@ export default function Landing() {
         <div className={styles.pricingGrid}>
           <div className={styles.priceCard}>
             <h3 className={styles.priceTitle}>Free</h3>
-            <p className={styles.pricePoint}>4-week plans</p>
+            <p className={styles.pricePoint}>Free, always</p>
             <p className={styles.priceBody}>
-              Full tracking — logs, nutrition, training, streaks — with 4-week workout plans.
+              Full tracking — logs, training, habits, streaks — plus your full 52-week workout plan,
+              matched to you.
             </p>
             <JoinCta className={styles.priceCta} />
           </div>
           <div className={`${styles.priceCard} ${styles.priceCardAccent}`}>
             <h3 className={styles.priceTitle}>Premium</h3>
-            <p className={styles.pricePoint}>Full 52-week plans</p>
+            <p className={styles.pricePoint}>AI plan that adjusts weekly</p>
             <p className={styles.priceBody}>
-              Everything in Free, plus the complete 52-week progressions. Pricing is coming soon —
-              contact us if you want early access.
+              Everything in Free, plus a plan that re-adjusts every week from your workouts, weigh-ins
+              and recovery. {priceLine()}.
             </p>
             <JoinCta className={styles.priceCta} />
           </div>
         </div>
+        <p className={styles.sectionSub}>
+          <Link to="/pricing">{pricingCopy.fullPricingLink}</Link>
+        </p>
       </Section>
 
       <Section className={styles.finalCta}>
@@ -293,6 +299,7 @@ export default function Landing() {
         <div className={styles.footerLinks}>
           <Link to="/privacy">Privacy</Link>
           <Link to="/terms">Terms</Link>
+          <Link to="/pricing">{pricingCopy.footerPricing}</Link>
         </div>
       </footer>
     </div>

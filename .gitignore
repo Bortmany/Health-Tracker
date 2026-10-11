@@ -5,3 +5,4 @@ apps/web/dist/
 apps/api/public/
 *.log
 .DS_Store
+apps/api/uploads/

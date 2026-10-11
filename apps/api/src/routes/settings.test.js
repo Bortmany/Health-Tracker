@@ -6,6 +6,7 @@ import { pool } from '../db/pool.js';
 let server;
 let baseUrl;
 let cookie;
+let userId;
 
 before(async () => {
   server = app.listen(0);
@@ -19,6 +20,7 @@ before(async () => {
     body: JSON.stringify({ email, password: 'hunter2pass', displayName: 'Settings Test' }),
   });
   cookie = registerRes.headers.get('set-cookie').split(';')[0];
+  userId = (await registerRes.json()).user.id;
 });
 
 after(async () => {
@@ -100,4 +102,25 @@ test('the target date comes back exactly as saved, and can be saved again unchan
   // Clearing it works too.
   const cleared = await put({ targetWeight: 72, targetDate: null });
   assert.equal((await cleared.json()).settings.targetDate, null);
+});
+
+test('an old stored weight outside 20-400 does not block an unrelated save, but a changed one is still checked', async () => {
+  // Simulate a weight saved before the range existed.
+  await pool.query('UPDATE user_settings SET start_weight = 5, target_weight = 500 WHERE user_id = $1', [userId]);
+
+  // The screen sends the stored weights back with a new step goal: allowed.
+  const ok = await put({ startWeight: 5, targetWeight: '500', stepGoal: 9000 });
+  assert.equal(ok.status, 200);
+  const saved = (await ok.json()).settings;
+  assert.equal(saved.stepGoal, 9000);
+  assert.equal(Number(saved.startWeight), 5);
+  assert.equal(Number(saved.targetWeight), 500);
+
+  // Changing a weight to another bad value is still refused...
+  const bad = await put({ startWeight: 6, targetWeight: 500, stepGoal: 9000 });
+  assert.equal(bad.status, 400);
+  // ...and a good new value is accepted.
+  const good = await put({ startWeight: 80, targetWeight: 500, stepGoal: 9000 });
+  assert.equal(good.status, 200);
+  assert.equal(Number((await good.json()).settings.startWeight), 80);
 });

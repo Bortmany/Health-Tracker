@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { measurementsFromRow } from '../lib/measurements.js';
 import { countStreak } from '../lib/streak.js';
 import { resolveToday } from '../lib/userToday.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -89,20 +90,6 @@ router.get('/', asyncHandler(async (req, res) => {
   const activitiesByLog = groupBy(logActivityRows, 'daily_log_id');
   const checkinsByLog = groupBy(checkinRows, 'daily_log_id');
 
-  // Nutrition days with their meals.
-  const { rows: nutritionRows } = await pool.query(
-    'SELECT *, date::text AS date FROM nutrition_logs WHERE user_id = $1 ORDER BY nutrition_logs.date',
-    [req.userId]
-  );
-  const { rows: mealRows } = await pool.query(
-    `SELECT m.* FROM nutrition_log_meals m
-     JOIN nutrition_logs nl ON nl.id = m.nutrition_log_id
-     WHERE nl.user_id = $1
-     ORDER BY m.sort_order`,
-    [req.userId]
-  );
-  const mealsByLog = groupBy(mealRows, 'nutrition_log_id');
-
   // Programs with their days and exercises (same nested shape the app uses).
   const { rows: programRows } = await pool.query(
     'SELECT * FROM programs WHERE user_id = $1 ORDER BY created_at',
@@ -161,13 +148,23 @@ router.get('/', asyncHandler(async (req, res) => {
 
   // Current adopted plan, if any.
   const { rows: planRows } = await pool.query(
-    `SELECT up.start_date::text AS start_date, up.duration_weeks, t.name
+    `SELECT up.start_date::text AS start_date, up.duration_weeks, up.source,
+            COALESCE(up.ai_name, t.name) AS name
      FROM user_plans up
      LEFT JOIN plan_templates t ON t.id = up.plan_template_id
      WHERE up.user_id = $1`,
     [req.userId]
   );
   const plan = planRows[0];
+
+  // The AI plan's weekly adjustments (paid accounts), oldest first.
+  const { rows: adjustmentRows } = await pool.query(
+    `SELECT week_number, summary, changes, created_at
+     FROM ai_plan_adjustments
+     WHERE user_id = $1
+     ORDER BY created_at`,
+    [req.userId]
+  );
 
   // Current logging streak, computed the same way as GET /logs/streak.
   const { rows: streakRows } = await pool.query(
@@ -192,6 +189,63 @@ router.get('/', asyncHandler(async (req, res) => {
     `SELECT r.display_name FROM users u
      JOIN users r ON r.id = u.referred_by_coach_id
      WHERE u.id = $1`,
+    [req.userId]
+  );
+
+  // Weekly check-ins this user sent, oldest week first, each with the
+  // questions exactly as they were asked and the coach it went to.
+  const { rows: weeklyCheckinRows } = await pool.query(
+    `SELECT ck.week_start::text AS week_start, ck.mood, ck.answers, ck.notes,
+            ck.submitted_at, ck.updated_at, u.display_name AS coach_name
+     FROM checkins ck
+     LEFT JOIN users u ON u.id = ck.coach_id
+     WHERE ck.user_id = $1
+     ORDER BY ck.week_start`,
+    [req.userId]
+  );
+  // A coach's own check-in questions (none for a student).
+  const { rows: questionRows } = await pool.query(
+    'SELECT questions FROM checkin_templates WHERE coach_id = $1',
+    [req.userId]
+  );
+
+  // Every message thread this user has been part of, as student or coach, with
+  // each message oldest first. Threads on links that have since ended are
+  // included too: they are this person's own conversations, even though the
+  // app no longer shows them.
+  const { rows: messageRows } = await pool.query(
+    `SELECT cc.id AS link_id, cc.status, cc.created_at AS link_created_at,
+            other.display_name AS other_name,
+            m.sender_id, m.body, m.created_at, m.read_at
+     FROM coach_clients cc
+     JOIN users other ON other.id = CASE WHEN cc.coach_id = $1 THEN cc.client_id ELSE cc.coach_id END
+     JOIN messages m ON m.coach_client_id = cc.id
+     WHERE cc.coach_id = $1 OR cc.client_id = $1
+     ORDER BY cc.created_at, cc.id, m.created_at, m.id`,
+    [req.userId]
+  );
+  const messageThreads = [];
+  for (const row of messageRows) {
+    let thread = messageThreads[messageThreads.length - 1];
+    if (!thread || thread.linkId !== row.link_id) {
+      thread = { linkId: row.link_id, otherName: row.other_name, status: row.status, messages: [] };
+      messageThreads.push(thread);
+    }
+    thread.messages.push({
+      sender: row.sender_id === req.userId ? 'you' : row.other_name,
+      body: row.body,
+      sentAt: row.created_at,
+      readAt: row.read_at,
+    });
+  }
+
+  // Progress photos: the list only (date, shared or not). The pictures
+  // themselves are not in this export (no download exists yet); owners who
+  // want copies are told to email the contact address on the privacy page.
+  const { rows: photoRows } = await pool.query(
+    `SELECT id, taken_on::text AS taken_on, shared_with_coach, created_at
+     FROM progress_photos WHERE user_id = $1
+     ORDER BY taken_on, created_at, id`,
     [req.userId]
   );
 
@@ -250,6 +304,8 @@ router.get('/', asyncHandler(async (req, res) => {
       steps: row.steps,
       calories: row.calories,
       notes: row.notes,
+      // Chest, arms, hips, thighs and neck in cm (null when not measured).
+      ...measurementsFromRow(row),
       habits: (habitsByLog.get(row.id) ?? []).map((h) => ({ label: h.label, completed: h.completed })),
       activities: (activitiesByLog.get(row.id) ?? []).map((a) => ({
         name: a.name,
@@ -262,21 +318,6 @@ router.get('/', asyncHandler(async (req, res) => {
         painPost: c.pain_post,
         swelling: c.swelling,
         canTrainTomorrow: c.can_train_tomorrow,
-      })),
-    })),
-    nutritionLogs: nutritionRows.map((row) => ({
-      date: row.date,
-      calories: row.calories,
-      protein: row.protein,
-      carbs: row.carbs,
-      fat: row.fat,
-      notes: row.notes,
-      meals: (mealsByLog.get(row.id) ?? []).map((m) => ({
-        name: m.name,
-        calories: m.calories,
-        protein: m.protein,
-        carbs: m.carbs,
-        fat: m.fat,
       })),
     })),
     programs,
@@ -296,8 +337,14 @@ router.get('/', asyncHandler(async (req, res) => {
     })),
     personalRecords: recordRows.map((r) => ({ name: r.name, weight: r.weight, reps: r.reps, date: r.date })),
     plan: plan
-      ? { name: plan.name, startDate: plan.start_date, durationWeeks: plan.duration_weeks }
+      ? { name: plan.name, startDate: plan.start_date, durationWeeks: plan.duration_weeks, source: plan.source }
       : null,
+    aiPlanAdjustments: adjustmentRows.map((r) => ({
+      weekNumber: r.week_number,
+      summary: r.summary,
+      changes: r.changes,
+      createdAt: r.created_at,
+    })),
     streak,
     coach: coachRows[0] ? { displayName: coachRows[0].display_name } : null,
     coachLinks: coachLinkRows.map((row) => ({
@@ -308,6 +355,27 @@ router.get('/', asyncHandler(async (req, res) => {
       endedAt: row.ended_at,
     })),
     referredByCoach: referrerRows[0] ? referrerRows[0].display_name : null,
+    checkins: weeklyCheckinRows.map((row) => ({
+      weekStart: row.week_start,
+      coachName: row.coach_name ?? null,
+      mood: row.mood,
+      answers: row.answers,
+      notes: row.notes,
+      submittedAt: row.submitted_at,
+      updatedAt: row.updated_at,
+    })),
+    checkinQuestions: questionRows[0] ? questionRows[0].questions : null,
+    messageThreads: messageThreads.map(({ otherName, status, messages }) => ({
+      otherName,
+      connection: status === 'active' ? 'current' : 'ended',
+      messages,
+    })),
+    photos: photoRows.map((row) => ({
+      id: row.id,
+      takenOn: row.taken_on,
+      sharedWithCoach: row.shared_with_coach,
+      createdAt: row.created_at,
+    })),
   });
 }));
 

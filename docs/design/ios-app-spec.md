@@ -9,7 +9,7 @@ The backend API already exists and does not change for this app.*
 Cut is a fat-loss and training tracker for people who aren't sure what to
 train, plus the coaches who train them. A short quiz matches each user to one
 of 14 structured workout plans; day to day they log weight, sleep, steps,
-habits, food and training sessions, and watch their streak, charts and
+habits and training sessions, and watch their streak, charts and
 personal records grow. The iOS app is for two audiences in one binary:
 **consumers** (the everyday tracker) and **coaches** (who monitor clients and
 assign programs). The killer reason to go native: automatic Apple Health data
@@ -22,7 +22,7 @@ and a muscle-heat home-screen widget — things the installed web app can't do.
 | Tab | Existing screen it maps to |
 |---|---|
 | Today | Today dashboard (plan week, weight trend, habit ring, streak) |
-| Log | Daily log (weight, sleep, steps, habits, food, injuries) |
+| Log | Daily log (weight, sleep, steps, habits, injuries) |
 | Train | Training log (program day, sets, rest timer, exercise autocomplete) |
 | Progress | Charts, personal records, **and the new Muscle Heatmap** |
 | More | Settings, plan details, premium upgrade, coach connection |
@@ -32,7 +32,7 @@ and a muscle-heat home-screen widget — things the installed web app can't do.
 other tabs still work on their own account.
 
 **Modals (sheets), not pushes:**
-- Add/edit a log entry (weight, meal, habit) — half-height sheet.
+- Add/edit a log entry (weight, habit) — half-height sheet.
 - Rest timer — a persistent bottom bar during a session that expands to a
   full sheet; it must survive backgrounding (see notifications).
 - Onboarding quiz — full-screen cover on first launch, exactly the existing
@@ -60,7 +60,7 @@ refresh. One "Log today" button if today is empty.
 
 **Log** — a dated list, defaulting to today, with a date strip to swipe back.
 Each metric is a row (weight, waist, sleep, HRV, recovery, strain, steps,
-habits, activities, injuries, food with calories + macros + meals). Tapping a
+habits, activities, injuries, calories burned). Tapping a
 row opens the half-sheet editor with a large native number pad. Empty values
 stay visually empty — blanks matter because Health sync only fills blanks.
 Rows filled by Apple Health show a small "from Apple Health" tag so the user
@@ -73,7 +73,7 @@ starts automatically. Exercise search uses the 50-exercise library with form
 cues shown inline. Personal records get a full-width lime flash moment.
 
 **Progress** — segmented control: Charts | Records | **Muscle Heat**. Charts
-reuse the same data as the web (weight, calories, measurements). Records is a
+reuse the same data as the web (weight, calories burned, measurements). Records is a
 grouped list of PRs by exercise.
 
 **Muscle Heatmap (new screen — being built on the web now)** — a front/back
@@ -131,7 +131,7 @@ ring completing the week.
   only if the user opted in. One per day maximum.
 - "Your coach assigned you a new program" (push — needs a small server
   addition to send pushes; flag for the owner, don't build silently).
-- Never nutrition guilt, never marketing.
+- Never guilt-tripping, never marketing.
 
 **Share sheet:** coaches share invite codes; consumers can share a
 progress-chart or heatmap image (rendered card with the Cut wordmark).
@@ -163,7 +163,7 @@ sheets and keyboards come up dark. Revisit only if users ask.
 
 - **Category:** Health & Fitness. **Age rating:** 4+.
 - **Privacy questionnaire (honest answers):** collects email (account),
-  health & fitness data (weight, body measurements, sleep, steps, nutrition,
+  health & fitness data (weight, body measurements, sleep, steps, calories burned,
   workouts), all **linked to the user's account** because that's the whole
   product; no tracking across other apps, no ads, no data sold. HealthKit
   data must never be used for advertising — Apple's hard rule, and ours.

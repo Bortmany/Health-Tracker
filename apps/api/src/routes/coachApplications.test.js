@@ -91,7 +91,7 @@ test('validation: missing agreement, too many years, and a bad link are refused'
 
   const tooMany = await apply(cookie, { ...validForm, yearsCoaching: 61 });
   assert.equal(tooMany.status, 400);
-  assert.match((await tooMany.json()).error.message, /yearsCoaching/);
+  assert.match((await tooMany.json()).error.message, /years of coaching/i);
 
   const badLink = await apply(cookie, { ...validForm, link: 'not a link' });
   assert.equal(badLink.status, 400);

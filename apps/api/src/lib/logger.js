@@ -43,8 +43,24 @@ function write(level, message, context) {
   else console.log(out);
 }
 
+// Optional hook so error tracking (Sentry, once switched on) hears about every
+// logged server error that carries a real Error - money paths included.
+let errorHook = null;
+export function setErrorHook(fn) {
+  errorHook = typeof fn === 'function' ? fn : null;
+}
+
 export const logger = {
   info: (message, context) => write('info', message, context),
   warn: (message, context) => write('warn', message, context),
-  error: (message, context) => write('error', message, context),
+  error: (message, context) => {
+    write('error', message, context);
+    if (errorHook && context && context.error instanceof Error) {
+      try {
+        errorHook(context.error, message);
+      } catch {
+        // Error reporting must never break the request.
+      }
+    }
+  },
 };

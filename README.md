@@ -7,7 +7,7 @@ A fat-loss and training tracker for people who aren't sure what to train — and
 **For regular users**
 - A short quiz (age, experience, goal, equipment, days per week) matches you to one of 14 professionally structured workout plans — calisthenics, powerlifting, muscle building, cardio, general fitness, including an over-50 joint-friendly plan.
 - The app tells you what week of your plan you're on, in plain English, with easy (deload) weeks scheduled where they belong. Free accounts get 4-week plans; Premium unlocks the 52-week periodized versions.
-- Daily log: weight, waist, sleep, HRV, recovery, strain, steps, habits, activities, injury check-ins, and food (calories, macros, meals).
+- Daily log: weight, waist, sleep, HRV, recovery, strain, steps, habits, activities, injury check-ins, and calories burned.
 - Training log with rest timer, exercise autocomplete backed by a 50-exercise guide with form cues, personal-record tracking, and per-exercise "last time" hints.
 - Dashboard with weight trend chart, weekly habit ring, and logging streak; Progress page with charts and personal records.
 
@@ -48,9 +48,15 @@ Tests: `npm test` (integration tests against the local Postgres). Build check: `
 | `PG_POOL_MAX` | No | Most database connections one copy of the server will open (default 10). Lower it if Railway runs several copies, so copies × this stays under the database's connection limit. |
 | `PG_IDLE_TIMEOUT_MS`, `PG_CONNECTION_TIMEOUT_MS` | No | Close an idle database connection after this long (default 30000), and give up waiting for a free one after this long (default 10000). Defaults fine. |
 | `ANTHROPIC_API_KEY` | Optional switch | Wakes the AI plan writer (personalized plans written by Claude instead of picked from the library) |
-| `PADDLE_API_KEY` + `PADDLE_WEBHOOK_SECRET` + `PADDLE_PRICE_ID` + `APP_URL` | Optional switch | Wakes paid Premium upgrades (Paddle checkout + webhook). Until all of them are set, the upgrade button shows "coming soon" and Premium can be granted manually: `UPDATE users SET plan_tier = 'premium' WHERE email = '...';` |
-| `PADDLE_ENV` | Optional | `sandbox` (the default, and what anything unrecognised falls back to) or `production` for real money. Decides which Paddle address the server talks to. |
+| `MONEY_PROVIDER` | Optional | `whop` (default) or `paypal` (possible later fallback). Picks who handles payments. |
+| `WHOP_API_KEY` + `WHOP_WEBHOOK_SECRET` + `WHOP_COMPANY_ID` + `APP_URL` | Optional switch | Wakes payments through Whop (AI plan, coach startup fee, students paying coaches) and the webhook at `/api/billing/webhook`. Until set, every money button shows "coming soon" and Premium can be granted manually: `UPDATE users SET plan_tier = 'premium' WHERE email = '...';` |
+| `WHOP_STARTUP_FEE_PLAN_ID`, `WHOP_AI_MONTHLY_PLAN_ID`, `WHOP_AI_YEARLY_PLAN_ID` | Optional switch | The three Whop plans (coach startup fee $49 once; AI plan $12.99/month and $89.99/year). Created in Whop's dashboard. |
+| `WHOP_ENV` | Optional | `live` for real money; anything else (or unset) means Whop's sandbox. |
+| `PAYOUT_METHOD` | Optional switch | `A` (Whop takes Cut's fee on every payment) or `B` (Cut collects, then pays the coach's share). Unset = coach payouts stay off. |
+| `RESEND_API_KEY` + `EMAIL_FROM` | Optional switch | Wakes password-reset emails (Resend). Until set, "Forgot password" says it is coming soon and sends nothing. |
 | `ADMIN_EMAIL` | Optional switch | The one account allowed to review coach applications at `/admin/coaches`. The first time that email signs in while no admin exists yet, it becomes the admin — once, ever. `/api/health` reports it as `admin`. |
+| `S3_BUCKET` + `S3_ENDPOINT` + `S3_ACCESS_KEY_ID` + `S3_SECRET_ACCESS_KEY` + `S3_REGION` | Optional switch | Wakes progress photo uploads: files go to a private S3-compatible bucket (a Railway Storage Bucket). In production, until all five are set, photos are switched off ("Photo uploads are coming soon"). `/api/health` reports it as `photos` (`s3`, `local` or `dormant`). |
+| `UPLOAD_DIR` | No | Local development only: the folder photos are saved in when no bucket is set (default `apps/api/uploads`, ignored by git). A relative path counts from the folder the server is started in. |
 | `PRIVACY_CONTACT_EMAIL` | Optional | The contact address shown as a mailto link on the `/terms`, `/privacy` and `/refunds` pages (served by the public `GET /api/legal/contact`). Defaults to the owner's address, `naeljam@hotmail.com`. |
 
 ## Repo structure

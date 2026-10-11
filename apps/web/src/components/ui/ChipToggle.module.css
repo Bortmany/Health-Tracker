@@ -1,7 +1,7 @@
 /* Layered on top of Chip's pill look: a thumb-friendly height, a visible
    border so the tap target reads as a control, and the standard states. */
 .toggle {
-  min-height: 36px;
+  min-height: 40px;
   padding-left: var(--space-3);
   padding-right: var(--space-3);
   border: 1px solid transparent;

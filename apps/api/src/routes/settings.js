@@ -22,6 +22,15 @@ function toPublicSettings(row) {
   };
 }
 
+// True when the weight sent is the very number already stored.
+function unchangedWeight(sent, stored) {
+  if (sent == null || stored == null) return false;
+  if (typeof sent === 'string' && sent.trim() === '') return false;
+  const a = Number(typeof sent === 'string' ? sent.trim() : sent);
+  const b = Number(stored);
+  return Number.isFinite(a) && Number.isFinite(b) && a === b;
+}
+
 router.use(requireAuth);
 
 router.get('/', asyncHandler(async (req, res) => {
@@ -39,8 +48,22 @@ router.put('/', asyncHandler(async (req, res) => {
   // sensible value. This rejects text, negatives, impossible dates (e.g.
   // 2026-13-45) and absurd/huge numbers with a clean 400 instead of a server
   // error or a silently-stored bad value — matching the daily-log endpoints.
-  const cleanStartWeight = validate.nonNegativeNumber(startWeight, 'start weight', { optional: true, max: 2000 });
-  const cleanTargetWeight = validate.nonNegativeNumber(targetWeight, 'target weight', { optional: true, max: 2000 });
+  //
+  // A weight is only checked against the 20-400 kg range when it actually
+  // changed. Screens send the stored weights back with every save, so an old
+  // out-of-range value (saved before the range existed) must not make an
+  // unrelated save, like a new step goal, fail. A new or different value is
+  // always checked.
+  const { rows: current } = await pool.query(
+    'SELECT start_weight, target_weight FROM user_settings WHERE user_id = $1',
+    [req.userId]
+  );
+  const cleanStartWeight = unchangedWeight(startWeight, current[0]?.start_weight)
+    ? Number(current[0].start_weight)
+    : validate.bodyWeight(startWeight, 'Start weight');
+  const cleanTargetWeight = unchangedWeight(targetWeight, current[0]?.target_weight)
+    ? Number(current[0].target_weight)
+    : validate.bodyWeight(targetWeight, 'Target weight');
   const cleanTargetDate = targetDate == null || targetDate === '' ? null : validate.isoDate(targetDate, 'target date');
   const cleanHeight = validate.nonNegativeNumber(height, 'height', { optional: true, max: 400 });
   const cleanAge = validate.nonNegativeNumber(age, 'age', { optional: true, integer: true, max: 150 });

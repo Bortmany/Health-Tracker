@@ -28,7 +28,7 @@ Same pattern as the six agents that built Cut — each has one job and a written
 | **Publisher** | Takes cards you've approved in Notion and loads them into the scheduler with the right date/time | Daily check |
 | **Reddit scout** | Watches the communities where your future users hang out (r/loseit, r/Fitness, r/xxfitness, coach subs for Cut; trading subs for the trading app) for threads asking for what your product does, or mentioning it. Drafts a genuinely helpful, human-sounding reply for each opportunity — advice first, app mentioned with honest disclosure ("I built this") — into the same approval queue | Daily scan |
 | **Email marketer** | Drafts the welcome email for new Cut signups, plus a periodic newsletter — also drafts-first, into the same board | Weekly |
-| **Ads manager** | Designs ad campaigns (audience, budget, creative) as *proposals only* — dormant until you give it an ad account and budget, exactly like the Paddle/AI switches in Cut | On request |
+| **Ads manager** | Designs ad campaigns (audience, budget, creative) as *proposals only* — dormant until you give it an ad account and budget, exactly like the Whop/AI switches in Cut | On request |
 | **Analyst** | Pulls the numbers — reach, likes, follower growth, link clicks, and Cut signups — and writes the Friday report in plain English with 2–3 suggestions | Fridays |
 
 **How they wake up:** scheduled routines (the same mechanism as a calendar reminder, but it starts a Claude session in the marketing repo). You can also poke the system any time by just asking, e.g. *"draft a post about the new streaks feature."*
@@ -108,7 +108,7 @@ Posting pace to start: ~4–5/week on Cut's Instagram, ~5–7/week on each X acc
 
 - **Paid ads:** Meta + Google campaigns, starting ~$5–10/day test budgets — needs ad accounts + budget green-light
 - **TikTok:** scripts and shot-lists drafted for you to film — when you want video
-- **Sales funnel for Cut Premium:** free-trial email sequence, once Paddle is live
+- **Sales funnel for Cut Premium:** free-trial email sequence, once payments are live
 - **App-store pages:** copy + screenshots, once the native apps happen (`docs/mobile.md`)
 
 ---
@@ -121,11 +121,11 @@ Same pattern (agents + schedules + your approval where it matters), pointed at r
 |---|---|---|
 | 1 | **Ops watchdog** | Checks the live Cut site every few hours — is it up, can a test account log in, did the last deploy work? You get a message only when something breaks, ideally before users notice. |
 | 2 | **Support inbox** | A support email address the system triages: drafts a plain-English reply for you to approve, answers FAQs, and flags real bugs straight into the dev backlog. |
-| 3 | **Weekly business report** | One Friday email combining everything: signups, active users, streak/retention numbers, revenue (once Paddle is on), and the marketing stats — the whole business on one page. |
+| 3 | **Weekly business report** | One Friday email combining everything: signups, active users, streak/retention numbers, revenue (once payments are on), and the marketing stats — the whole business on one page. |
 | 4 | **Feedback loop** | Collects user feedback (in-app form, emails, app-store reviews later, and what the Reddit Scout overhears) into a digest, spots patterns ("5 people asked for barcode scanning"), and files them as ranked feature ideas. |
 | 5 | **Maintenance PRs** | Monthly: update dependencies, run security checks, run the full test suite, and prepare the fix as a ready-to-merge change. Keeps the app healthy with zero effort from you. |
 | 6 | **Competitor watch** | Monthly digest: what MyFitnessPal/MacroFactor-type apps (and the trading app's competitors) shipped and charge, and what users complain about — free product research. |
-| 7 | **Billing ops** *(once Paddle is live)* | Failed-payment recovery emails, cancellation exit-question, monthly revenue summary. |
+| 7 | **Billing ops** *(once payments are live)* | Failed-payment recovery emails, cancellation exit-question, monthly revenue summary. |
 | 8 | **Blog/SEO engine** *(later)* | Drafts helpful articles ("beginner cutting guide") published on the site so Google sends free traffic long-term — the slowest but most compounding channel. |
 
 Suggested rollout: **1–3 alongside the marketing build** (the watchdog matters the moment real users arrive), 4–5 shortly after, 6–8 when live and stable.

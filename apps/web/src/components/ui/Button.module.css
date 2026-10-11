@@ -8,6 +8,7 @@
   font-size: var(--text-base);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-5);
+  min-height: 44px; /* phone tap target */
   border: 1px solid transparent;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
@@ -15,6 +16,7 @@
 
 .sm {
   padding: var(--space-2) var(--space-3);
+  min-height: 40px; /* small buttons still get a 40px hit area */
   font-size: var(--text-sm);
   border-radius: var(--radius-sm);
 }
@@ -69,9 +71,17 @@
   background: rgba(248, 113, 113, 0.12);
 }
 
-.btn[disabled] {
+.btn[disabled],
+.btn[aria-disabled='true'] {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* "Coming soon" buttons use aria-disabled (not disabled) so a keyboard can
+   still reach them and read the hint; they must not feel pressable. */
+.btn[aria-disabled='true']:active {
+  transform: none;
+  filter: none;
 }
 
 .block {

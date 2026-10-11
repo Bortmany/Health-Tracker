@@ -11,6 +11,13 @@
 
 .accountInfo {
   min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* "Log out" stays on one line; the account details give way instead. */
+.logoutButton {
+  flex: none;
+  white-space: nowrap;
 }
 
 .mutedLine {
@@ -18,20 +25,6 @@
   font-size: var(--text-sm);
 }
 
-/* The "Upgrade to Premium" text link inside the plan-tier line. */
-.inlineLinkButton {
-  background: none;
-  border: none;
-  color: var(--color-accent);
-  cursor: pointer;
-  padding: 0;
-  font: inherit;
-}
-
-.inlineLinkButton:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
 
 /* A react-router Link dressed as a secondary button. */
 .linkAsButton {
@@ -45,7 +38,7 @@
   font-weight: 600;
   font-size: var(--text-sm);
   padding: var(--space-2) var(--space-4);
-  min-height: 2.75rem;
+  min-height: 44px;
   text-decoration: none;
   flex: none;
 }
@@ -75,7 +68,7 @@
   font: inherit;
   font-size: var(--text-sm);
   font-weight: 600;
-  min-height: 2.75rem;
+  min-height: 44px;
   cursor: pointer;
 }
 
@@ -190,4 +183,80 @@
   margin-top: var(--space-3);
   padding-top: var(--space-3);
   border-top: var(--surface-outline);
+}
+
+/* "Your coach" when linked. Phone: name and "Remove coach" on one line, the
+   message button full width underneath. Laptop: all three on one line. */
+.coachRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'name remove'
+    'message message';
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.coachName {
+  grid-area: name;
+  min-width: 0;
+}
+
+.coachRemove {
+  grid-area: remove;
+}
+
+.coachMessage {
+  grid-area: message;
+}
+
+/* Holds a button and pins the unread dot to its top-right corner. */
+.dotAnchor {
+  position: relative;
+  display: block;
+}
+
+@media (min-width: 1024px) {
+  .coachRow {
+    grid-template-columns: 1fr auto auto;
+    grid-template-areas: 'name message remove';
+  }
+}
+
+/* The "Manage subscription" / "Premium plan" text links. */
+.inlineLink {
+  color: var(--color-accent);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: var(--text-sm);
+}
+
+.inlineLink:hover {
+  text-decoration: underline;
+}
+
+.manageRow {
+  margin-top: var(--space-2);
+}
+
+/* "Waiting for payment" pill at the top of the Your coach card. */
+.payChip {
+  margin-bottom: var(--space-3);
+}
+
+/* "Payments: Set up needed / Active" on the coach's card. */
+.paymentsLine {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.chipLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: none;
 }

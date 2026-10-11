@@ -9,6 +9,7 @@ export default function ConfirmDialog({
   open,
   message,
   confirmLabel = 'Yes, do it',
+  cancelLabel = 'Cancel',
   onConfirm,
   onCancel,
   busy = false,
@@ -61,7 +62,7 @@ export default function ConfirmDialog({
         </p>
         <div className={styles.actions} ref={actionsRef}>
           <Button variant="secondary" onClick={onCancel} disabled={busy}>
-            Cancel
+            {cancelLabel}
           </Button>
           <Button variant="danger" onClick={onConfirm} disabled={busy}>
             {confirmLabel}

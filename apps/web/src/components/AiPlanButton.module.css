@@ -1,0 +1,28 @@
+.wrap {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* Full-width button on phones, natural width on laptops. */
+.action > button {
+  width: 100%;
+  min-height: 44px;
+}
+
+.writing {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@media (min-width: 640px) {
+  .action > button {
+    width: auto;
+  }
+}

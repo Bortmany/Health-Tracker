@@ -63,7 +63,7 @@
   gap: 2px;
   font-size: var(--text-base);
   font-family: var(--font-body);
-  min-height: 2.75rem;
+  min-height: 44px;
 }
 
 .option:hover {
@@ -155,6 +155,13 @@
   margin-bottom: var(--space-5);
 }
 
+/* One quiet line under the plan card: the plan is free, the AI plan is extra. */
+.includedNote {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: calc(var(--space-3) - var(--space-5)) 0 var(--space-5);
+}
+
 .reassurance {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
@@ -177,7 +184,8 @@
 .textLink {
   background: none;
   border: none;
-  padding: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  min-height: 40px;
   font: inherit;
   font-size: var(--text-sm);
   color: var(--color-text-muted);

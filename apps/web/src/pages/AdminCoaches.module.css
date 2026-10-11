@@ -20,7 +20,7 @@
   justify-content: space-between;
   gap: var(--space-3);
   width: 100%;
-  min-height: 2.75rem;
+  min-height: 44px;
   padding: 0;
   background: none;
   border: none;
@@ -49,7 +49,33 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  min-height: 2.75rem;
+  min-height: 44px;
+}
+
+.coachEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: none;
+}
+
+/* Laptop: who's owed (left) beside what has gone out (right). */
+.cols {
+  display: block;
+}
+
+@media (min-width: 56.25em) {
+  .cols {
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    gap: var(--space-5);
+    align-items: start;
+  }
+
+  .colSide {
+    position: sticky;
+    top: var(--space-4);
+  }
 }
 
 .rowInfo {

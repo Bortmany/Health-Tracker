@@ -1,8 +1,11 @@
 import bcrypt from 'bcrypt';
+import crypto from 'node:crypto';
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { isEmailEnabled, sendEmail } from '../lib/email.js';
 import { signToken, verifyTokenPayload } from '../lib/jwt.js';
+import { logger } from '../lib/logger.js';
 import { getSignupMode, isValidInviteCode } from '../lib/signupMode.js';
 import * as validate from '../lib/validate.js';
 import { withTransaction } from '../lib/withTransaction.js';
@@ -95,7 +98,7 @@ router.post('/register', asyncHandler(async (req, res) => {
 
   if (!email || !password || !displayName) {
     return res.status(400).json({
-      error: { message: 'email, password, and displayName are required', code: 'INVALID_INPUT' },
+      error: { message: 'Please enter your name, email and password.', code: 'INVALID_INPUT' },
     });
   }
   // Reject malformed addresses up front (returns it trimmed + lower-cased).
@@ -105,7 +108,7 @@ router.post('/register', asyncHandler(async (req, res) => {
       error: { message: 'Password must be at least 8 characters long', code: 'WEAK_PASSWORD' },
     });
   }
-  const cleanDisplayName = validate.stringLength(displayName, 'displayName', { max: 100 });
+  const cleanDisplayName = validate.stringLength(displayName, 'name', { max: 100, label: 'a name' });
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
 
@@ -217,6 +220,134 @@ router.get('/me', requireAuth, asyncHandler(async (req, res) => {
     return res.status(401).json({ error: { message: 'Not authenticated', code: 'NO_TOKEN' } });
   }
   res.json({ user: toPublicUser(user) });
+}));
+
+// ---- Forgot / reset password ------------------------------------------------
+//
+// The emailed link carries a random 32-byte token. Only its SHA-256 hash is
+// stored (a database leak can't be turned into working links), it works once
+// and expires after one hour. The token is never logged. Asking for a link
+// gives the SAME answer whether or not the address has an account, and the
+// work happens after the reply is sent, so timing says nothing either.
+
+const RESET_TOKEN_BYTES = 32;
+const RESET_LINK_MINUTES = 60;
+
+const sha256Hex = (value) => crypto.createHash('sha256').update(value).digest('hex');
+
+// The public address used in emailed links. In production it MUST be set: a
+// localhost fallback there would email people a dead link, so the caller
+// refuses to send instead (null). Development keeps the localhost fallback.
+function appBaseUrl() {
+  const raw = (process.env.APP_URL ?? '').trim().replace(/\/+$/, '');
+  if (raw) return raw;
+  return process.env.NODE_ENV === 'production' ? null : 'http://localhost:5173';
+}
+
+// Creates a new reset link for this account (voiding any older ones) and
+// emails it.
+async function sendResetLink(userId, address) {
+  const baseUrl = appBaseUrl();
+  if (!baseUrl) {
+    logger.error('APP_URL is not set in production, so the password reset email was NOT sent. Set APP_URL to the public address.');
+    return;
+  }
+  const token = crypto.randomBytes(RESET_TOKEN_BYTES).toString('base64url');
+  await withTransaction(async (client) => {
+    // A new request voids every older link that hasn't been used.
+    await client.query(
+      'UPDATE password_resets SET used_at = now() WHERE user_id = $1 AND used_at IS NULL',
+      [userId]
+    );
+    await client.query(
+      `INSERT INTO password_resets (user_id, token_hash, expires_at)
+       VALUES ($1, $2, now() + make_interval(mins => $3::int))`,
+      [userId, sha256Hex(token), RESET_LINK_MINUTES]
+    );
+  });
+  await sendEmail({
+    to: address,
+    subject: 'Reset your Cut password',
+    text: [
+      'Someone asked to reset the password for your Cut account.',
+      '',
+      `Open this link to choose a new password. It works once and expires in ${RESET_LINK_MINUTES} minutes:`,
+      `${baseUrl}/reset-password?token=${token}`,
+      '',
+      "If that wasn't you, ignore this email. Your password has not changed.",
+    ].join('\n'),
+  });
+}
+
+router.post('/forgot-password', asyncHandler(async (req, res) => {
+  // With email switched off nothing can be sent, so say so plainly.
+  if (!isEmailEnabled()) {
+    return res.status(503).json({
+      error: { message: 'Password reset is coming soon — contact us.', code: 'EMAIL_DISABLED' },
+    });
+  }
+  const address = validate.email(req.body?.email);
+
+  // Same reply for every valid-looking address; the real work follows it.
+  res.json({ ok: true });
+
+  try {
+    const { rows } = await pool.query('SELECT id FROM users WHERE email = $1', [address]);
+    if (rows[0]) await sendResetLink(rows[0].id, address);
+  } catch (err) {
+    // The token is never part of what gets logged.
+    logger.error('Could not process a password reset request', { error: err });
+  }
+}));
+
+const LINK_INVALID = {
+  error: { message: 'This link has expired or was already used. Ask for a new one.', code: 'LINK_INVALID' },
+};
+
+router.post('/reset-password', asyncHandler(async (req, res) => {
+  const { token, password } = req.body ?? {};
+  if (typeof token !== 'string' || token.length < 10 || token.length > 200) {
+    return res.status(400).json(LINK_INVALID);
+  }
+  // Checked BEFORE the link is used up, so a too-short password doesn't burn it.
+  if (typeof password !== 'string' || password.length < 8) {
+    return res.status(400).json({
+      error: { message: 'Password must be at least 8 characters long', code: 'WEAK_PASSWORD' },
+    });
+  }
+  if (password.length > 200) {
+    return res.status(400).json({
+      error: { message: 'That password is too long.', code: 'WEAK_PASSWORD' },
+    });
+  }
+
+  const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
+
+  const done = await withTransaction(async (client) => {
+    // One atomic step decides who wins: the link is marked used only if it is
+    // still unused and unexpired, so two clicks can't both succeed.
+    const { rows } = await client.query(
+      `UPDATE password_resets SET used_at = now()
+       WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()
+       RETURNING user_id`,
+      [sha256Hex(token)]
+    );
+    if (!rows[0]) return false;
+    // Bumping token_version signs the account out everywhere.
+    await client.query(
+      'UPDATE users SET password_hash = $2, token_version = token_version + 1 WHERE id = $1',
+      [rows[0].user_id, passwordHash]
+    );
+    // Any other open links for the account die with it.
+    await client.query(
+      'UPDATE password_resets SET used_at = now() WHERE user_id = $1 AND used_at IS NULL',
+      [rows[0].user_id]
+    );
+    return true;
+  });
+
+  if (!done) return res.status(400).json(LINK_INVALID);
+  res.json({ ok: true });
 }));
 
 export default router;

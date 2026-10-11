@@ -1,80 +1,101 @@
-/* The Premium explanation: a dimmed overlay with one calm card. */
+/* The quiet Premium card: one column on phones; text left, price and
+   button right from 640px up. */
 
-.overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  background: rgba(0, 0, 0, 0.6);
-  display: grid;
-  place-items: center;
-  padding: var(--space-5);
+.card {
+  margin-bottom: var(--space-4);
 }
 
-.panel {
-  background: var(--color-surface);
-  border: var(--surface-outline);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-2);
-  padding: var(--space-5);
-  width: 100%;
-  max-width: 24rem;
-  max-height: 90vh;
-  overflow-y: auto;
+.layout {
   display: grid;
   gap: var(--space-3);
 }
 
+.text,
+.side {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+}
+
 .title {
   font-family: var(--font-display);
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
+  font-weight: 700;
   margin: 0;
 }
 
-/* Why the panel opened, e.g. after tapping a full-year plan. */
-.reason {
+/* Checkmark benefits: a lime tick, then the line. The tick sits on the
+   line's start edge, so it mirrors correctly right-to-left. */
+.benefits {
+  list-style: none;
   margin: 0;
-  font-size: var(--text-base);
-  color: var(--color-text);
-}
-
-.copy {
-  margin: 0;
-  font-size: var(--text-base);
-  color: var(--color-text-muted);
-}
-
-.list {
-  margin: 0;
-  padding-left: var(--space-5);
+  padding: 0;
   display: grid;
   gap: var(--space-2);
-  font-size: var(--text-sm);
+}
+
+.benefit {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-base);
   color: var(--color-text);
 }
 
-.priceNote {
+.check {
+  flex: none;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.prices {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.price {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.priceYearly {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.action {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.note {
   margin: 0;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
 
-/* ---- Plan-length badge on a plan card ---- */
-
-.badgeRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-3);
+/* Full-width button on phones, natural width on laptops. */
+.action > button {
+  width: 100%;
+  min-height: 44px;
 }
 
-.badgeLink {
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  font-size: var(--text-sm);
-  color: var(--color-accent);
-  cursor: pointer;
-  text-align: left;
+@media (min-width: 640px) {
+  .layout {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: var(--space-5);
+    align-items: start;
+  }
+
+  .action > button {
+    width: auto;
+    justify-self: start;
+  }
 }

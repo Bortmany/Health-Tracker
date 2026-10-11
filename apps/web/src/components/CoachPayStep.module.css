@@ -1,0 +1,59 @@
+.wrap {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.accepted {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.line {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.priceRow {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.price {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-xl);
+  margin-bottom: var(--space-1);
+}
+
+/* One primary button; long coach names wrap to a second line. */
+.pay button {
+  min-height: 44px;
+  text-align: center;
+  white-space: normal;
+}
+
+.bars {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Laptop: price at the start, button at the end, extra space stays empty. */
+@media (min-width: 640px) {
+  .priceRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-5);
+  }
+
+  .pay {
+    max-width: 20rem;
+  }
+}

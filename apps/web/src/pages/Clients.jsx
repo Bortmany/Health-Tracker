@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { Link, useNavigate } from 'react-router-dom';
 import LineChart from '../components/LineChart.jsx';
+import MeasurementsChart from '../components/MeasurementsChart.jsx';
+import SharedPhotosStrip from '../components/SharedPhotosStrip.jsx';
 import Sparkline from '../components/Sparkline.jsx';
+import UnreadDot from '../components/UnreadDot.jsx';
 import {
   Avatar,
   Button,
@@ -19,8 +23,14 @@ import {
   TextArea,
   Toast,
   useToast,
+  Tooltip,
 } from '../components/ui/index.js';
+import { useMe } from '../hooks/useAuth.js';
+import { useCoachBilling } from '../hooks/useCoachBilling.js';
+import { useCheckinQuestions } from '../hooks/useCheckins.js';
+import { useClientMeasurements } from '../hooks/useMeasurements.js';
 import {
+  CLIENTS_KEY,
   useAssignProgram,
   useClientNote,
   useClients,
@@ -35,6 +45,9 @@ import {
   useDeclineRequest,
   useInviteByEmail,
 } from '../hooks/useCoachRequests.js';
+import { inbox as inboxCopy } from '../lib/billingCopy.js';
+import { firstName, formatWeightChange, habitsValue, moodSummary } from '../lib/checkin.js';
+import { dayOfMoment, formatShortDay } from '../lib/localDate.js';
 import { emailError } from '../lib/validation.js';
 import { smoothSeries, trendCaption } from '../lib/trend.js';
 import styles from './Clients.module.css';
@@ -173,9 +186,11 @@ function AssignProgramBuilder({ clientId }) {
         <div className={styles.dayCard} key={day.key}>
           <div className={styles.dayHeaderRow}>
             <Input value={day.name} onChange={(e) => updateDay(day.key, { name: e.target.value })} placeholder="Day name" />
-            <button type="button" className={styles.removeButton} onClick={() => removeDay(day.key)} aria-label="Remove day">
-              ✕
-            </button>
+            <Tooltip text="Remove day">
+              <button type="button" className={styles.removeButton} onClick={() => removeDay(day.key)} aria-label="Remove day">
+                ✕
+              </button>
+            </Tooltip>
           </div>
           {day.exercises.map((ex) => (
             <div className={styles.exerciseRow} key={ex.key}>
@@ -198,14 +213,16 @@ function AssignProgramBuilder({ clientId }) {
                 value={ex.targetReps}
                 onChange={(e) => updateExercise(day.key, ex.key, { targetReps: e.target.value })}
               />
-              <button
-                type="button"
-                className={styles.removeButton}
-                onClick={() => removeExercise(day.key, ex.key)}
-                aria-label="Remove exercise"
-              >
-                ✕
-              </button>
+              <Tooltip text="Remove exercise">
+                <button
+                  type="button"
+                  className={styles.removeButton}
+                  onClick={() => removeExercise(day.key, ex.key)}
+                  aria-label="Remove exercise"
+                >
+                  ✕
+                </button>
+              </Tooltip>
             </div>
           ))}
           <Button variant="ghost" block onClick={() => addExercise(day.key)}>
@@ -342,10 +359,163 @@ function ClientNotes({ clientId, onSaved }) {
   );
 }
 
+// The global skeleton grey is the Card colour, so inside a Card it would be
+// invisible; this lifts it to the nested-surface grey instead.
+const IN_CARD_SKELETON = { background: 'var(--color-surface-2)' };
+
+// "This week" for one client: six plain numbers, no calories or protein.
+function ThisWeekGrid({ week, firstWeighIn }) {
+  const change = formatWeightChange(week.weightChange);
+  const since = firstWeighIn ? formatShortDay(firstWeighIn) : null;
+  return (
+    <div className={styles.weekGrid}>
+      <StatCard
+        label="Weight"
+        value={week.latestWeight != null ? `${week.latestWeight} kg` : '—'}
+        sub={change ? (since ? `${change} since ${since}` : change) : undefined}
+      />
+      <StatCard label="Avg sleep" value={week.avgSleep != null ? `${week.avgSleep} h` : '—'} />
+      <StatCard
+        label="Avg steps"
+        value={week.avgSteps != null ? Number(week.avgSteps).toLocaleString() : '—'}
+      />
+      <StatCard label="Habits ticked" value={habitsValue(week.habitsTicked, week.habitsPossible)} />
+      <StatCard label="Sessions this week" value={week.sessions ?? 0} />
+      <StatCard label="Last logged" value={week.lastLoggedOn ? formatShortDay(week.lastLoggedOn) : 'Never'} />
+    </div>
+  );
+}
+
+// The coach's thread with one client.
+function messagesPath(clientId) {
+  return `/coach/clients/${encodeURIComponent(clientId)}/messages`;
+}
+
+// This week's answers beside the numbers above, or a quiet line if not sent yet.
+function CheckinAnswers({ checkin, clientId, clientName }) {
+  const navigate = useNavigate();
+  const name = firstName(clientName, 'This client');
+  if (!checkin) {
+    return (
+      <div className={styles.checkinPending}>
+        <p className={styles.mutedLine}>{name} hasn&apos;t sent this week&apos;s check-in yet.</p>
+        <Button variant="ghost" size="sm" onClick={() => navigate(messagesPath(clientId))}>
+          Message {firstName(clientName, 'client')}
+        </Button>
+      </div>
+    );
+  }
+  const answers = Array.isArray(checkin.answers) ? checkin.answers : [];
+  return (
+    <Card>
+      <div className={styles.checkinBody}>
+        <p className={styles.checkinMood}>{moodSummary(checkin.mood)}</p>
+        {answers.map((a, i) => (
+          <div className={styles.checkinItem} key={`${i}-${a.question}`}>
+            <p className={styles.checkinQuestion}>{a.question}</p>
+            {a.answer?.trim() ? (
+              <p className={styles.checkinAnswer}>{a.answer}</p>
+            ) : (
+              <p className={styles.checkinBlank}>No answer</p>
+            )}
+          </div>
+        ))}
+        <div className={styles.checkinItem}>
+          <p className={styles.checkinQuestion}>Note</p>
+          {checkin.notes?.trim() ? (
+            <p className={styles.checkinAnswer}>{checkin.notes}</p>
+          ) : (
+            <p className={styles.checkinBlank}>No answer</p>
+          )}
+        </div>
+        <p className={styles.checkinFooter}>Sent {formatShortDay(dayOfMoment(checkin.submittedAt))}</p>
+      </div>
+    </Card>
+  );
+}
+
+// "Check-in due" / "Check-in done" on each row. Always the neutral chip: the
+// two differ by wording and brightness only, never by red or green.
+function CheckinChip({ status, sentAt }) {
+  if (status === 'done') {
+    const day = dayOfMoment(sentAt);
+    return (
+      <span className={styles.checkinDone}>
+        <Chip title={day ? `Sent on ${formatShortDay(day)}` : 'Sent this week'}>
+          <span aria-hidden="true">✓</span> Check-in done
+        </Chip>
+      </span>
+    );
+  }
+  if (status !== 'due') return null;
+  return <Chip title="Hasn't sent this week's check-in yet">Check-in due</Chip>;
+}
+
+// The small card that leads to the question editor.
+function CheckinQuestionsCard() {
+  const navigate = useNavigate();
+  const questions = useCheckinQuestions();
+  const count = questions.data?.length ?? 0;
+  return (
+    <Card className={styles.stackCard} title="Weekly check-in">
+      {questions.isLoading ? (
+        <Skeleton height="1rem" width="70%" style={IN_CARD_SKELETON} />
+      ) : questions.isError ? (
+        <p className={styles.mutedLine}>Couldn&apos;t load your questions.</p>
+      ) : (
+        <p className={styles.mutedLine}>
+          {count} question{count === 1 ? '' : 's'} · your clients answer them each week
+        </p>
+      )}
+      <div className={styles.cardAction}>
+        <Button variant="secondary" size="sm" onClick={() => navigate('/coach/checkin-questions')}>
+          Edit questions
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+// The client's body measurements (a linked coach sees them like weight,
+// with no switch). A 404 means the connection ended; the summary shows that.
+function ClientMeasurements({ clientId, clientName }) {
+  const measurements = useClientMeasurements(clientId);
+  if (measurements.isError && measurements.error?.status === 404) {
+    return <p className={styles.mutedLine}>You&apos;re no longer connected.</p>;
+  }
+  return (
+    <MeasurementsChart
+      measurements={measurements.data}
+      isLoading={measurements.isLoading}
+      isError={measurements.isError}
+      onRetry={() => measurements.refetch()}
+      height={140}
+      personName={firstName(clientName, 'This client')}
+    />
+  );
+}
+
 // The expanded row. The summary loads only once a row is opened — the list
 // rows already carry everything the coach needs to scan without tapping.
-function ClientDetail({ clientId, onToast }) {
-  const { data: summary, isLoading, isError, refetch } = useClientSummary(clientId);
+function ClientDetail({ clientId, clientName, unread = false, onToast }) {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { data: summary, isLoading, isError, error, refetch } = useClientSummary(clientId);
+  // A 404 means this person is no longer this coach's client (they ended
+  // it, or the coach did on another device). Never show an old copy.
+  const linkEnded = isError && error?.status === 404;
+
+  useEffect(() => {
+    if (linkEnded) queryClient.invalidateQueries({ queryKey: CLIENTS_KEY });
+  }, [linkEnded, queryClient]);
+
+  if (linkEnded) {
+    return (
+      <div className={styles.clientDetail}>
+        <EmptyState>You&apos;re no longer connected. This coaching connection has ended.</EmptyState>
+      </div>
+    );
+  }
 
   if (isError) {
     return (
@@ -359,7 +529,22 @@ function ClientDetail({ clientId, onToast }) {
   }
 
   if (isLoading || !summary) {
-    return <Skeleton height={160} style={{ marginTop: 'var(--space-3)' }} />;
+    return (
+      <div className={styles.clientDetail}>
+        <div className={styles.detailSection}>
+          <SectionTitle>This week</SectionTitle>
+          <div className={styles.weekGrid}>
+            {Array.from({ length: 6 }, (_, i) => (
+              <Skeleton key={i} height={88} style={IN_CARD_SKELETON} />
+            ))}
+          </div>
+        </div>
+        <div className={styles.detailSection}>
+          <SectionTitle>Check-in</SectionTitle>
+          <Skeleton height={140} style={IN_CARD_SKELETON} />
+        </div>
+      </div>
+    );
   }
 
   const weighIns = summary.weighIns ?? [];
@@ -369,9 +554,24 @@ function ClientDetail({ clientId, onToast }) {
   const trend = smoothSeries(rawWeights);
   const caption = trendCaption(weighIns, trend);
 
+  const checkinWeek = summary.thisWeek?.weekStart ?? summary.checkinThisWeek?.weekStart ?? null;
+
   return (
-    <div className={styles.clientDetail}>
-      <div className={styles.detailSection}>
+    <div className={`${styles.clientDetail} ${styles.detailGrid}`}>
+      <div className={styles.detailColumn}>
+      {summary.thisWeek && (
+        <div className={`${styles.detailSection} ${styles.order1}`}>
+          <SectionTitle>This week</SectionTitle>
+          <ThisWeekGrid week={summary.thisWeek} firstWeighIn={weighIns[0]?.date ?? null} />
+        </div>
+      )}
+
+      <div className={`${styles.detailSection} ${styles.order2}`}>
+        <SectionTitle>{checkinWeek ? `Check-in · Week of ${formatShortDay(checkinWeek)}` : 'Check-in'}</SectionTitle>
+        <CheckinAnswers checkin={summary.checkinThisWeek ?? null} clientId={clientId} clientName={clientName} />
+      </div>
+
+      <div className={`${styles.detailSection} ${styles.order6}`}>
         <SectionTitle>Weight trend</SectionTitle>
         {weighIns.length > 0 ? (
           <>
@@ -388,7 +588,7 @@ function ClientDetail({ clientId, onToast }) {
         )}
       </div>
 
-      <div className={styles.detailSection}>
+      <div className={`${styles.detailSection} ${styles.order7}`}>
         <SectionTitle>Recent sessions</SectionTitle>
         {recentSessions.length > 0 ? (
           recentSessions.map((s) => (
@@ -402,7 +602,31 @@ function ClientDetail({ clientId, onToast }) {
         )}
       </div>
 
-      <div className={styles.detailSection}>
+      </div>
+      <div className={styles.detailColumn}>
+      <div className={`${styles.detailSection} ${styles.order3}`}>
+        <SectionTitle>Messages</SectionTitle>
+        <span className={styles.dotAnchor}>
+          <Button variant="secondary" block onClick={() => navigate(messagesPath(clientId))}>
+            Message {firstName(clientName, 'client')}
+          </Button>
+          {unread && <UnreadDot corner />}
+        </span>
+      </div>
+
+      <SharedPhotosStrip
+        clientId={clientId}
+        firstName={firstName(clientName, 'This client')}
+        sectionClass={`${styles.detailSection} ${styles.order4}`}
+        onToast={onToast}
+      />
+
+      <div className={`${styles.detailSection} ${styles.order5}`}>
+        <SectionTitle>Measurements</SectionTitle>
+        <ClientMeasurements clientId={clientId} clientName={clientName} />
+      </div>
+
+      <div className={`${styles.detailSection} ${styles.order8}`}>
         <SectionTitle>Programs</SectionTitle>
         {programs.length > 0 ? (
           programs.map((p) => (
@@ -416,12 +640,13 @@ function ClientDetail({ clientId, onToast }) {
         )}
       </div>
 
-      <div className={styles.detailSection}>
+      </div>
+      <div className={`${styles.detailSection} ${styles.order9} ${styles.fullRow}`}>
         <SectionTitle>Assign a program</SectionTitle>
         <AssignProgramBuilder clientId={clientId} />
       </div>
 
-      <div className={styles.detailSection}>
+      <div className={`${styles.detailSection} ${styles.order10} ${styles.fullRow}`}>
         <SectionTitle>Notes (only you see these)</SectionTitle>
         <ClientNotes clientId={clientId} onSaved={onToast} />
       </div>
@@ -434,10 +659,16 @@ function ClientDetail({ clientId, onToast }) {
 function RequestRow({ request, onDone }) {
   const accept = useAcceptRequest();
   const decline = useDeclineRequest();
+  const billing = useCoachBilling();
   const busy = accept.isPending || decline.isPending;
+  // A paying student can only be accepted once the coach has paid the startup
+  // fee and finished the identity check. While we don't know yet, the server
+  // still decides (it answers COACH_NOT_READY).
+  const notReady = Boolean(billing.data) && !billing.data.active && !billing.data.revoked;
+  const notReadyFromServer = accept.isError && accept.error?.code === 'COACH_NOT_READY';
 
   const takenElsewhere = accept.isError && accept.error?.status === 409;
-  const failed = (accept.isError && !takenElsewhere) || decline.isError;
+  const failed = (accept.isError && !takenElsewhere && !notReadyFromServer) || decline.isError;
 
   return (
     <div className={styles.requestRow}>
@@ -450,11 +681,14 @@ function RequestRow({ request, onDone }) {
           <Button
             size="sm"
             onClick={() =>
+              !notReady &&
               accept.mutate(request.id, {
                 onSuccess: () => onDone(`Accepted — ${request.displayName} is now training with you.`),
               })
             }
             disabled={busy}
+            aria-disabled={notReady ? 'true' : undefined}
+            title={notReady ? inboxCopy.acceptHint : undefined}
           >
             {accept.isPending ? 'Accepting...' : 'Accept'}
           </Button>
@@ -468,6 +702,11 @@ function RequestRow({ request, onDone }) {
           </Button>
         </div>
       </div>
+      {(notReady || notReadyFromServer) && (
+        <p className={styles.clientEmail}>
+          {inboxCopy.notReadyLine} <Link to="/coach/profile#get-paid" className="textLink">{inboxCopy.goToGetPaid}</Link>
+        </p>
+      )}
       {takenElsewhere && <ErrorText>This student now has another coach — nothing to do here.</ErrorText>}
       {failed && <ErrorText>Couldn&apos;t save that — please try again.</ErrorText>}
     </div>
@@ -572,41 +811,58 @@ function ClientRow({ client, expanded, onToggle, onRemove, onToast, removing = f
         </div>
         <div className={styles.clientInfo}>
           <div className={styles.clientTop}>
-            <div className={styles.clientName}>{client.displayName}</div>
+            <div className={styles.nameLine}>
+              <span className={styles.clientName}>{client.displayName}</span>
+              {client.unreadMessages === true && <UnreadDot />}
+            </div>
             {weights.length >= 2 ? (
               <Sparkline values={weights} />
             ) : (
               <span className={styles.noWeighIns}>No weigh-ins yet</span>
             )}
           </div>
-          <div className={styles.clientEmail}>{client.email}</div>
+          <div className={styles.clientEmail} title={client.email}>{client.email}</div>
+          <div className={styles.statusBlock}>
           <div className={styles.triageStats}>
             <StatusLabel quietDays={client.quietDays} />
             <AdherenceLabel adherence={client.adherence} />
           </div>
+          {(client.checkinThisWeek === 'done' || client.checkinThisWeek === 'due') && (
+            <div className={styles.checkinLine}>
+              <CheckinChip status={client.checkinThisWeek} sentAt={client.checkinSentAt} />
+            </div>
+          )}
+          </div>
         </div>
         <div className={styles.rowActions}>
-          <button
-            type="button"
-            className={styles.removeGhost}
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove();
-            }}
-            disabled={removing}
-            aria-label={`End coaching with ${client.displayName}`}
-          >
-            ✕
-          </button>
+          <Tooltip text={`End coaching with ${client.displayName}`}>
+            <button
+              type="button"
+              className={styles.removeGhost}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
+              disabled={removing}
+              aria-label={`End coaching with ${client.displayName}`}
+            >
+              ✕
+            </button>
+          </Tooltip>
           <span className={styles.chevron}>{expanded ? '▲' : '▼'}</span>
         </div>
       </div>
-      {expanded && <ClientDetail clientId={client.clientId} onToast={onToast} />}
+      {expanded && <ClientDetail
+          clientId={client.clientId}
+          clientName={client.displayName}
+          unread={client.unreadMessages === true}
+          onToast={onToast}
+        />}
     </div>
   );
 }
 
-export default function Clients() {
+function CoachClients() {
   const { data, isLoading, isError, refetch } = useClients();
   const requests = useCoachRequests();
   const createInvite = useCreateInvite();
@@ -654,7 +910,7 @@ export default function Clients() {
   const onTrackCount = clients.filter(isOnTrack).length;
 
   return (
-    <Screen title="Clients">
+    <Screen title="Clients" wide>
       {showSummary && (
         <div className={styles.summaryStrip}>
           <StatCard label="Clients" value={clients.length} />
@@ -696,15 +952,17 @@ export default function Clients() {
             {pendingInvites.map((invite) => (
               <div className={styles.inviteRow} key={invite.linkId}>
                 <span className={styles.inviteRowCode}>{invite.inviteCode}</span>
-                <button
-                  type="button"
-                  className={styles.removeGhost}
-                  onClick={() => removeClient.mutate(invite.linkId)}
-                  disabled={removeClient.isPending}
-                  aria-label="Remove invite"
-                >
-                  ✕
-                </button>
+                <Tooltip text="Remove invite">
+                  <button
+                    type="button"
+                    className={styles.removeGhost}
+                    onClick={() => removeClient.mutate(invite.linkId)}
+                    disabled={removeClient.isPending}
+                    aria-label="Remove invite"
+                  >
+                    ✕
+                  </button>
+                </Tooltip>
               </div>
             ))}
           </div>
@@ -722,6 +980,8 @@ export default function Clients() {
           )}
         </Card>
       )}
+
+      <CheckinQuestionsCard />
 
       <Card className={styles.stackCard} title="Your clients">
         {isLoading ? (
@@ -781,4 +1041,33 @@ export default function Clients() {
       <Toast message={toast.message} />
     </Screen>
   );
+}
+
+// The Clients tab is for coaches. Anyone else who types the address gets a
+// plain note and a way back, never the coach screen with an error on it.
+export default function Clients() {
+  const { data: user, isLoading } = useMe();
+  if (isLoading) {
+    return (
+      <Screen title="Clients">
+        <Skeleton height={120} />
+      </Screen>
+    );
+  }
+  if (user?.role !== 'coach') {
+    return (
+      <Screen title="Clients">
+        <EmptyState
+          action={
+            <Link className={styles.linkAsButton} to="/more">
+              Back to More
+            </Link>
+          }
+        >
+          This page is for coaches.
+        </EmptyState>
+      </Screen>
+    );
+  }
+  return <CoachClients />;
 }

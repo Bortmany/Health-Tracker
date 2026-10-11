@@ -56,11 +56,7 @@ async function seedData(cookie, marker) {
   await post('/habits', { label: `Drink water ${marker}` });
   await post('/activities', { name: `Walking ${marker}` });
   await post('/injuries', { region: `Knee ${marker}` });
-  await put('/logs/2026-05-01', { weight: 81, notes: `daily ${marker}` });
-  await put('/nutrition/2026-05-01', {
-    calories: 2000,
-    meals: [{ name: `Oats ${marker}`, calories: 400 }],
-  });
+  await put('/logs/2026-05-01', { weight: 81, calories: 350, notes: `daily ${marker}` });
   await post('/training-logs', {
     date: '2026-05-01',
     exercises: [{ name: `Bench Press ${marker}`, sets: [{ weight: 100, reps: 5 }] }],
@@ -82,7 +78,10 @@ test('GET /export returns everything the user logged, without the password hash'
 
   assert.equal(body.profile.email, email);
   assert.ok(body.dailyLogs.some((l) => l.date === '2026-05-01' && Number(l.weight) === 81));
-  assert.ok(body.nutritionLogs.some((l) => l.meals.some((m) => m.name === `Oats ${marker}`)));
+  // Calories burned stay part of the daily log export.
+  assert.ok(body.dailyLogs.some((l) => l.date === '2026-05-01' && Number(l.calories) === 350));
+  // Food tracking was removed: the export no longer carries a meals section.
+  assert.equal('nutritionLogs' in body, false);
   assert.ok(
     body.trainingLogs.some((l) =>
       l.exercises.some((e) => e.name === `Bench Press ${marker}` && e.sets[0].reps === 5)

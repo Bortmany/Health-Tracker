@@ -1,8 +1,9 @@
 import { Navigate, Outlet } from 'react-router-dom';
+import ReconnectNotice from './ReconnectNotice.jsx';
 import { useMe } from '../hooks/useAuth.js';
 
 export default function ProtectedRoute() {
-  const { data: user, isLoading } = useMe();
+  const { data: user, isLoading, isError, refetch } = useMe();
 
   if (isLoading) {
     return (
@@ -12,6 +13,9 @@ export default function ProtectedRoute() {
       </div>
     );
   }
+
+  // Couldn't ask (busy server / no connection): not the same as signed out.
+  if (!user && isError) return <ReconnectNotice onRetry={() => refetch()} />;
 
   if (!user) {
     return <Navigate to="/login" replace />;

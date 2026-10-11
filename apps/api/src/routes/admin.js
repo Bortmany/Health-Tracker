@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { isPayoutsEnabled, payoutMethod } from '../lib/billing/index.js';
 import { ensureCoachProfile } from '../lib/coachProfiles.js';
+import { resolveManualReviewPayout, runPayoutsMethodB } from '../lib/payoutRun.js';
+import { loadOwnerAttention } from '../lib/ownerAttention.js';
+import { retryPendingCancels, retryPendingRefunds } from '../lib/providerRetries.js';
+import { stopSubscriptionsWhere } from '../lib/stopSubscriptions.js';
 import * as validate from '../lib/validate.js';
 import { Rollback, withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -127,13 +132,157 @@ router.post('/coaches/:userId/revoke', asyncHandler(async (req, res) => {
     }
     await client.query(
       `UPDATE coach_clients SET status = 'revoked'
-       WHERE coach_id = $1 AND status IN ('active', 'pending', 'requested')`,
+       WHERE coach_id = $1 AND status IN ('active', 'pending', 'requested', 'pending_payment')`,
       [req.params.userId]
     );
     return true;
   });
   if (!revoked) return;
+  // Their students' monthly payments stop too. The coach's unpaid earnings
+  // stay in the ledger, listed and payable (revoking access is not forgiving
+  // a debt).
+  await stopSubscriptionsWhere('cc.coach_id = $1', [req.params.userId]);
   res.json({ userId: req.params.userId, revoked: true });
+}));
+
+// ---- Coach money (owner only) ---------------------------------------------
+
+// Everyone who is, or ever was, a coach with money on the books. Revoked
+// coaches are included: what they have earned stays listed and payable.
+router.get('/coaches/earnings', asyncHandler(async (_req, res) => {
+  const { rows } = await pool.query(
+    `SELECT u.id, u.display_name, u.email, u.role,
+            COALESCE(cs.identity_verified, false) AS identity_verified,
+            (cs.provider_account_id IS NOT NULL) AS has_account,
+            COALESCE(l.owed, 0) AS owed,
+            COALESCE(l.provider_settled, 0) AS provider_settled,
+            COALESCE(pd.paid, 0) AS paid,
+            COALESCE(pd.being_checked, 0) AS being_checked
+     FROM users u
+     LEFT JOIN coach_subscriptions cs ON cs.coach_id = u.id
+     LEFT JOIN (
+       SELECT coach_id,
+              SUM(coach_cents) FILTER (WHERE settled_by = 'cut' AND payout_id IS NULL)::int AS owed,
+              SUM(coach_cents) FILTER (WHERE settled_by = 'provider')::int AS provider_settled
+       FROM commission_ledger GROUP BY coach_id
+     ) l ON l.coach_id = u.id
+     LEFT JOIN (
+       SELECT coach_id,
+              SUM(amount_cents) FILTER (WHERE status = 'paid')::int AS paid,
+              SUM(amount_cents) FILTER (WHERE status IN ('pending', 'manual_review'))::int AS being_checked
+       FROM payouts GROUP BY coach_id
+     ) pd ON pd.coach_id = u.id
+     WHERE u.role = 'coach' OR l.coach_id IS NOT NULL OR pd.coach_id IS NOT NULL
+     ORDER BY u.display_name`
+  );
+
+  const coaches = rows.map((row) => ({
+    userId: row.id,
+    displayName: row.display_name,
+    email: row.email,
+    revoked: row.role !== 'coach',
+    identityVerified: row.identity_verified === true,
+    owedCents: row.owed,
+    paidCents: row.paid + Math.max(row.provider_settled, 0),
+    // Sent but not confirmed yet (or parked for a check): not "paid".
+    beingCheckedCents: row.being_checked,
+    // Can be sent money: passed the identity check and has a payment account.
+    payable: row.identity_verified === true && row.has_account === true,
+  }));
+  const owing = coaches.filter((c) => c.owedCents > 0);
+  const payable = owing.filter((c) => c.payable);
+  res.json({
+    totalOwedCents: owing.reduce((sum, c) => sum + c.owedCents, 0),
+    payableCents: payable.reduce((sum, c) => sum + c.owedCents, 0),
+    payableCoachCount: payable.length,
+    skippedCoachCount: owing.length - payable.length,
+    coaches: coaches.map(({ payable: _payable, ...rest }) => rest),
+    negativeBalances: coaches
+      .filter((c) => c.owedCents < 0)
+      .map((c) => ({ userId: c.userId, displayName: c.displayName, owedCents: c.owedCents })),
+    // Plain-English list of money things that need the owner (stuck payouts,
+    // cancels and refunds still waiting, payments in other currencies).
+    needsAttention: await loadOwnerAttention(),
+  });
+}));
+
+// "Pay coaches now". Owner only (requireAdmin above answers 404 to anyone
+// else). Method A: the payment company pays coaches itself, so nothing is sent
+// from here. Method B: runs the locked payout (lib/payoutRun.js).
+router.post('/payouts/run', asyncHandler(async (_req, res) => {
+  const method = payoutMethod();
+  if (!method || !isPayoutsEnabled()) {
+    return res.status(503).json({
+      error: { message: "Payouts aren't switched on yet.", code: 'PAYOUTS_DISABLED' },
+    });
+  }
+  // Saved retries first: subscription cancels and refunds that failed earlier.
+  await retryPendingCancels();
+  await retryPendingRefunds();
+  if (method === 'A') {
+    return res.json({
+      method: 'A',
+      started: 0,
+      totalCents: 0,
+      failed: 0,
+      message: 'The payment company pays coaches directly. Nothing to send from here.',
+    });
+  }
+  const result = await runPayoutsMethodB();
+  if (result.busy) {
+    return res.status(409).json({
+      error: { message: 'A payout run is already going. Wait for it to finish.', code: 'PAYOUT_IN_PROGRESS' },
+    });
+  }
+  res.json({ method: 'B', ...result });
+}));
+
+// The owner settles a payout parked for review, after checking with the payment
+// company: it was really 'paid', or it 'failed' (its money is owed again,
+// exactly once). Only valid from manual_review; the same answer twice is fine.
+router.post('/payouts/:id/resolve', asyncHandler(async (req, res) => {
+  const id = req.params.id;
+  const outcome = req.body?.outcome;
+  const note = typeof req.body?.note === 'string' ? req.body.note.trim() : '';
+  if (!validate.isUuid(id)) return notFound(res);
+  if (outcome !== 'paid' && outcome !== 'failed') {
+    return res.status(400).json({ error: { message: 'Choose whether the payout was sent or did not go through.', code: 'INVALID_INPUT' } });
+  }
+  if (note.length < 1 || note.length > 300) {
+    return res.status(400).json({ error: { message: 'Add a short note (up to 300 characters) about what you checked.', code: 'INVALID_INPUT' } });
+  }
+  const result = await resolveManualReviewPayout(id, outcome, note);
+  if (result === 'not_found') return notFound(res);
+  if (result === 'not_in_review') {
+    return res.status(409).json({
+      error: { message: 'This payout is not waiting for a check, so it cannot be changed.', code: 'NOT_IN_REVIEW' },
+    });
+  }
+  res.json({ id, status: outcome, changed: result === 'resolved' });
+}));
+
+router.get('/payouts', asyncHandler(async (req, res) => {
+  const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 20, 1), 100);
+  const offset = Math.max(Number.parseInt(req.query.offset, 10) || 0, 0);
+  const { rows } = await pool.query(
+    `SELECT p.id, p.coach_id, p.amount_cents, p.status, p.provider_reference, p.created_at, u.display_name
+     FROM payouts p
+     JOIN users u ON u.id = p.coach_id
+     ORDER BY p.created_at DESC, p.id
+     LIMIT $1 OFFSET $2`,
+    [limit + 1, offset]
+  );
+  res.json({
+    payouts: rows.slice(0, limit).map((row) => ({
+      id: row.id,
+      coach: { userId: row.coach_id, displayName: row.display_name },
+      amountCents: row.amount_cents,
+      status: row.status,
+      providerRef: row.provider_reference,
+      createdAt: row.created_at,
+    })),
+    hasMore: rows.length > limit,
+  });
 }));
 
 export default router;

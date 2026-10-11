@@ -58,7 +58,7 @@
   font-size: var(--text-sm);
   font-family: var(--font-body);
   cursor: pointer;
-  min-height: 2.75rem;
+  min-height: 44px;
 }
 
 .roleOptionActive {
@@ -76,8 +76,12 @@
 }
 
 .switch a {
-  color: var(--color-accent);
+  color: var(--color-link);
   text-decoration: none;
+  /* the link is part of the sentence, so extra top/bottom room grows the tap
+     area to about 44px without moving the text or the line */
+  padding: 0.875rem 0.25rem;
+  margin: 0 -0.25rem;
 }
 
 /* One-line helper under the signup invite code input. */
@@ -107,5 +111,45 @@
 }
 
 .legalNote a {
+  color: var(--color-text-muted);
+  padding: 0.875rem 0.125rem;
+  margin: 0 -0.125rem;
+}
+
+/* "Forgot password?" under the password field. */
+.forgotRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: calc(-1 * var(--space-2));
+}
+
+.forgotLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.forgotLink:hover,
+.forgotLink:focus-visible {
+  text-decoration: underline;
+}
+
+.noticeStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.noticeStack a,
+.notice a {
+  color: var(--color-link);
+}
+
+.fieldHint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
   color: var(--color-text-muted);
 }

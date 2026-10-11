@@ -7,7 +7,7 @@
 // isn't installed or fails to start, we log a warning and carry on — the app
 // never crashes because of error tracking.
 
-import { logger } from './logger.js';
+import { logger, setErrorHook } from './logger.js';
 
 let sentry = null;
 
@@ -22,6 +22,8 @@ export async function initSentry() {
       tracesSampleRate: 0,
     });
     sentry = Sentry;
+    // Every logged server error (payment, payout, checkout...) is reported too.
+    setErrorHook((err) => captureException(err));
     logger.info('Sentry error tracking enabled');
   } catch (err) {
     logger.warn('SENTRY_DSN is set but @sentry/node could not be loaded; error tracking stays off. Run: npm install @sentry/node', {

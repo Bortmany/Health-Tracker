@@ -1,0 +1,33 @@
+/* 8px accent circle with a 2px surface ring, so it still shows on the
+   active (also accent) tab. */
+.dot,
+.corner {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-surface);
+  vertical-align: middle;
+}
+
+.corner {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  pointer-events: none;
+}
+
+/* Read out by screen readers, invisible on screen. */
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
