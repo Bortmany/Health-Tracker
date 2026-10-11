@@ -164,7 +164,7 @@ test('DELETE /account removes the user and every row of their data', async () =>
   // Nothing left in the database for this user, in any table.
   const userScopedTables = [
     'user_settings', 'habits', 'activities', 'injuries', 'daily_logs',
-    'programs', 'training_logs', 'nutrition_logs', 'user_plans',
+    'programs', 'training_logs', 'user_plans',
   ];
   for (const table of userScopedTables) {
     const { rows } = await pool.query(`SELECT COUNT(*)::int AS count FROM ${table} WHERE user_id = $1`, [user.id]);

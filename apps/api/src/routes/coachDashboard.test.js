@@ -138,15 +138,12 @@ test('a training session counts as being active', async () => {
   assert.deepEqual(clients.map((c) => c.displayName), ['walker User', 'lifter User']);
 });
 
-// Food tracking was removed from the app. Old meal rows can still sit in the
-// database, but they no longer count as the client being active.
-test('a client who only ever logged meals reads as "never logged"', async () => {
+// Food tracking (and its old tables) is gone. A client with no logs of any
+// kind reads as "never logged".
+test('a client with nothing logged reads as "never logged"', async () => {
   const coach = await makeCoach('oldmealcoach');
   const eater = await register('eater');
   await link(coach, eater);
-
-  const today = await dbDate(0);
-  await pool.query('INSERT INTO nutrition_logs (user_id, date, calories) VALUES ($1, $2, 2000)', [eater.user.id, today]);
 
   const [row] = await listClients(coach);
   assert.equal(row.displayName, 'eater User');

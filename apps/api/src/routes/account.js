@@ -82,7 +82,6 @@ router.delete('/', asyncHandler(async (req, res) => {
     await client.query('DELETE FROM ai_plan_adjustments WHERE user_id = $1', [req.userId]);
     await client.query('DELETE FROM ai_plan_attempts WHERE user_id = $1', [req.userId]);
     await client.query('DELETE FROM training_logs WHERE user_id = $1', [req.userId]);
-    await client.query('DELETE FROM nutrition_logs WHERE user_id = $1', [req.userId]);
     await client.query('DELETE FROM daily_logs WHERE user_id = $1', [req.userId]);
     await client.query('DELETE FROM programs WHERE user_id = $1', [req.userId]);
     await client.query('DELETE FROM injuries WHERE user_id = $1', [req.userId]);
