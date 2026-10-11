@@ -1,4 +1,7 @@
 .headerLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem; /* a text link still gets a 40px tap area */
   color: var(--color-text-muted);
   text-decoration: none;
 }

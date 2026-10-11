@@ -40,7 +40,7 @@ export default function Login() {
           <h1 className={styles.wordmark}>Cut</h1>
           <p className={styles.subtitle}>Log in to your tracker</p>
           <form className={styles.form} onSubmit={handleSubmit} noValidate>
-            <Field label="Email" error={emailMessage || login.isError}>
+            <Field htmlFor="email" label="Email" error={emailMessage || login.isError}>
               <Input
                 id="email"
                 type="email"
@@ -53,7 +53,7 @@ export default function Login() {
                 required
               />
             </Field>
-            <Field label="Password" error={login.isError}>
+            <Field htmlFor="password" label="Password" error={login.isError}>
               <Input
                 id="password"
                 type="password"

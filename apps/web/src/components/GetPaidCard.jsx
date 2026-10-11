@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Card, Chip, ErrorText, Field, Input, Skeleton } from './ui/index.js';
 import MoneyButton from './MoneyButton.jsx';
 import MoneyOffNote from './MoneyOffNote.jsx';
@@ -30,6 +30,9 @@ function PriceForm({ billing, onToast }) {
   const setPrice = useSetCoachPrice();
   const [text, setText] = useState(centsToInput(billing.priceCents));
   const [touched, setTouched] = useState(false);
+  // Set the instant a save starts, before React re-renders: two clicks in the
+  // same moment both see the isPending flag as still false, but not this.
+  const inFlight = useRef(false);
 
   // A fresh price from the server (after a save) wins over a stale draft.
   useEffect(() => {
@@ -50,13 +53,19 @@ function PriceForm({ billing, onToast }) {
     e.preventDefault();
     setTouched(true);
     // One request at a time: a second click or Enter while saving does nothing.
-    if (!changed || setPrice.isPending) return;
-    setPrice.mutate(parsed.cents, { onSuccess: () => onToast(getPaid.priceSavedToast(parsed.cents)) });
+    if (!changed || setPrice.isPending || inFlight.current) return;
+    inFlight.current = true;
+    setPrice.mutate(parsed.cents, {
+      onSuccess: () => onToast(getPaid.priceSavedToast(parsed.cents)),
+      onSettled: () => {
+        inFlight.current = false;
+      },
+    });
   }
 
   return (
     <form className={styles.priceForm} onSubmit={handleSubmit} noValidate>
-      <Field label={getPaid.priceLabel} error={fieldError || serverError}>
+      <Field htmlFor="coach-price" label={getPaid.priceLabel} error={fieldError || serverError}>
         <div className={styles.priceBox}>
           <span className={styles.affix} aria-hidden="true">
             {getPaid.pricePrefix}

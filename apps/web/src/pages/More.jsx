@@ -637,7 +637,7 @@ export default function More() {
             <PlanTierLine planTier={user?.planTier} />
             {user?.role === 'coach' && <div className={styles.mutedLine}>Coach account</div>}
           </div>
-          <Button variant="secondary" onClick={() => logout.mutate()} disabled={logout.isPending}>
+          <Button variant="secondary" className={styles.logoutButton} onClick={() => logout.mutate()} disabled={logout.isPending}>
             {logout.isPending ? 'Logging out...' : 'Log out'}
           </Button>
         </div>

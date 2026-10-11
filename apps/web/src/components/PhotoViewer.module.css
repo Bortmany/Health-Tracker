@@ -11,6 +11,11 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* Phone: the dialog box adds nothing, its three parts fill the overlay. */
+.dialog {
+  display: contents;
+}
+
 .topBar {
   display: flex;
   align-items: center;
@@ -134,4 +139,58 @@
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+}
+
+/* Laptop: a centred dialog, not a stretched full screen. The photo sits on
+   the left (fitted, never stretched); the date, the share switch and Delete
+   (or "Shared by ...") sit in a 320px panel on the right. */
+@media (min-width: 64em) {
+  .overlay {
+    background: rgba(0, 0, 0, 0.72);
+    display: grid;
+    place-items: center;
+    padding: var(--space-6);
+  }
+
+  .dialog {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      'stage top'
+      'stage panel';
+    width: min(960px, 100%);
+    height: min(720px, 100%);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg, var(--radius-md));
+    overflow: hidden;
+  }
+
+  .topBar {
+    grid-area: top;
+    padding: var(--space-3) var(--space-4);
+    border-left: 1px solid var(--color-border);
+  }
+
+  .stage {
+    grid-area: stage;
+    padding: var(--space-4);
+  }
+
+  .panel {
+    grid-area: panel;
+    border-top: none;
+    border-left: 1px solid var(--color-border);
+    padding: var(--space-2) var(--space-4) var(--space-4);
+    align-content: start;
+    grid-template-rows: none;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .deleteButton {
+    margin-top: auto;
+  }
 }

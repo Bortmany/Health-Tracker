@@ -3,11 +3,20 @@ import styles from './Field.module.css';
 
 // A labelled form control with an optional error state. Pass a string to
 // show a red message under the control; pass `true` to just mark the box
-// red (when the message already lives elsewhere on the screen).
-export default function Field({ label, error, children }) {
+// red (when the message already lives elsewhere on the screen). Pass
+// `htmlFor` (the input's id) so the label is tied to its box: tapping the
+// label focuses the box and screen readers read the label.
+export default function Field({ label, error, htmlFor, children }) {
   return (
     <div className={`${styles.field} ${error ? styles.fieldError : ''}`.trim()}>
-      {label && <span className={styles.label}>{label}</span>}
+      {label &&
+        (htmlFor ? (
+          <label className={styles.label} htmlFor={htmlFor}>
+            {label}
+          </label>
+        ) : (
+          <span className={styles.label}>{label}</span>
+        ))}
       {children}
       {typeof error === 'string' && error && <ErrorText>{error}</ErrorText>}
     </div>

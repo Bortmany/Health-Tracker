@@ -47,6 +47,9 @@
 }
 
 .logLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem; /* a text link still gets a 40px tap area */
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   letter-spacing: var(--tracking-label);

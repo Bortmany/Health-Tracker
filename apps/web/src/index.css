@@ -57,16 +57,26 @@ button {
   }
 }
 
+/* Tap size for plain text links. A link with no class of its own (footer
+   links, "Log in" in a sentence, "Back to Cut") and anything marked
+   className="textLink" gets 14px of extra room above and below. On a link that
+   sits inside a line of text this adds no height to the line, and the text
+   does not move, but the area you can tap grows to about 44px. Links that
+   already have their own class set their own size in their own style file. */
+a:not([class]):not(:has(button)),
+.textLink {
+  padding-block: 0.875rem;
+}
+
 /* Shared text-link look: use className="textLink" on any <a> or <Link> that
-   sits in running text. The colour is readable on dark and light themes; the
-   padding trick grows the tap area to about 40px without moving the text. */
+   sits in running text. The colour is readable on dark and light themes. */
 .textLink,
 .textLink:visited {
   color: var(--color-link);
   text-decoration: underline;
   text-underline-offset: 2px;
-  padding: 0.5rem 0.125rem;
-  margin: -0.5rem -0.125rem;
+  padding-inline: 0.125rem;
+  margin-inline: -0.125rem;
 }
 
 .textLink:hover {

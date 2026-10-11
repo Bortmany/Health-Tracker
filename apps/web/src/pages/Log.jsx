@@ -392,7 +392,6 @@ export default function Log() {
       </div>
 
       {measureFormError && <ErrorText>Some measurements need a look before saving.</ErrorText>}
-      {weightMessage && <ErrorText>{weightMessage}</ErrorText>}
       {putLog.isError && <ErrorText>{plainServerMessage(putLog.error.message)}</ErrorText>}
 
       {isLoading || !form ? (

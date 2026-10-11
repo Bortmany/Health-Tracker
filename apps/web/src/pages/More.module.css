@@ -11,6 +11,13 @@
 
 .accountInfo {
   min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* "Log out" stays on one line; the account details give way instead. */
+.logoutButton {
+  flex: none;
+  white-space: nowrap;
 }
 
 .mutedLine {

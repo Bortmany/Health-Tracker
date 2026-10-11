@@ -182,7 +182,7 @@ export default function Dashboard() {
 
         <div className={styles.quickRow}>
           {QUICK_LOGS.map(({ label, focus }) => (
-            <Button key={focus} variant="ghost" size="sm" onClick={() => navigate(`/log?focus=${focus}`)}>
+            <Button key={focus} variant="ghost" onClick={() => navigate(`/log?focus=${focus}`)}>
               {label}
             </Button>
           ))}

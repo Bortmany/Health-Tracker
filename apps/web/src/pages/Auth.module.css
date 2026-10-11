@@ -78,10 +78,10 @@
 .switch a {
   color: var(--color-link);
   text-decoration: none;
-  /* grows the tap area to about 40px without moving the text */
-  display: inline-block;
-  padding: 0.5rem 0.25rem;
-  margin: -0.5rem -0.25rem;
+  /* the link is part of the sentence, so extra top/bottom room grows the tap
+     area to about 44px without moving the text or the line */
+  padding: 0.875rem 0.25rem;
+  margin: 0 -0.25rem;
 }
 
 /* One-line helper under the signup invite code input. */
@@ -112,9 +112,8 @@
 
 .legalNote a {
   color: var(--color-text-muted);
-  display: inline-block;
-  padding: 0.5rem 0.125rem;
-  margin: -0.5rem -0.125rem;
+  padding: 0.875rem 0.125rem;
+  margin: 0 -0.125rem;
 }
 
 /* "Forgot password?" under the password field. */

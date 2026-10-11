@@ -118,6 +118,7 @@
 }
 
 .removeButton {
+  min-width: 2.75rem; /* wide enough to tap, not just tall enough */
   background: none;
   border: var(--surface-outline);
   color: var(--color-text-muted);
@@ -235,7 +236,9 @@
 }
 
 .heatmapLink {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem; /* a text link still gets a 40px tap area */
   margin-bottom: var(--space-3);
   font-family: var(--font-mono);
   font-size: var(--text-xs);

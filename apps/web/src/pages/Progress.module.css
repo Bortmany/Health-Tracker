@@ -197,10 +197,18 @@
   text-decoration: none;
 }
 
+/* Phone: these two wrappers vanish and the cards follow the order written
+   in the page. */
+.cLeft,
+.cLower {
+  display: contents;
+}
+
 /* ---- Laptop layout (the page is 960px wide) ----
-   Rows: This week | Consistency, Weight | Measurements, Progress photos
-   across the full width, Muscle heat | Personal records. On a phone it stays
-   one column in the order written in the page. */
+   Row 1: "This week" and "Weight" stacked on the left, the tall Consistency
+   calendar on the right (about the same height, so no empty gap).
+   Row 2: Measurements | Muscle heat and Personal records stacked.
+   Row 3: Progress photos across the full width. */
 @media (min-width: 1024px) {
   .stack {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -208,11 +216,16 @@
     align-items: start;
   }
 
-  .cWeek { order: 1; }
+  .cLeft,
+  .cLower {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+
+  .cLeft { order: 1; }
   .cCalendar { order: 2; }
-  .cWeight { order: 3; }
-  .cMeasure { order: 4; }
+  .cMeasure { order: 3; }
+  .cLower { order: 4; }
   .cPhotos { order: 5; grid-column: 1 / -1; }
-  .cHeat { order: 6; }
-  .cRecords { order: 7; }
 }

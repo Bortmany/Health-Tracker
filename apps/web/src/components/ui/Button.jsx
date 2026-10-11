@@ -12,6 +12,7 @@ export default function Button({
   type = 'button',
   onClick,
   title,
+  className = '',
   children,
   ...rest
 }) {
@@ -20,6 +21,7 @@ export default function Button({
     styles[variant],
     size === 'sm' ? styles.sm : '',
     block ? styles.block : '',
+    className,
   ]
     .filter(Boolean)
     .join(' ');

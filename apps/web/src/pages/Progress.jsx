@@ -232,6 +232,9 @@ export default function Progress() {
   return (
     <Screen title="Progress" wide>
       <div className={styles.stack}>
+        {/* On a laptop "This week" and "Weight" stack in the left column beside
+            the tall calendar; on a phone this wrapper disappears. */}
+        <div className={styles.cLeft}>
         <div className={styles.cWeek}>
           <WeekStrip />
         </div>
@@ -252,6 +255,7 @@ export default function Progress() {
             <EmptyState>Nothing to chart yet — weigh-ins you log will show up here.</EmptyState>
           )}
         </Card>
+        </div>
 
         <div className={styles.cMeasure}>
           <MeasurementsCard />
@@ -265,6 +269,7 @@ export default function Progress() {
           <ConsistencyCalendar />
         </div>
 
+        <div className={styles.cLower}>
         <Card className={styles.cHeat} title="Muscle heat">
           <p className={styles.heatmapTeaser}>
             See which muscles you have been hitting — and which you have been skipping.
@@ -293,6 +298,7 @@ export default function Progress() {
             <EmptyState>Log some weighted sets and your best lifts will land here.</EmptyState>
           )}
         </Card>
+        </div>
       </div>
       <Toast message={toast.message} />
     </Screen>

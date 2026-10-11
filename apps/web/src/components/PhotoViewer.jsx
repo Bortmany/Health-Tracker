@@ -186,6 +186,7 @@ export default function PhotoViewer({
 
   return createPortal(
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={`Photo from ${dateLabel}`}>
+      <div className={styles.dialog}>
       <div className={styles.topBar}>
         {/* No hover hint here: the button is focused on open, so a hint would pop up and linger. aria-label names it. */}
         <button
@@ -244,7 +245,7 @@ export default function PhotoViewer({
                 {shareError && <ErrorText>Couldn&apos;t change sharing. Please try again.</ErrorText>}
               </div>
             )}
-            <Button variant="danger" block onClick={() => setConfirmOpen(true)} disabled={deletePhoto.isPending}>
+            <Button variant="danger" block className={styles.deleteButton} onClick={() => setConfirmOpen(true)} disabled={deletePhoto.isPending}>
               Delete photo
             </Button>
             {deletePhoto.isError && !confirmOpen && (
@@ -254,6 +255,7 @@ export default function PhotoViewer({
         ) : (
           <p className={styles.muted}>Shared by {sharedByName}</p>
         )}
+      </div>
       </div>
 
       {isOwner && (

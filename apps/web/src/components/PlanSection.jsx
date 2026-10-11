@@ -26,7 +26,7 @@ function TemplateCard({ template, onAdopt, adopting }) {
         <Chip>{template.experience}</Chip>
         <Chip>{template.daysPerWeek} days/week</Chip>
       </div>
-      <Button variant="primary" size="sm" onClick={onAdopt} disabled={adopting}>
+      <Button variant="primary" onClick={onAdopt} disabled={adopting}>
         {adopting ? 'Setting up...' : 'Use this plan'}
       </Button>
     </div>

@@ -6,6 +6,7 @@ import { useAdoptTemplate, useRecommendedTemplates } from '../hooks/usePlans.js'
 import { useSettings, useUpdateSettings } from '../hooks/useSettings.js';
 import styles from './Onboarding.module.css';
 import { localToday, toCalendarDay } from '../lib/localDate.js';
+import { isBlankWeight, weightError, weightToPayload } from '../lib/weight.js';
 
 const STEPS = [
   {
@@ -67,6 +68,7 @@ function RevealStep() {
   const adopt = useAdoptTemplate();
   const updateSettings = useUpdateSettings();
   const [weight, setWeight] = useState('');
+  const [weightMessage, setWeightMessage] = useState(null);
   const top = recommended[0];
 
   // Straight into the first workout of the new program, with it already
@@ -78,14 +80,14 @@ function RevealStep() {
   }
 
   function saveWeightThenStart(adopted) {
-    if (weight === '') {
+    if (isBlankWeight(weight)) {
       goToDayOne(adopted);
       return;
     }
     updateSettings.mutate(
       {
         // Keep every other goal the person already had — only add the weight.
-        startWeight: Number(weight),
+        startWeight: weightToPayload(weight),
         targetWeight: settings?.targetWeight ?? null,
         targetDate: toCalendarDay(settings?.targetDate),
         height: settings?.height ?? null,
@@ -99,6 +101,13 @@ function RevealStep() {
 
   function handleStart() {
     if (!top) return;
+    // A weight that can't be saved (like 5 or 500) is said out loud before
+    // anything happens, instead of being silently dropped.
+    const problem = weightError(weight);
+    if (problem) {
+      setWeightMessage(problem);
+      return;
+    }
     adopt.mutate({ id: top.id, startDate: localToday() }, { onSuccess: saveWeightThenStart });
   }
 
@@ -129,13 +138,18 @@ function RevealStep() {
           <p className={styles.includedNote}>Included free. Upgrade any time for an AI plan that adjusts weekly.</p>
 
           <div className={styles.weightField}>
-            <Field label="Starting weight (kg)">
+            <Field htmlFor="startingWeight" label="Starting weight (kg)" error={weightMessage || false}>
               <Input
+                id="startingWeight"
                 type="number"
                 inputMode="decimal"
                 step="0.1"
                 value={weight}
-                onChange={(e) => setWeight(e.target.value)}
+                onChange={(e) => {
+                  setWeight(e.target.value);
+                  setWeightMessage(null);
+                }}
+                aria-invalid={weightMessage ? 'true' : undefined}
               />
             </Field>
             <p className={styles.reassurance}>

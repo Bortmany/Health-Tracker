@@ -71,7 +71,7 @@ export default function ResetPassword() {
     const serverMessage = reset.isError ? (reset.error?.status === 429 ? copy.tooMany : copy.saveError) : '';
     body = (
       <form className={styles.form} onSubmit={handleSubmit} noValidate>
-        <Field label={copy.newPassword} error={tooShort}>
+        <Field htmlFor="password" label={copy.newPassword} error={tooShort}>
           <Input
             id="password"
             type="password"
@@ -83,7 +83,7 @@ export default function ResetPassword() {
           />
           <p className={styles.fieldHint}>{copy.newPasswordHint}</p>
         </Field>
-        <Field label={copy.again} error={mismatch}>
+        <Field htmlFor="password-again" label={copy.again} error={mismatch}>
           <Input
             id="password-again"
             type="password"

@@ -140,6 +140,7 @@
 }
 
 .removeButton {
+  min-width: 2.75rem; /* wide enough to tap, not just tall enough */
   background: none;
   border: var(--surface-outline);
   color: var(--color-text-muted);

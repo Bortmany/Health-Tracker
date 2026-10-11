@@ -821,7 +821,8 @@ function ClientRow({ client, expanded, onToggle, onRemove, onToast, removing = f
               <span className={styles.noWeighIns}>No weigh-ins yet</span>
             )}
           </div>
-          <div className={styles.clientEmail}>{client.email}</div>
+          <div className={styles.clientEmail} title={client.email}>{client.email}</div>
+          <div className={styles.statusBlock}>
           <div className={styles.triageStats}>
             <StatusLabel quietDays={client.quietDays} />
             <AdherenceLabel adherence={client.adherence} />
@@ -831,6 +832,7 @@ function ClientRow({ client, expanded, onToggle, onRemove, onToast, removing = f
               <CheckinChip status={client.checkinThisWeek} sentAt={client.checkinSentAt} />
             </div>
           )}
+          </div>
         </div>
         <div className={styles.rowActions}>
           <Tooltip text={`End coaching with ${client.displayName}`}>

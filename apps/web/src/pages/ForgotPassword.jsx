@@ -91,7 +91,7 @@ export default function ForgotPassword() {
   } else {
     body = (
       <form className={styles.form} onSubmit={handleSubmit} noValidate>
-        <Field label={copy.emailLabel} error={emailMessage}>
+        <Field htmlFor="email" label={copy.emailLabel} error={emailMessage}>
           <Input
             id="email"
             type="email"

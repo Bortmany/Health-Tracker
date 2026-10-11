@@ -148,6 +148,14 @@
 .clientEmail {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+  /* One line; a long address ends in "..." (the full one shows on hover). */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statusBlock {
+  min-width: 0;
 }
 
 /* Status line: quiet/active on the left, adherence on the right. Stays
@@ -317,6 +325,7 @@
 }
 
 .removeButton {
+  min-width: 2.75rem; /* wide enough to tap, not just tall enough */
   background: none;
   border: var(--surface-outline);
   color: var(--color-text-muted);
@@ -553,5 +562,25 @@
 
   .fullRow {
     grid-column: 1 / -1;
+  }
+}
+
+/* Laptop: the check-in chip joins the status line, right-aligned before the
+   end-coaching button, instead of sitting on its own line. */
+@media (min-width: 1024px) {
+  .statusBlock {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .statusBlock .triageStats {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .statusBlock .checkinLine {
+    margin-top: var(--space-1);
+    flex: none;
   }
 }
