@@ -10,6 +10,18 @@ const MAX_ENTRIES = 90;
 
 router.use(requireAuth);
 
+// Devices often send 0 (or blank) for "no reading", and a stray impossible
+// value shouldn't sink a whole 400-day sync. So a weight that is missing, 0,
+// not a number, or outside the sane body-weight range is simply skipped for
+// that day (null = leave the weight alone); the other readings still sync.
+function syncWeight(value) {
+  try {
+    return validate.bodyWeight(value);
+  } catch {
+    return null;
+  }
+}
+
 // Phone apps (Apple Health / Health Connect) push batches of readings here.
 // Device data must never clobber a value the user typed in manually — it
 // only fills in fields that are currently empty for that date.
@@ -35,7 +47,7 @@ router.post('/', asyncHandler(async (req, res) => {
     const date = validate.isoDate(entry?.date);
     return {
       date,
-      weight: validate.bodyWeight(entry?.weight, `Weight (entry for ${date})`),
+      weight: syncWeight(entry?.weight),
       sleep: validate.nonNegativeNumber(entry?.sleep, `sleep (entry for ${date})`, { optional: true, max: 48 }),
       steps: validate.nonNegativeNumber(entry?.steps, `steps (entry for ${date})`, { optional: true, integer: true, max: 1000000 }),
       calories: validate.nonNegativeNumber(entry?.calories, `calories (entry for ${date})`, { optional: true, integer: true, max: 100000 }),

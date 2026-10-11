@@ -249,15 +249,40 @@ const forgotEmailLimiter = rateLimit({
 app.use('/api/auth/forgot-password', forgotVisitorLimiter, forgotEmailLimiter);
 // Invite codes get the same guessing protection as passwords.
 // Everyday use gets the generous session budget; WRONG codes are counted
-// separately per IP (20 wrong guesses in 15 minutes, then a 429), so guessing
-// stays capped without punishing people who simply use the app.
-const redeemFailureThrottle = makeIpFailureThrottle({
-  successStatus: 200,
-  failureStatus: 404,
-  maxFailures: 20,
-  message: 'Too many invite code attempts. Please wait 15 minutes and try again.',
-});
-app.use('/api/coach-link/redeem', sessionLimiter, redeemFailureThrottle);
+// separately per IP. Once an IP has made 20 wrong guesses in 15 minutes it is
+// locked out BEFORE the redeem route runs, so every request (right or wrong)
+// gets the same 429 and the answer never reveals whether a guess was correct.
+// Only wrong codes (404) count; a success does not clear the count, so a
+// guesser can't reset their budget by redeeming a code they own.
+const REDEEM_MAX_WRONG = 20;
+const redeemFailuresByIp = new Map();
+function redeemLockout(req, res, next) {
+  if (rateLimitDisabled()) return next();
+  const key = req.ip;
+  const now = Date.now();
+  const existing = redeemFailuresByIp.get(key);
+  if (existing && existing.resetAt <= now) redeemFailuresByIp.delete(key);
+  const entry = redeemFailuresByIp.get(key);
+  if (entry && entry.count >= REDEEM_MAX_WRONG) {
+    return res.status(429).json({
+      error: { message: 'Too many invite code attempts. Please wait 15 minutes and try again.', code: 'RATE_LIMITED' },
+    });
+  }
+  const originalJson = res.json.bind(res);
+  res.json = (body) => {
+    if (res.statusCode === 404) {
+      const current = redeemFailuresByIp.get(key);
+      const fresh = current && current.resetAt > now
+        ? current
+        : { count: 0, resetAt: now + FAILURE_WINDOW_MS };
+      fresh.count += 1;
+      redeemFailuresByIp.set(key, fresh);
+    }
+    return originalJson(body);
+  };
+  next();
+}
+app.use('/api/coach-link/redeem', sessionLimiter, redeemLockout);
 // So do coach referral codes (the public "who invited me" lookup).
 app.use('/api/coaches/referral', authLimiter);
 // Deleting an account asks for your password first, so it gets the same

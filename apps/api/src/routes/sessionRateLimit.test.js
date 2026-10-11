@@ -34,18 +34,44 @@ test('/auth/me can be called 70 times in a row and never gets a 429', async () =
   }
 });
 
-test('wrong invite codes are still capped, and a wrong-code flood does not affect /me', async () => {
-  let blocked = false;
-  for (let i = 0; i < 25; i += 1) {
-    const res = await fetch(`${baseUrl}/coach-link/redeem`, {
+test('invite codes: valid ones work before the limit; after 20 wrong guesses even a valid code gets 429', async () => {
+  const redeem = (c, code) => fetch(`${baseUrl}/coach-link/redeem`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: c },
+    body: JSON.stringify({ code }),
+  });
+  const mkUser = async (label) => {
+    const r = await fetch(`${baseUrl}/auth/register`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Cookie: cookie },
-      body: JSON.stringify({ code: `nope-${i}` }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: `${label}-${Date.now()}@example.com`, password: 'hunter2pass', displayName: label }),
     });
-    if (res.status === 429) blocked = true;
-    else assert.equal(res.status, 404);
+    const body = await r.json();
+    return { cookie: r.headers.get('set-cookie').split(';')[0], id: body.user.id };
+  };
+  const coach = await mkUser('rl-coach');
+  const student = await mkUser('rl-student');
+  const student2 = await mkUser('rl-student2');
+  await pool.query("UPDATE users SET role = 'coach' WHERE id = $1", [coach.id]);
+  const makeInvite = async () => {
+    const r = await fetch(`${baseUrl}/coach/invites`, { method: 'POST', headers: { Cookie: coach.cookie } });
+    assert.equal(r.status, 201);
+    return (await r.json()).inviteCode;
+  };
+  const valid1 = await makeInvite();
+  const valid2 = await makeInvite();
+
+  // Before the limit: one wrong guess is a clean 404, and a right code works.
+  assert.equal((await redeem(student.cookie, 'nope-first')).status, 404);
+  assert.equal((await redeem(student.cookie, valid1)).status, 200);
+
+  // Use up the rest of the 20 wrong guesses (one already counted).
+  for (let i = 0; i < 19; i += 1) {
+    assert.equal((await redeem(student2.cookie, `nope-${i}`)).status, 404, `wrong guess ${i + 2}`);
   }
-  assert.equal(blocked, true);
+  // Locked out: a valid code gets the same 429 as a wrong one.
+  assert.equal((await redeem(student2.cookie, valid2)).status, 429);
+  assert.equal((await redeem(student2.cookie, 'nope-again')).status, 429);
   const me = await fetch(`${baseUrl}/auth/me`, { headers: { Cookie: cookie } });
   assert.equal(me.status, 200);
 });

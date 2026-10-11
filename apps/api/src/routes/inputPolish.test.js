@@ -60,8 +60,21 @@ test('daily-log weight: 0, 999 and 19.9 are refused; blank and spaces save as no
 
 test('device sync and settings use the same weight range', async () => {
   const me = await register('consumer', 'weight-sync');
-  const sync = await call('/health-sync', me, 'POST', { entries: [{ date: '2026-05-01', weight: 999 }] });
-  assert.equal(sync.status, 400);
+  // A bad weight is skipped for that day (sync still succeeds); a good one is stored.
+  const sync = await call('/health-sync', me, 'POST', {
+    entries: [
+      { date: '2026-05-01', weight: 999 },
+      { date: '2026-05-02', weight: 82.5 },
+    ],
+  });
+  assert.equal(sync.status, 200);
+  const stored = await pool.query(
+    'SELECT date::text AS date, weight FROM daily_logs WHERE user_id = $1 ORDER BY date',
+    [me.id]
+  );
+  const byDate = Object.fromEntries(stored.rows.map((r) => [r.date, r.weight]));
+  assert.equal(byDate['2026-05-01'] ?? null, null);
+  assert.equal(Number(byDate['2026-05-02']), 82.5);
   const settings = await call('/settings', me, 'PUT', { startWeight: 0, targetWeight: 70 });
   assert.equal(settings.status, 400);
 });
