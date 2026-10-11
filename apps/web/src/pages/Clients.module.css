@@ -45,7 +45,7 @@
   padding: var(--space-1) 0;
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  min-height: 2.75rem;
+  min-height: 44px;
 }
 
 .inviteRow:last-child {
@@ -74,7 +74,7 @@
   justify-content: space-between;
   gap: var(--space-2);
   cursor: pointer;
-  min-height: 2.75rem;
+  min-height: 44px;
 }
 
 .clientInfo {
@@ -90,7 +90,7 @@
 .avatarSlot {
   display: flex;
   align-items: center;
-  min-height: 2.75rem;
+  min-height: 44px;
   flex: none;
 }
 
@@ -100,7 +100,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 2.75rem;
+  min-height: 44px;
 }
 
 /* Name, then the unread-messages dot right after it. */
@@ -208,7 +208,7 @@
   align-items: center;
   gap: var(--space-2);
   flex: none;
-  min-height: 2.75rem;
+  min-height: 44px;
 }
 
 .chevron {
@@ -221,7 +221,7 @@
   border: none;
   color: var(--color-danger);
   border-radius: var(--radius-sm);
-  min-height: 2.75rem;
+  min-height: 44px;
   min-width: 2.75rem;
   cursor: pointer;
   font-size: var(--text-sm);
@@ -330,7 +330,7 @@
   border: var(--surface-outline);
   color: var(--color-text-muted);
   border-radius: var(--radius-sm);
-  min-height: 2.75rem;
+  min-height: 44px;
   cursor: pointer;
 }
 
@@ -360,7 +360,7 @@
 }
 
 .emailInviteRow > button {
-  min-height: 2.75rem;
+  min-height: 44px;
 }
 
 .emailInviteField {
@@ -388,7 +388,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  min-height: 2.75rem;
+  min-height: 44px;
 }
 
 /* Three at-a-glance numbers under the page title; hidden with no clients. */
@@ -411,7 +411,7 @@
   font-weight: 600;
   font-size: var(--text-sm);
   padding: var(--space-2) var(--space-4);
-  min-height: 2.75rem;
+  min-height: 44px;
   text-decoration: none;
 }
 

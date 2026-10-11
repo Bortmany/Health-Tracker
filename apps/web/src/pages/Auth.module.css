@@ -58,7 +58,7 @@
   font-size: var(--text-sm);
   font-family: var(--font-body);
   cursor: pointer;
-  min-height: 2.75rem;
+  min-height: 44px;
 }
 
 .roleOptionActive {

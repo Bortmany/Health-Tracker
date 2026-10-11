@@ -1,7 +1,7 @@
 .backLink {
   display: inline-flex;
   align-items: center;
-  min-height: 2.5rem; /* a text link still gets a 40px tap area */
+  min-height: 40px; /* a text link still gets a 40px tap area */
   color: var(--color-text-muted);
   text-decoration: none;
 }
@@ -159,7 +159,7 @@
   font-weight: 600;
   font-size: var(--text-sm);
   padding: var(--space-2) var(--space-4);
-  min-height: 2.75rem;
+  min-height: 44px;
   text-decoration: none;
 }
 

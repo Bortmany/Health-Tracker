@@ -26,7 +26,7 @@
   text-transform: uppercase;
   border-radius: var(--radius-full);
   padding: var(--space-1) var(--space-4);
-  min-height: 2.5rem; /* thumb-friendly pill */
+  min-height: 40px; /* thumb-friendly pill */
   background: var(--color-surface-2);
   border: var(--surface-outline);
   color: var(--color-text-muted);

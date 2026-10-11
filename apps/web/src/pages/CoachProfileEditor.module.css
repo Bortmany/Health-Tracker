@@ -4,7 +4,7 @@
   /* A text link still gets a 40px tap area. */
   display: inline-flex;
   align-items: center;
-  min-height: 2.5rem;
+  min-height: 40px;
 }
 
 .backLink:hover {
@@ -135,7 +135,7 @@
 .previewLink {
   color: var(--color-accent);
   font-size: var(--text-sm);
-  min-height: 2.75rem;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
 }

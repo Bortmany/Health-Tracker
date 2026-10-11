@@ -32,7 +32,7 @@
   color: var(--color-text);
   border-radius: var(--radius-sm);
   width: 2.75rem;
-  height: 2.75rem;
+  height: 44px;
   font-size: var(--text-base);
   cursor: pointer;
 }
@@ -87,7 +87,7 @@
 
 .groupHeader {
   width: 100%;
-  min-height: 2.75rem;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -145,7 +145,7 @@
   border: var(--surface-outline);
   color: var(--color-text-muted);
   border-radius: var(--radius-sm);
-  height: 2.75rem;
+  height: 44px;
   cursor: pointer;
 }
 
@@ -168,7 +168,7 @@
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--color-border);
   font-size: var(--text-base);
-  min-height: 2.75rem;
+  min-height: 44px;
 }
 
 .habitRow:last-child {
@@ -237,7 +237,7 @@
 
 .toggleButton {
   flex: 1;
-  min-height: 2.75rem;
+  min-height: 44px;
   background: var(--color-surface-2);
   border: var(--surface-outline);
   color: var(--color-text-muted);
