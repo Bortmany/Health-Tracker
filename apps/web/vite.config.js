@@ -23,6 +23,8 @@ export default defineConfig({
       workbox: {
         // Never serve the app shell for API calls, and never cache them:
         // health data must always be live.
+        // Cache the pictures too so they show offline.
+        globPatterns: ['**/*.{js,css,html,webp,png}'],
         navigateFallbackDenylist: [/^\/api/],
       },
     }),

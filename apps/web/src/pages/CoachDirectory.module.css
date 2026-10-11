@@ -90,3 +90,19 @@
   gap: var(--space-3);
   align-items: flex-start;
 }
+
+/* Wide banner of coaches; black edges fade into the page. */
+.banner {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: var(--space-3);
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 55%, transparent 85%);
+  mask-image: radial-gradient(ellipse at center, #000 55%, transparent 85%);
+}
+
+:root[data-theme='light'] .banner {
+  /* black-backed picture on a light page: multiply lets the black darken, not box, the page */
+  mix-blend-mode: multiply;
+  opacity: 0.9;
+}

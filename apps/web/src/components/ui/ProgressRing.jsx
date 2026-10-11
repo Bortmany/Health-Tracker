@@ -1,6 +1,6 @@
 import styles from './ProgressRing.module.css';
 
-// Conic-gradient progress ring. The filled arc is the accent color,
+// Conic-gradient progress ring. The filled arc fades from lime to orange,
 // the remainder is the raised surface color; center content defaults
 // to the percentage.
 export default function ProgressRing({ percent = 0, size = 72, children }) {
@@ -12,7 +12,7 @@ export default function ProgressRing({ percent = 0, size = 72, children }) {
       style={{
         width: size,
         height: size,
-        background: `conic-gradient(var(--color-accent) ${clamped}%, var(--color-surface-2) 0)`,
+        background: `conic-gradient(var(--color-accent), var(--color-accent-2) ${clamped}%, var(--color-surface-2) 0)`,
       }}
     >
       <div className={styles.inner} style={{ width: innerSize, height: innerSize }}>

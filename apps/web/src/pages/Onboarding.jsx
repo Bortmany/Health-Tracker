@@ -113,6 +113,15 @@ function RevealStep() {
 
   return (
     <div className={styles.screen}>
+      <img
+        className={styles.headerArt}
+        src="/img/onboarding.webp"
+        alt=""
+        width="800"
+        height="400"
+        loading="lazy"
+        decoding="async"
+      />
       <h1 className={styles.revealTitle}>Here's your plan</h1>
       <p className={styles.subtitle}>Based on what you told us, this is where we'd start.</p>
 
@@ -238,6 +247,15 @@ export default function Onboarding() {
 
   return (
     <div className={styles.screen}>
+      <img
+        className={styles.headerArt}
+        src="/img/onboarding.webp"
+        alt=""
+        width="800"
+        height="400"
+        loading="lazy"
+        decoding="async"
+      />
       <div className={styles.progressTrack} aria-hidden="true">
         <div
           className={styles.progressFill}

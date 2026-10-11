@@ -10,3 +10,19 @@
 .action {
   margin-top: var(--space-3);
 }
+
+/* The picture is black-backed, so its edges fade out into the card. */
+.image {
+  display: block;
+  width: 100%;
+  max-width: 12rem;
+  height: auto;
+  margin: 0 auto var(--space-3);
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 50%, transparent 78%);
+  mask-image: radial-gradient(ellipse at center, #000 50%, transparent 78%);
+}
+
+:root[data-theme='light'] .image {
+  /* a black picture on a light card looks odd, so let it blend darker */
+  mix-blend-mode: multiply;
+}
