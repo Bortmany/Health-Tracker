@@ -4,6 +4,8 @@ import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { logger } from '../lib/logger.js';
 import { deletePhoto } from '../lib/photoStorage.js';
+import { cancelSubscriptionSafely } from '../lib/providerRetries.js';
+import { stopSubscriptionsWhere } from '../lib/stopSubscriptions.js';
 import { withTransaction } from '../lib/withTransaction.js';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -48,6 +50,44 @@ router.delete('/', asyncHandler(async (req, res) => {
     });
   }
 
+  // A coach who is still owed money, or has a payout on its way, can't delete
+  // yet: their payout and earnings records are kept for accounting, but
+  // erasing the account now would leave that money with nobody to pay.
+  const { rows: owed } = await pool.query(
+    `SELECT
+       COALESCE((SELECT SUM(coach_cents) FROM commission_ledger
+                 WHERE coach_id = $1 AND settled_by = 'cut' AND payout_id IS NULL), 0)::int AS owed_cents,
+       (SELECT COUNT(*) FROM payouts WHERE coach_id = $1 AND status = 'pending')::int AS payouts_in_progress`,
+    [req.userId]
+  );
+  if (owed[0].owed_cents > 0 || owed[0].payouts_in_progress > 0) {
+    return res.status(409).json({
+      error: {
+        message: 'You still have earnings waiting to be paid out, or a payout in progress. Please wait until your payout has arrived, then delete your account.',
+        code: 'PAYOUT_PENDING',
+      },
+    });
+  }
+
+  // Stop every subscription at the payment company BEFORE the data goes: the
+  // person's own paid subscriptions (AI plan or coaching), and any student
+  // subscriptions on this person's coaching links. Deleting our records alone
+  // would leave the payment company still charging the card. A cancel that
+  // fails is saved and retried later (it never blocks the deletion).
+  const { rows: ownSubs } = await pool.query(
+    `SELECT id, provider_subscription_id FROM student_subscriptions
+     WHERE user_id = $1 AND status <> 'ended' AND cancel_at_period_end = false`,
+    [req.userId]
+  );
+  for (const sub of ownSubs) {
+    await cancelSubscriptionSafely({
+      providerSubscriptionId: sub.provider_subscription_id,
+      subscriptionId: sub.id,
+      reason: 'account deleted',
+    });
+  }
+  await stopSubscriptionsWhere('cc.coach_id = $1 OR cc.client_id = $1', [req.userId]);
+
   // Progress photo files live outside the database: the transaction hands
   // back every file key it deleted, and the files are removed after it commits.
   const photoKeys = await withTransaction(async (client) => {
@@ -89,7 +129,9 @@ router.delete('/', asyncHandler(async (req, res) => {
     await client.query('DELETE FROM habits WHERE user_id = $1', [req.userId]);
     await client.query('DELETE FROM user_settings WHERE user_id = $1', [req.userId]);
 
-    // Finally the account itself.
+    // Finally the account itself. The coach's payout and earnings records stay
+    // for accounting, detached from the account (their coach_id is cleared by
+    // the database; migration 035).
     await client.query('DELETE FROM users WHERE id = $1', [req.userId]);
     return photoRows.map((row) => row.file_key);
   });

@@ -163,7 +163,7 @@ router.post('/login', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: { message: 'email and password are required', code: 'INVALID_INPUT' } });
   }
 
-  const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [String(email).toLowerCase()]);
+  const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [String(email).trim().toLowerCase()]);
   const user = rows[0];
   // Always run a bcrypt comparison — against a throwaway hash when no account
   // matches — so an unknown email takes the same time as a real one. This keeps

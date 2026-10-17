@@ -158,8 +158,22 @@ const sessionLimiter = rateLimit({
 // gets a 429. Successful registrations (201) clear the streak.
 const FAILURE_WINDOW_MS = 15 * 60 * 1000;
 
+// Drops entries whose 15-minute window is over, so the in-memory maps below
+// can't grow forever. Runs on a timer that never keeps the server alive.
+function sweepExpired(map) {
+  const now = Date.now();
+  for (const [key, entry] of map) {
+    if (entry.resetAt <= now) map.delete(key);
+  }
+}
+function sweepEvery(map) {
+  const timer = setInterval(() => sweepExpired(map), FAILURE_WINDOW_MS);
+  timer.unref();
+}
+
 function makeIpFailureThrottle({ successStatus, failureStatus, maxFailures, message }) {
   const failuresByIp = new Map();
+  sweepEvery(failuresByIp);
 
   return function ipFailureThrottle(req, res, next) {
     if (rateLimitDisabled()) return next();
@@ -256,6 +270,7 @@ app.use('/api/auth/forgot-password', forgotVisitorLimiter, forgotEmailLimiter);
 // guesser can't reset their budget by redeeming a code they own.
 const REDEEM_MAX_WRONG = 20;
 const redeemFailuresByIp = new Map();
+sweepEvery(redeemFailuresByIp);
 function redeemLockout(req, res, next) {
   if (rateLimitDisabled()) return next();
   const key = req.ip;
@@ -350,7 +365,7 @@ const writeLimiter = rateLimit({
 // progress photos and body measurements.
 // Money routes join too (not the webhook: the signature is its protection, and
 // the payment company must never be throttled).
-for (const path of ['/api/billing/checkout', '/api/billing/ai-checkout', '/api/billing/coach-checkout', '/api/billing/subscriptions', '/api/admin', '/api/logs', '/api/training-logs', '/api/programs', '/api/plans', '/api/health-sync', '/api/coach', '/api/coach-link', '/api/checkins', '/api/messages', '/api/photos', '/api/measurements']) {
+for (const path of ['/api/billing/checkout', '/api/billing/ai-checkout', '/api/billing/coach-checkout', '/api/billing/subscriptions', '/api/admin', '/api/logs', '/api/training-logs', '/api/programs', '/api/plans', '/api/health-sync', '/api/coach', '/api/coach-link', '/api/checkins', '/api/messages', '/api/photos', '/api/measurements', '/api/habits', '/api/activities', '/api/injuries', '/api/settings']) {
   app.use(path, writeLimiter);
 }
 

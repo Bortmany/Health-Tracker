@@ -813,3 +813,14 @@ ALTER TABLE payouts ADD CONSTRAINT payouts_attention_check
 -- Their CREATE TABLE statements above (migration 008) are kept because this file replays in order.
 DROP TABLE IF EXISTS nutrition_log_meals;
 DROP TABLE IF EXISTS nutrition_logs;
+
+-- 035: keep money records after a coach deletes their account
+ALTER TABLE payouts ALTER COLUMN coach_id DROP NOT NULL;
+ALTER TABLE payouts DROP CONSTRAINT payouts_coach_id_fkey;
+ALTER TABLE payouts ADD CONSTRAINT payouts_coach_id_fkey
+  FOREIGN KEY (coach_id) REFERENCES users(id) ON DELETE SET NULL;
+
+ALTER TABLE commission_ledger ALTER COLUMN coach_id DROP NOT NULL;
+ALTER TABLE commission_ledger DROP CONSTRAINT commission_ledger_coach_id_fkey;
+ALTER TABLE commission_ledger ADD CONSTRAINT commission_ledger_coach_id_fkey
+  FOREIGN KEY (coach_id) REFERENCES users(id) ON DELETE SET NULL;
