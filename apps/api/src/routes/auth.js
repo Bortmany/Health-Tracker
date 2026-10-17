@@ -4,11 +4,13 @@ import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { isEmailEnabled, sendEmail } from '../lib/email.js';
+import { hasOpenDebtHold } from '../lib/debtHold.js';
 import { signToken, verifyTokenPayload } from '../lib/jwt.js';
 import { logger } from '../lib/logger.js';
 import { getSignupMode, isValidInviteCode } from '../lib/signupMode.js';
 import * as validate from '../lib/validate.js';
 import { withTransaction } from '../lib/withTransaction.js';
+import { getContactEmail } from './legal.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -109,6 +111,17 @@ router.post('/register', asyncHandler(async (req, res) => {
     });
   }
   const cleanDisplayName = validate.stringLength(displayName, 'name', { max: 100, label: 'a name' });
+
+  // A former coach who left owing Cut money can't sign up again until that is
+  // settled. The message says only what the person needs to act on.
+  if (await hasOpenDebtHold(pool, normalizedEmail)) {
+    return res.status(403).json({
+      error: {
+        message: `This email can't be used to sign up yet because an account that used it has an unpaid balance. Please contact support at ${getContactEmail()} to sort it out.`,
+        code: 'ACCOUNT_ON_HOLD',
+      },
+    });
+  }
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
 

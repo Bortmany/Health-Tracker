@@ -123,3 +123,84 @@ test('login ignores spaces around the email address', async () => {
   });
   assert.equal(res.status, 200);
 });
+
+// ---- Coaches who owe Cut money (debt holds) ----
+
+const registerEmail = (email) =>
+  fetch(`${kit.baseUrl}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: 'hunter2pass', displayName: 'Again User' }),
+  });
+
+// A coach whose unpaid balance is net negative: an earlier payout was paid,
+// then a refund came in after it (settled_by 'cut', not yet paid out).
+async function makeOwingCoach(label) {
+  const coach = await kit.makeCoach(label, { ready: true });
+  const student = await kit.register(`${label}-stu`);
+  const { rows: payout } = await pool.query(
+    `INSERT INTO payouts (coach_id, amount_cents, status) VALUES ($1, 2550, 'paid') RETURNING id`,
+    [coach.id]
+  );
+  await pool.query(
+    `INSERT INTO commission_ledger (coach_id, student_id, gross_cents, commission_cents, coach_cents, rate_bps, source_ref, kind, settled_by, payout_id)
+     VALUES ($1, $2, 3000, 450, 2550, 1500, $3, 'payment', 'cut', $4)`,
+    [coach.id, student.id, `payment:${label}_${kit.run}`, payout[0].id]
+  );
+  const { rows: refund } = await pool.query(
+    `INSERT INTO commission_ledger (coach_id, student_id, gross_cents, commission_cents, coach_cents, rate_bps, source_ref, kind, original_ref, settled_by)
+     VALUES ($1, $2, -3000, -450, -2550, 1500, $3, 'refund', $4, 'cut') RETURNING id`,
+    [coach.id, student.id, `refund:${label}_${kit.run}`, `payment:${label}_${kit.run}`]
+  );
+  return { coach, refundId: refund[0].id };
+}
+
+const holdsFor = async (cents, ledgerId) =>
+  (await pool.query('SELECT * FROM coach_debt_holds WHERE $1 = ANY(ledger_ids) AND amount_cents = $2', [ledgerId, cents])).rows;
+
+test('a coach who owes Cut can delete; a hold is recorded with no raw email, and the money rows stay', async () => {
+  const { coach, refundId } = await makeOwingCoach('am-debt');
+  assert.equal((await deleteAccount(coach)).status, 204);
+  assert.equal((await pool.query('SELECT 1 FROM users WHERE id = $1', [coach.id])).rowCount, 0);
+  const holds = await holdsFor(2550, refundId);
+  assert.equal(holds.length, 1);
+  assert.equal(holds[0].settled_at, null);
+  assert.ok(!JSON.stringify(holds[0]).includes(coach.email), 'the email itself is not stored');
+  const ledger = await pool.query('SELECT coach_id FROM commission_ledger WHERE id = $1', [refundId]);
+  assert.equal(ledger.rows[0].coach_id, null, 'ledger row kept, detached');
+});
+
+test('the same email (any case or spaces) cannot register while the hold is open; settling frees it', async () => {
+  const { coach, refundId } = await makeOwingCoach('am-hold');
+  assert.equal((await deleteAccount(coach)).status, 204);
+
+  for (const variant of [coach.email, `  ${coach.email.toUpperCase()} `]) {
+    const res = await registerEmail(variant);
+    assert.equal(res.status, 403);
+    const body = await res.json();
+    assert.equal(body.error.code, 'ACCOUNT_ON_HOLD');
+    assert.match(body.error.message, /unpaid balance/);
+  }
+  // Other emails are unaffected.
+  assert.equal((await registerEmail(`money-other-${kit.run}@example.com`)).status, 201);
+
+  // Only the admin can settle; a normal user just sees "not found".
+  const hold = (await holdsFor(2550, refundId))[0];
+  const plain = await kit.register('am-hold-plain');
+  assert.equal((await kit.call(plain, 'POST', `/admin/debt-holds/${hold.id}/settle`)).status, 404);
+  const admin = await kit.makeAdmin('am-hold-admin');
+  const list = await (await kit.call(admin, 'GET', '/admin/debt-holds')).json();
+  assert.ok(list.holds.some((h) => h.id === hold.id && h.settledAt === null));
+  assert.equal((await kit.call(admin, 'POST', `/admin/debt-holds/${hold.id}/settle`)).status, 200);
+  assert.equal((await kit.call(admin, 'POST', `/admin/debt-holds/${hold.id}/settle`)).status, 404, 'already settled');
+
+  assert.equal((await registerEmail(coach.email)).status, 201);
+});
+
+test('a coach with a zero balance deletes with no hold', async () => {
+  const before = (await pool.query('SELECT COUNT(*)::int AS n FROM coach_debt_holds')).rows[0].n;
+  const coach = await kit.makeCoach('am-clean', { ready: true });
+  assert.equal((await deleteAccount(coach)).status, 204);
+  const after = (await pool.query('SELECT COUNT(*)::int AS n FROM coach_debt_holds')).rows[0].n;
+  assert.equal(after, before);
+});

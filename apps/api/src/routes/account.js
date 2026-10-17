@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { hashEmailForHold } from '../lib/debtHold.js';
 import { logger } from '../lib/logger.js';
 import { deletePhoto } from '../lib/photoStorage.js';
 import { cancelSubscriptionSafely } from '../lib/providerRetries.js';
@@ -38,7 +39,7 @@ router.delete('/', asyncHandler(async (req, res) => {
     });
   }
 
-  const { rows } = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.userId]);
+  const { rows } = await pool.query('SELECT password_hash, email FROM users WHERE id = $1', [req.userId]);
   const user = rows[0];
   if (!user) {
     return res.status(401).json({ error: { message: 'Not authenticated', code: 'NO_TOKEN' } });
@@ -53,13 +54,20 @@ router.delete('/', asyncHandler(async (req, res) => {
   // A coach who is still owed money, or has a payout on its way, can't delete
   // yet: their payout and earnings records are kept for accounting, but
   // erasing the account now would leave that money with nobody to pay.
+  // The balance is the NET of every unpaid row Cut collected: earnings count
+  // up, refunds and chargebacks (negative rows) count down. Above zero Cut
+  // owes the coach (blocked); below zero the coach owes Cut (allowed, but a
+  // debt hold is recorded below so they can't sign up again until settled).
   const { rows: owed } = await pool.query(
     `SELECT
        COALESCE((SELECT SUM(coach_cents) FROM commission_ledger
                  WHERE coach_id = $1 AND settled_by = 'cut' AND payout_id IS NULL), 0)::int AS owed_cents,
+       COALESCE((SELECT ARRAY_AGG(id) FROM commission_ledger
+                 WHERE coach_id = $1 AND settled_by = 'cut' AND payout_id IS NULL), '{}') AS ledger_ids,
        (SELECT COUNT(*) FROM payouts WHERE coach_id = $1 AND status = 'pending')::int AS payouts_in_progress`,
     [req.userId]
   );
+  const debtCents = owed[0].owed_cents < 0 ? -owed[0].owed_cents : 0;
   if (owed[0].owed_cents > 0 || owed[0].payouts_in_progress > 0) {
     return res.status(409).json({
       error: {
@@ -132,6 +140,16 @@ router.delete('/', asyncHandler(async (req, res) => {
     // Finally the account itself. The coach's payout and earnings records stay
     // for accounting, detached from the account (their coach_id is cleared by
     // the database; migration 035).
+    // A coach who owes Cut money leaves a debt hold first (same transaction,
+    // so there is never a deletion without it): only a keyed hash of the email.
+    if (debtCents > 0) {
+      await client.query(
+        `INSERT INTO coach_debt_holds (email_hash, amount_cents, ledger_ids)
+         VALUES ($1, $2, $3::uuid[])
+         ON CONFLICT (email_hash) WHERE settled_at IS NULL DO NOTHING`,
+        [hashEmailForHold(user.email), debtCents, owed[0].ledger_ids]
+      );
+    }
     await client.query('DELETE FROM users WHERE id = $1', [req.userId]);
     return photoRows.map((row) => row.file_key);
   });

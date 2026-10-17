@@ -824,3 +824,16 @@ ALTER TABLE commission_ledger ALTER COLUMN coach_id DROP NOT NULL;
 ALTER TABLE commission_ledger DROP CONSTRAINT commission_ledger_coach_id_fkey;
 ALTER TABLE commission_ledger ADD CONSTRAINT commission_ledger_coach_id_fkey
   FOREIGN KEY (coach_id) REFERENCES users(id) ON DELETE SET NULL;
+
+-- 036: debt holds for coaches who owe Cut money. Same DDL as migration 036.
+CREATE TABLE coach_debt_holds (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email_hash TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+  -- The commission_ledger rows that make up the debt (the rows stay, detached).
+  ledger_ids UUID[] NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  settled_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX coach_debt_holds_open_email_idx ON coach_debt_holds(email_hash) WHERE settled_at IS NULL;
+CREATE INDEX coach_debt_holds_email_idx ON coach_debt_holds(email_hash);
