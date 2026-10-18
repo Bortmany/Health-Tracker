@@ -1,0 +1,52 @@
+.stackCard {
+  margin-bottom: var(--space-4);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  border-bottom: var(--surface-outline);
+  padding: var(--space-3) 0;
+}
+
+.row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.muted {
+  opacity: 0.7;
+}
+
+.amount {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.meta {
+  color: var(--color-text-muted, inherit);
+  font-size: 0.875rem;
+}
+
+.intro {
+  margin: 0 0 var(--space-4);
+}
+
+.link {
+  color: var(--color-accent);
+}
+
+.summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.retry {
+  margin-top: var(--space-3);
+}

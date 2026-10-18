@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Button,
   Card,
@@ -213,6 +214,9 @@ export default function AdminCoaches() {
 
   return (
     <Screen title="Coaches" width={1040}>
+      <p className={styles.rowMeta}>
+        <Link to="/admin/debt-holds" className={styles.link}>Coach debt holds</Link>
+      </p>
       <PayoutsSummary />
       <div className={styles.cols}>
         <div className={styles.colMain}>
