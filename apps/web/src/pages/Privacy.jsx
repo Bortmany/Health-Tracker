@@ -261,7 +261,11 @@ export default function Privacy() {
           <h2>How long we keep data</h2>
           <p>
             For as long as your account exists. Delete your account and it is
-            gone.
+            gone. One exception: if you were a coach and leave owing Cut
+            money, we keep a scrambled one-way code made from your email (not
+            the email itself) and the amount owed, only so that address can't
+            sign up again until the balance is settled. It is removed from use
+            once settled.
           </p>
 
           <h2>Contact</h2>

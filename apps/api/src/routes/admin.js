@@ -115,6 +115,37 @@ router.get('/coaches', asyncHandler(async (_req, res) => {
   });
 }));
 
+// Debt holds: former coaches who left owing Cut money. Only a hash of the
+// email is stored, so the owner matches a hold by its amount, date and
+// ledger rows, not by name. Settling lets that email register again.
+router.get('/debt-holds', asyncHandler(async (_req, res) => {
+  const { rows } = await pool.query(
+    `SELECT id, amount_cents, ledger_ids, created_at, settled_at FROM coach_debt_holds
+     ORDER BY (settled_at IS NULL) DESC, created_at DESC`
+  );
+  res.json({
+    holds: rows.map((r) => ({
+      id: r.id,
+      amountCents: r.amount_cents,
+      ledgerIds: r.ledger_ids,
+      createdAt: r.created_at,
+      settledAt: r.settled_at,
+    })),
+  });
+}));
+
+router.post('/debt-holds/:id/settle', asyncHandler(async (req, res) => {
+  if (!validate.isUuid(req.params.id)) return notFound(res, 'Hold not found');
+  const { rows } = await pool.query(
+    `UPDATE coach_debt_holds SET settled_at = now() WHERE id = $1 AND settled_at IS NULL
+     RETURNING id, amount_cents, ledger_ids, created_at, settled_at`,
+    [req.params.id]
+  );
+  if (!rows[0]) return notFound(res, 'Hold not found');
+  const r = rows[0];
+  res.json({ hold: { id: r.id, amountCents: r.amount_cents, ledgerIds: r.ledger_ids, createdAt: r.created_at, settledAt: r.settled_at } });
+}));
+
 // Revoke: the coach becomes a regular account and every link to their clients
 // is marked 'revoked'. Nothing else is touched — clients keep every log,
 // program and record in their own accounts.
