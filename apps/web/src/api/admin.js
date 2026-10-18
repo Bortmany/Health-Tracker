@@ -45,3 +45,15 @@ export function resolvePayout(id, outcome, note) {
 export function getPayouts({ limit = 20, offset = 0 } = {}) {
   return request(`/admin/payouts?limit=${limit}&offset=${offset}`);
 }
+
+// ---- Debt holds (owner only) ----
+
+// -> { holds: [{ id, amountCents, ledgerIds, createdAt, settledAt }] }, open first.
+export function getDebtHolds() {
+  return request('/admin/debt-holds');
+}
+
+// Lets that email register again. Moves no money. -> { hold }
+export function settleDebtHold(id) {
+  return request(`/admin/debt-holds/${id}/settle`, { method: 'POST' });
+}

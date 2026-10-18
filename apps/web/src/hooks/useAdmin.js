@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as adminApi from '../api/admin.js';
 import { normalizeAdminEarnings } from '../lib/billingLogic.js';
+import { normalizeDebtHolds } from '../lib/debtHolds.js';
 
 const APPLICATIONS_KEY = (status) => ['admin', 'coachApplications', status];
 const COACHES_KEY = ['admin', 'coaches'];
@@ -108,5 +109,23 @@ export function useRevokeCoach() {
   return useMutation({
     mutationFn: adminApi.revokeCoach,
     onSuccess: refresh,
+  });
+}
+
+const DEBT_HOLDS_KEY = ['admin', 'debtHolds'];
+
+export function useDebtHolds({ enabled = true } = {}) {
+  return useQuery({
+    queryKey: DEBT_HOLDS_KEY,
+    queryFn: async () => normalizeDebtHolds(await adminApi.getDebtHolds()),
+    enabled,
+  });
+}
+
+export function useSettleDebtHold() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: adminApi.settleDebtHold,
+    onSettled: () => queryClient.invalidateQueries({ queryKey: DEBT_HOLDS_KEY }),
   });
 }

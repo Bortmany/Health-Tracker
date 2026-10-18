@@ -8,6 +8,7 @@ import layoutStyles from './components/AppLayout.module.css';
 import { useMe } from './hooks/useAuth.js';
 import { useHealthSync } from './hooks/useHealthSync.js';
 import AdminCoaches from './pages/AdminCoaches.jsx';
+import AdminDebtHolds from './pages/AdminDebtHolds.jsx';
 import CheckIn from './pages/CheckIn.jsx';
 import CheckinQuestions from './pages/CheckinQuestions.jsx';
 import ClientMessages from './pages/ClientMessages.jsx';
@@ -97,6 +98,7 @@ export default function App() {
             </Route>
             <Route element={<AdminRoute />}>
               <Route path="/admin/coaches" element={<AdminCoaches />} />
+              <Route path="/admin/debt-holds" element={<AdminDebtHolds />} />
             </Route>
           </Route>
         </Route>
