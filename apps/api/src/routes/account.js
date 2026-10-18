@@ -64,7 +64,8 @@ router.delete('/', asyncHandler(async (req, res) => {
                  WHERE coach_id = $1 AND settled_by = 'cut' AND payout_id IS NULL), 0)::int AS owed_cents,
        COALESCE((SELECT ARRAY_AGG(id) FROM commission_ledger
                  WHERE coach_id = $1 AND settled_by = 'cut' AND payout_id IS NULL), '{}') AS ledger_ids,
-       (SELECT COUNT(*) FROM payouts WHERE coach_id = $1 AND status = 'pending')::int AS payouts_in_progress`,
+       (SELECT COUNT(*) FROM payouts WHERE coach_id = $1
+          AND (status IN ('pending', 'manual_review') OR (attention IS NOT NULL AND status <> 'paid')))::int AS payouts_in_progress`,
     [req.userId]
   );
   const debtCents = owed[0].owed_cents < 0 ? -owed[0].owed_cents : 0;

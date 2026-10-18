@@ -78,6 +78,31 @@ test('a coach who is still owed money cannot delete yet, and nothing is removed'
   assert.equal((await pool.query('SELECT 1 FROM users WHERE id = $1', [coach.id])).rowCount, 1);
 });
 
+for (const [label, status, attention] of [
+  ['pending', 'pending', null],
+  ['waiting for a manual check', 'manual_review', null],
+  ['flagged as processing too long', 'failed', 'processing_too_long'],
+  ['pending and flagged', 'pending', 'lookup_failed'],
+]) {
+  test(`a coach with a payout ${label} cannot delete yet`, async () => {
+    const coach = await kit.makeCoach(`am-po-${status}-${attention || 'none'}`, { ready: true });
+    await pool.query(
+      `INSERT INTO payouts (coach_id, amount_cents, status, attention) VALUES ($1, 1000, $2, $3)`,
+      [coach.id, status, attention]
+    );
+    const res = await deleteAccount(coach);
+    assert.equal(res.status, 409);
+    assert.equal((await res.json()).error.code, 'PAYOUT_PENDING');
+    assert.equal((await pool.query('SELECT 1 FROM users WHERE id = $1', [coach.id])).rowCount, 1);
+  });
+}
+
+test('a coach whose only payouts are settled (paid) can delete', async () => {
+  const coach = await kit.makeCoach('am-po-settled', { ready: true });
+  await pool.query(`INSERT INTO payouts (coach_id, amount_cents, status) VALUES ($1, 1000, 'paid')`, [coach.id]);
+  assert.equal((await deleteAccount(coach)).status, 204);
+});
+
 test('deleting a paying student cancels their subscription at the payment company first', async () => {
   fake = createFakeBillingClient();
   setBillingClient(fake);
