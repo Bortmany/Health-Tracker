@@ -12,8 +12,9 @@ import { fileURLToPath } from 'node:url';
 const outDir = join(dirname(fileURLToPath(import.meta.url)), '../public');
 mkdirSync(outDir, { recursive: true });
 
-const BG = [10, 10, 10];
+const BG = [11, 11, 13];
 const ACCENT = [200, 241, 53];
+const ACCENT2 = [255, 106, 26]; // hot orange: the glyph fades from lime to orange
 
 function crc32(buf) {
   let c;
@@ -101,9 +102,14 @@ function drawIcon(size, opaque) {
       const dotA = smooth(dotR, Math.hypot(x - pts[3][0], y - pts[3][1]) - dotR);
       const a = Math.max(lineA, dotA);
       if (a > 0) {
-        r = Math.round(r + (ACCENT[0] - r) * a);
-        g = Math.round(g + (ACCENT[1] - g) * a);
-        b = Math.round(b + (ACCENT[2] - b) * a);
+        // blend lime (top-left) into orange (bottom-right) along the diagonal
+        const t = Math.max(0, Math.min(1, (x + y) / (2 * (size - 1))));
+        const cr = ACCENT[0] + (ACCENT2[0] - ACCENT[0]) * t;
+        const cg = ACCENT[1] + (ACCENT2[1] - ACCENT[1]) * t;
+        const cb = ACCENT[2] + (ACCENT2[2] - ACCENT[2]) * t;
+        r = Math.round(r + (cr - r) * a);
+        g = Math.round(g + (cg - g) * a);
+        b = Math.round(b + (cb - b) * a);
       }
 
       const idx = (y * size + x) * 4;

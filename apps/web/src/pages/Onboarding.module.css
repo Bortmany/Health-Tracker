@@ -195,3 +195,20 @@
 .textLink:hover {
   color: var(--color-text);
 }
+
+/* Small header picture; black edges fade into the page. */
+.headerArt {
+  display: block;
+  width: 100%;
+  max-width: 14rem;
+  height: auto;
+  margin: 0 auto var(--space-3);
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 50%, transparent 80%);
+  mask-image: radial-gradient(ellipse at center, #000 50%, transparent 80%);
+}
+
+:root[data-theme='light'] .headerArt {
+  /* black-backed picture on a light page: multiply lets the black darken, not box, the page */
+  mix-blend-mode: multiply;
+  opacity: 0.9;
+}

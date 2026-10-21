@@ -22,6 +22,13 @@
   --color-on-accent: #0b0b0d;      /* text/icons on top of accent */
   --color-link: #c8f135;           /* text links: readable on the dark theme */
 
+  /* ---- Color: second accent (hot orange) — highlights, gradients, glows ---- */
+  --color-accent-2: #ff6a1a;
+  --color-accent-2-strong: #ff8a4a;
+  --color-on-accent-2: #0b0b0d;    /* text/icons on top of orange */
+  --gradient-brand: linear-gradient(135deg, var(--color-accent), var(--color-accent-2));
+  --gradient-brand-soft: linear-gradient(135deg, rgba(200, 241, 53, 0.18), rgba(255, 106, 26, 0.18));
+
   /* ---- Color: feedback (used sparingly — never to shame a missed target) ---- */
   --color-success: #6ee787;
   --color-warning: #f0b429;
@@ -38,7 +45,7 @@
   --color-heat-1: #3f4a1f;
   --color-heat-2: #7d9422;
   --color-heat-3: #c8f135;
-  --color-heat-4: #f0b429;
+  --color-heat-4: #ff6a1a;
 
   /* ---- Typography ---- */
   --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
@@ -74,6 +81,7 @@
   /* ---- Elevation (dark theme leans on borders; shadows add depth on overlays) ---- */
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-2: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 40px rgba(255, 106, 26, 0.25);
   --surface-outline: 1px solid var(--color-border);
 
   /* ---- Layout ---- */
@@ -97,6 +105,11 @@
   --color-accent-strong: #8db310;
   --color-on-accent: #14150f;
   --color-link: #4f6a00;           /* darker lime so links read on the light theme */
+  --color-accent-2: #cb4a05;       /* darker orange so white text on it passes 4.5:1 */
+  --color-accent-2-strong: #b04004;
+  --color-on-accent-2: #ffffff;
+  --gradient-brand: linear-gradient(135deg, var(--color-accent), var(--color-accent-2));
+  --gradient-brand-soft: linear-gradient(135deg, rgba(159, 199, 22, 0.18), rgba(203, 74, 5, 0.18));
   --color-chart-line: #86a812;
   --color-chart-line-2: #5e7710;
   --color-chart-raw: #c9c9c2;
@@ -105,7 +118,8 @@
   --color-heat-1: #dfe9b4;
   --color-heat-2: #b7d24e;
   --color-heat-3: #86a812;
-  --color-heat-4: #e09b00;
+  --color-heat-4: #e5560a;
   --shadow-1: 0 1px 2px rgba(25, 26, 22, 0.08);
   --shadow-2: 0 10px 30px rgba(25, 26, 22, 0.12);
+  --shadow-glow: 0 0 30px rgba(203, 74, 5, 0.18);
 }

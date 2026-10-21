@@ -23,27 +23,33 @@ const HABITS = [
 const FEATURES = [
   {
     title: 'Muscle heat map',
+    img: '/img/features/heatmap.webp',
     tag: 'New',
     body: "A front-and-back body map that lights up where you've trained recently, so you can spot the muscle group you've been skipping.",
   },
   {
     title: 'Daily logs',
+    img: '/img/features/daily-logs.webp',
     body: 'Weight, sleep, steps, habits and how you felt — one place, one minute a day.',
   },
   {
     title: 'Training programs & rest timer',
+    img: '/img/features/programs.webp',
     body: 'Follow a real program with a built-in timer between sets, not a blank notebook.',
   },
   {
     title: 'Charts & personal records',
+    img: '/img/features/charts.webp',
     body: 'See your trend lines and every PR you have hit, tracked automatically.',
   },
   {
     title: 'Coach mode',
+    img: '/img/features/coach.webp',
     body: 'Coaches can assign and edit programs directly inside a client’s account.',
   },
   {
     title: 'Check-ins & messages',
+    img: '/img/features/checkins.webp',
     body: 'Send your coach a quick weekly check-in and keep the conversation in one place, inside the app.',
   },
 ];
@@ -212,7 +218,9 @@ export default function Landing() {
 
       <Section className={styles.hero}>
         <div className={styles.heroCopy}>
-          <h1 className={styles.heroHeadline}>Know what to train. Every day.</h1>
+          <h1 className={styles.heroHeadline}>
+            Know what to train. <span className={styles.heroAccent}>Every day.</span>
+          </h1>
           <p className={styles.heroSub}>
             Cut matches you to a real workout plan, then tracks your weight, sleep, training and streaks in
             one place — so you stop guessing and start showing up.
@@ -230,6 +238,18 @@ export default function Landing() {
           {joinCta.note && <p className={styles.ctaNote}>{joinCta.note} Ask whoever invited you for the code.</p>}
           {joinCta.closed && <p className={styles.ctaNote}>Sign-up is closed for now. Check back soon.</p>}
         </div>
+        <div className={styles.heroArt}>
+          <div className={styles.heroGlow} aria-hidden="true" />
+          <img
+            className={styles.heroImg}
+            src="/img/hero.webp"
+            alt="A faceless 3D training figure mid-squat under a loaded barbell"
+            width="1600"
+            height="1200"
+            fetchpriority="high"
+            decoding="async"
+          />
+        </div>
         <PhoneDemo />
       </Section>
 
@@ -238,6 +258,15 @@ export default function Landing() {
         <div className={styles.featureGrid}>
           {FEATURES.map((f) => (
             <div key={f.title} className={`${styles.featureCard} ${f.tag ? styles.featureCardNew : ''}`}>
+              <img
+                className={styles.featureImg}
+                src={f.img}
+                alt=""
+                width="600"
+                height="400"
+                loading="lazy"
+                decoding="async"
+              />
               {f.tag && <span className={styles.featureTag}>{f.tag}</span>}
               <h3 className={styles.featureTitle}>{f.title}</h3>
               <p className={styles.featureBody}>{f.body}</p>
